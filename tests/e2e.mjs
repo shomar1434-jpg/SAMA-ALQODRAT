@@ -86,7 +86,7 @@ ok(qrUrl.startsWith(U + '#p'), 'رابط الباركود يشير إلى الص
 // آلية الاحتساب والشركاء
 await go('admin-rules', 900); await p.selectOption('#rl-lw', '0.5'); await p.click('#rlS'); await p.waitForTimeout(600);
 ok(await S(() => window.__SAMA__.LocalStore.data.settings.late_weight) === 0.5, 'حفظ آلية الاحتساب');
-await go('admin-partners', 900); ok(await p.$('#ptAdd'), 'صفحة النبذة والشركاء');
+await go('admin-partners', 300); ok(await p.waitForSelector('#ptAdd', {timeout:5000}).catch(() => null), 'صفحة النبذة والشركاء');
 
 // الشهادة والتحقق والتحضير بعد الأرشفة (من الصفحة العامة)
 if (arch.cert) { await go('v-' + arch.cert, 1200); ok(p.url().startsWith(U + '#v-') && /سارية|صالحة|شهادة/.test(await text('#app')), 'التحقق من شهادة صادرة'); }

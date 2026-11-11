@@ -894,3 +894,42 @@ body.portal .topbar .in{gap:10px}
 #drBody > .card,#drBody > .grid{margin-top:12px}#drBody > .card:first-child{margin-top:0}
 @media(max-width:900px){#drGrid{grid-template-columns:1fr!important}}
 .pdoc .psec{font-size:12pt;margin:10px 0 4px;color:#1A746B}
+
+/* =====================================================================
+   الجانب التعليمي: الواجبات، وقياس المستوى، والمراسلة، والتقييم
+   ===================================================================== */
+.ptabs{margin:16px 0}
+.hw-counts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.hw-list{display:grid;gap:12px}
+.hw{padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface-card)}
+details.hw{margin-top:10px}details.hw summary{cursor:pointer}
+.hw-h{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.hw p{margin:8px 0;line-height:1.9}
+.hw-fb{margin:8px 0;padding:10px 12px;border-radius:12px;background:var(--success-tint);color:var(--success-ink)}
+.hw-fb p{margin:4px 0 0}
+.hw-ans{padding:10px 12px;border-radius:12px;background:var(--surface-sunken);line-height:1.9;white-space:pre-wrap}
+.q{border:1px solid var(--border);border-radius:14px;padding:10px 14px;margin:0 0 10px}
+.q legend{padding:0 6px;line-height:1.8}
+.opt{display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:15px}
+.opt input{width:18px;height:18px;accent-color:var(--brand)}
+.qres{padding-inline-start:20px;display:grid;gap:8px}.qres li{padding:8px 10px;border-radius:12px}.qres li.ok{background:var(--success-tint)}.qres li.bad{background:var(--danger-tint)}.qres p{margin:2px 0}
+.skills{display:grid;gap:6px;margin:8px 0 12px}.skills > div{display:grid;grid-template-columns:120px 1fr 50px;gap:8px;align-items:center}
+.msg-wrap{display:grid;grid-template-columns:240px 1fr;gap:12px;min-height:360px}
+@media(max-width:760px){.msg-wrap{grid-template-columns:1fr}}
+.msg-list{display:grid;gap:6px;align-content:start;max-height:460px;overflow:auto}
+.msg-th{font:inherit;text-align:start;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--surface-card);color:var(--ink);cursor:pointer;display:flex;gap:6px;align-items:center}
+.msg-th.on{border-color:var(--brand);background:var(--brand-tint)}
+.msg-pane{display:grid;grid-template-rows:1fr auto;gap:8px}
+.msgs{display:flex;flex-direction:column;gap:8px;max-height:380px;overflow:auto;padding:4px}
+.msg{max-width:78%;padding:8px 12px;border-radius:14px;background:var(--surface-sunken);align-self:flex-start}
+.msg.me{align-self:flex-end;background:var(--brand-tint)}
+.msg p{margin:0;line-height:1.8;white-space:pre-wrap}.msg span{font-size:11.5px;color:var(--ink-subtle)}
+.msg-f{display:flex;gap:8px;align-items:flex-end}.msg-f textarea{flex:1;padding:10px 14px}
+.stars{display:inline-flex;flex-direction:row-reverse;gap:2px;border:0;padding:0;margin:0}
+.stars input{position:absolute;opacity:0;width:1px;height:1px}
+.stars label{font-size:34px;line-height:1;color:var(--border-control,#c9d3d2);cursor:pointer;transition:color 150ms}
+.stars input:checked ~ label,.stars label:hover,.stars label:hover ~ label{color:#E2A21B}
+.stars input:focus-visible + label{outline:3px solid var(--focus-ring);outline-offset:2px;border-radius:6px}
+.rate-it{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;font-size:14px}
+.rate-sum{display:grid;gap:8px}.rate-sum > div{display:grid;grid-template-columns:140px 1fr 40px;gap:8px;align-items:center}
+.rate-sum > div:first-child{grid-template-columns:auto 1fr}.rate-sum > div:first-child b{font-size:34px}

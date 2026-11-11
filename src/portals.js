@@ -10,6 +10,13 @@ import { LOGO } from './assets/logo.js';
 import { studentDashboard, teacherDashboard, guardianDashboard, ROLE_TXT, NOTIFY_TPL, normPhone } from './portal_logic.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy, toLatin, liveSay } from './features.js';
+import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
+import { assignmentsFor } from './learning_logic.js';
+
+const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المعلم']];
+const T_TABS = [['today','calendar','كشف اليوم'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
+let sTab = 'dash', tTab = 'today';
+const tabBar = (tabs, cur, attr, badges = {}) => `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
 const TITLES = { student:'بوابة الطالب', teacher:'بوابة المعلم', guardian:'بوابة ولي الأمر' };
 const KIND_TXT = { absence:'غياب', late:'تأخر', reminder:'تذكير بالحضور', homework:'واجب', general:'رسالة' };
@@ -107,7 +114,12 @@ function viewStudent(D){
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('user')}${TITLES.student}</span><h1>أهلًا ${esc(pr.trainee.first_name)}</h1>
       ${it ? `<p>${esc(it.plan)} · قسم ${esc(it.section)}${it.subjects.length ? ' · ' + esc(it.subjects.join('، ')) : ''}</p>` : ''}</div>
       ${it?.upcoming[0] ? `<div class="next-ses"><span>جلستي القادمة</span><b>${DAYS[new Date(it.upcoming[0].date + 'T12:00:00Z').getUTCDay()]} ${fmtShort(it.upcoming[0].date)}</b><span class="num">${t12(it.upcoming[0].start)}</span></div>` : ''}</section>
-    ${it ? subTabs(pr.items, sIdx) + studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) : emptyBox('لا توجد اشتراكات')}</div>`;
+    ${tabBar(S_TABS, sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length })}
+    <div id="sBody"></div></div>`;
+  const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
+  if(sTab === 'dash') $('#sBody').innerHTML = it ? subTabs(pr.items, sIdx) + studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) : emptyBox('لا توجد اشتراكات');
+  else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
+  $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
   $$('[data-pi]').forEach(b => b.onclick = () => { pIdx = +b.dataset.pi; sIdx = 0; viewStudent(D); });
   if(pr.notifications.some(x => !x.read_at)) Store.markRead('student');
@@ -131,12 +143,18 @@ function viewGuardian(D, s){
 
 /* ---------- المعلم ---------- */
 function viewTeacher(D, quiet){
+  if(tTab !== 'today'){ if(quiet) return; const t = teacherDashboard(D, D.me), reload = async () => viewTeacher(await Store.portalData('teacher'));
+    $('#app').innerHTML = `<div class="wrap"><section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1><p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))}</p></div></section>
+      ${tabBar(T_TABS, tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}<div id="tBody"></div></div>`;
+    const v = ({ hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings })[tTab](D, reload); $('#tBody').innerHTML = v.html; v.bind();
+    $$('[data-tt]').forEach(b => b.onclick = () => { tTab = b.dataset.tt; viewTeacher(D); }); return; }
   const t = teacherDashboard(D, D.me), n = riyadhNow();
   const PH = { none:'لا توجد جلسة اليوم', before:'الجلسة لم تبدأ', live:'الجلسة جارية', after:'انتهت جلسة اليوم' };
   $('#app').innerHTML = `<div class="wrap">
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1>
       <p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))} · ${fmtNum(t.rows.length)} طالب</p></div>
       <div class="next-ses"><span>${PH[t.phase]}</span><b>${t.session ? `${t12(t.session.start)} – ${t12(t.session.end)}` : fmtShort(n.date)}</b><span class="hint" style="color:inherit">آخر تحديث ${t12(n.hm)}</span></div></section>
+    ${tabBar(T_TABS, tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}
     ${t.reminder ? `<div class="alert t-warning rv" role="alert" style="margin-top:14px"><span class="aic">${ic('timer')}</span><div style="flex:1"><b style="font-weight:600">باقي أقل من ${fmtNum(t.remind)} دقيقة على نهاية الجلسة، و${fmtNum(t.missing.length)} طالب لم يُسجَّل حضوره</b>
       <p style="margin:4px 0 8px">${t.missing.map(m => esc(m.name.split(' ').slice(0, 2).join(' '))).join('، ')}</p>
       <button class="btn sm pri" id="tRemind">${ic('alert')} إرسال تذكير لهم</button> <span class="hint">التذكير يطلب المسح إن كانوا حاضرين، أو إبلاغك بالعذر.</span></div></div>` : ''}
@@ -153,6 +171,7 @@ function viewTeacher(D, quiet){
     ${t.sent.length ? `<div class="card pad rv" style="margin-top:16px"><h3 class="ctitle">${ic('alert')}ما أرسلته اليوم</h3><ul class="ntf">${t.sent.slice().reverse().map(x => `<li><span class="pill info">${KIND_TXT[x.kind]} · ${x.to === 'guardian' ? 'ولي الأمر' : 'الطالب'}</span><p>${esc(D.trainees.find(y => y.id === x.trainee_id)?.full_name || '')}: ${esc(x.text)}</p><span class="hint">${t12(new Date(x.at).toLocaleTimeString('en-GB', { timeZone:'Asia/Riyadh', hour12:false }).slice(0, 5))}</span></li>`).join('')}</ul></div>` : ''}
   </div>`;
   if(!quiet) liveSay(PH[t.phase]);
+  $$('[data-tt]').forEach(b => b.onclick = () => { tTab = b.dataset.tt; viewTeacher(D); });
   if($('#tRemind')) $('#tRemind').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ الإرسال'); let ok = 0;
     for(const m of t.missing){ try { const r = await Store.teacherNotify({ trainee_id:m.trainee_id, to:'student', kind:'reminder' }); if(!r.duplicate) ok++; } catch(_){} }
     toast(ok ? `أُرسل التذكير إلى ${fmtNum(ok)} طالب` : 'أُرسل التذكير سابقًا اليوم'); viewTeacher(await Store.portalData('teacher')); };
