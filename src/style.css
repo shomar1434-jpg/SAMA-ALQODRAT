@@ -884,3 +884,13 @@ body.portal .topbar .in{gap:10px}
 .portal-card{display:grid;gap:8px;text-decoration:none;color:var(--ink);transition:transform 300ms var(--ease),box-shadow 300ms var(--ease)}
 .portal-card:hover,.portal-card:focus-visible{transform:translateY(-4px);box-shadow:var(--shadow-lift)}
 .portal-card b{font-size:18px}
+/* تقرير اليوم */
+.dr-list{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-height:520px;overflow:auto}
+.dr-list li{display:grid;gap:6px;padding-bottom:8px;border-bottom:1px dashed var(--border)}
+.dr-list li > div{display:flex;gap:6px;flex-wrap:wrap}
+.dr-list .chip{font-size:12.5px;padding:4px 10px}
+.dr-group{margin-top:12px}.dr-group summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dr-group summary::before{content:"▸";transition:transform 200ms}.dr-group[open] summary::before{transform:rotate(90deg)}
+#drBody > .card,#drBody > .grid{margin-top:12px}#drBody > .card:first-child{margin-top:0}
+@media(max-width:900px){#drGrid{grid-template-columns:1fr!important}}
+.pdoc .psec{font-size:12pt;margin:10px 0 4px;color:#1A746B}

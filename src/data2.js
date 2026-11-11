@@ -3,6 +3,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
+import { makeReport, isPastReportTime } from './report_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -223,7 +224,7 @@ export const LocalStore = {
     if(!this.data.partners) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
-    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[];
+    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[];
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
@@ -268,7 +269,11 @@ export const LocalStore = {
   async isAdmin(){ return this.admin; },
   async login(user, pass){ if(pass===this.data.settings.admin_pin){ this.admin=true; try{sessionStorage.setItem(this.key+'_adm','1');}catch(e){} return true; } throw new Error('رمز الدخول غير صحيح'); },
   async logout(){ this.admin=false; try{sessionStorage.removeItem(this.key+'_adm');}catch(e){} },
-  async adminData(){ this.autoArchive(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
+  async adminData(){ this.autoArchive(); this.autoReport(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
+  /* تقرير اليوم: محليًا يُولَّد عند أول فتح للإدارة بعد 20:30 (لا خادم مجدول في الوضع التجريبي). سحابيًا: pg_cron */
+  autoReport(){ const n=riyadhNow(), D=this.data; D.daily_reports=D.daily_reports||[]; if(isPastReportTime(n) && !D.daily_reports.some(r=>r.date===n.date)){ const r=makeReport(D, n.date, 'snapshot', '', n); if(!r.existing){ r.report.auto=true; D.daily_reports.push(r.report); } } },
+  async generateReport(date, kind='snapshot', note=''){ const D=this.data; D.daily_reports=D.daily_reports||[]; const r=makeReport(D, date, kind, note); if(!r.existing){ D.daily_reports.push(r.report); this.audit('daily_report.'+r.report.kind, date); this.save(); } return r; },
+  async setReportNote(id, note){ const r=(this.data.daily_reports||[]).find(x=>x.id===id); if(r){ r.note=String(note||'').slice(0,1000); this.audit('daily_report.note', id); this.save(); } },
   async saveProgram(p){ const a=this.data.programs, i=a.findIndex(x=>x.id===p.id); if(i>=0) a[i]={...a[i],...p}; else { const n={...p,id:uid(),created_at:new Date().toISOString()}; n.code=p.code||progCode(n); a.push(n); } this.save(); },
   async deleteProgram(id){ const D=this.data; if(D.enrollments.some(e=>e.program_id===id)) throw new Error('لا يمكن حذف برنامج له متدربون مسجّلون. أوقفه (غير نشط) بدل حذفه.'); const cids=D.cohorts.filter(c=>c.program_id===id).map(c=>c.id);
     D.programs=D.programs.filter(x=>x.id!==id); D.cohorts=D.cohorts.filter(c=>c.program_id!==id); D.enrollments=D.enrollments.filter(e=>!cids.includes(e.cohort_id)); D.attendance=D.attendance.filter(a=>!cids.includes(a.cohort_id));
@@ -395,17 +400,17 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
       q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
       q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
       q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500)),
-      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000))]);
+      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false}))]);
     const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[]};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr)};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -454,7 +459,10 @@ export const CloudStore = {
   async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
   async saveGuardianLink(l){ const t=this._e(await this.sb.from('trainees').select('id').eq('national_id',l.national_id).maybeSingle()); if(!t) throw new Error('لا يوجد طالب بهذا السجل المدني');
     const {data:{session}}=await this.sb.auth.getSession(); this._e(await this.sb.from('guardian_links').insert({guardian_name:l.guardian_name, guardian_phone:normPhone(l.guardian_phone), trainee_id:t.id, relation:l.relation, verified_by:session?.user?.id||null})); },
-  async revokeGuardianLink(id){ this._e(await this.sb.from('guardian_links').update({status:'revoked', revoked_at:new Date().toISOString()}).eq('id',id)); }
+  async revokeGuardianLink(id){ this._e(await this.sb.from('guardian_links').update({status:'revoked', revoked_at:new Date().toISOString()}).eq('id',id)); },
+  /* تقرير اليوم: يولّده الخادم عند 20:30 (pg_cron)، ويمكن للمسؤول التوليد أو إصدار مراجعة */
+  async generateReport(date, kind='snapshot', note=''){ return this._e(await this.sb.rpc('generate_daily_report',{p_date:date, p_kind:kind, p_note:note})); },
+  async setReportNote(id, note){ this._e(await this.sb.rpc('set_report_note',{p_id:id, p_note:note})); }
 };
 
 /* ---------------- بيانات تجريبية: البرامج حقيقية من دليل المركز، والدفعات والمتدربون والحضور تجريبيون ---------------- */
