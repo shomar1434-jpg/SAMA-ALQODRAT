@@ -1,14 +1,25 @@
+import { LOGO } from './assets/logo.js';
+import { CENTER } from './catalog.js';
+import { CALC_DEFAULTS, LEVEL_TONE, LEVEL_TXT, Store, attendanceLevel, calcSet, cohortArchived, cohortState, enrollmentStats, enrollsOf, levelMessage, sessionDays, traineeAttendanceLogic } from './data2.js';
+import { siteFooter } from './landing.js';
+import { LOGOS } from './logos.js';
+import { exportCSV, fmtGreg, printDocs } from './print.js';
+import { $, $$, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, validSaudiId } from './utils.js';
+import { AD, progName, progOf, reloadAD } from './views2_admin.js';
+import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, toast } from './views2_head.js';
+import { baseUrl, cohortLabel, copyText, kpiCard, makeQR, short, titleBar } from './views2_main.js';
+
 /* =====================================================================
    حالة الانتظار في الأزرار + إعلان قارئ الشاشة
    ===================================================================== */
-function liveSay(t){ const l=$('#live'); if(!l) return; l.textContent=''; setTimeout(()=>{ l.textContent=t; },40); }
-function setBusy(b, on, txt){
+export function liveSay(t){ const l=$('#live'); if(!l) return; l.textContent=''; setTimeout(()=>{ l.textContent=t; },40); }
+export function setBusy(b, on, txt){
   if(!b) return;
   if(on){ if(b.getAttribute('aria-busy')==='true') return; b._html=b.innerHTML; b.disabled=true; b.setAttribute('aria-busy','true'); b.innerHTML=`<span class="spin" aria-hidden="true"></span><span>${txt||'جارٍ التنفيذ'}</span>`; liveSay(txt||'جارٍ التنفيذ'); }
   else { b.disabled=false; b.removeAttribute('aria-busy'); if(b._html!=null){ b.innerHTML=b._html; b._html=null; } }
 }
 /* ملخص أخطاء النموذج: أعلى النموذج، يستقبل التركيز، وكل بند يقود إلى حقله */
-function showErrorSummary(box, errs){
+export function showErrorSummary(box, errs){
   if(!errs.length){ box.hidden=true; box.innerHTML=''; return; }
   box.innerHTML = `<h3 id="${box.id}-h">${errs.length===1?'يوجد خطأ واحد يحتاج تصحيحًا':`يوجد ${fmtNum(errs.length)} أخطاء تحتاج تصحيحًا`}</h3><ul>${errs.map(e=>`<li><a href="#" data-fid="${e.id}">${esc(e.label)}: ${esc(e.msg)}</a></li>`).join('')}</ul>`;
   box.hidden=false; box.setAttribute('aria-labelledby', box.id+'-h');
@@ -16,7 +27,7 @@ function showErrorSummary(box, errs){
   box.focus(); box.scrollIntoView({block:'start',behavior:reduceMotion()?'auto':'smooth'});
 }
 /* يربط كل حقل بتسميته ورسالة خطئه (for / aria-describedby) */
-function wireFormA11y(f, prefix){
+export function wireFormA11y(f, prefix){
   $$('.field',f).forEach(fl=>{ const inp=$('input,select,textarea',fl), lab=$('label',fl), er=$('.errtxt',fl); if(!inp) return;
     const n=inp.name||inp.id; inp.id = inp.id || `${prefix}-${n}`; if(lab) lab.htmlFor=inp.id;
     if(er){ er.id=`${inp.id}-err`; er.setAttribute('aria-live','polite'); inp.setAttribute('aria-describedby', er.id); }
@@ -26,7 +37,7 @@ function wireFormA11y(f, prefix){
 /* =====================================================================
    الشهادة — قالب «السجل المضيء»
    ===================================================================== */
-function certSealSvg(att, total){
+export function certSealSvg(att, total){
   let h=`<circle cx="50" cy="50" r="46" fill="none" stroke="#1A746B" stroke-width="0.6"/><circle cx="50" cy="50" r="43.6" fill="none" stroke="#1A746B" stroke-width="0.25"/>`;
   const n=Math.max(1,total);
   for(let i=0;i<n;i++){ const a=-Math.PI/2+i*2*Math.PI/n, x=50+Math.cos(a)*37.5, y=50+Math.sin(a)*37.5, r=n>40?1.4:n>24?2.0:2.4;
@@ -35,7 +46,7 @@ function certSealSvg(att, total){
   const k=att.filter(Boolean).length;
   return h+`<circle cx="50" cy="50" r="20.5" fill="#FBF6E8"/><circle cx="50" cy="50" r="20.5" fill="none" stroke="#C9A24A" stroke-width="0.4"/><text x="50" y="49" text-anchor="middle" font-family="Readex Pro" font-weight="500" font-size="11" fill="#14524c">${fmtNum(Math.round(k/n*100))}٪</text><text x="50" y="58.5" text-anchor="middle" font-family="Readex Pro" font-weight="300" font-size="4.1" fill="#7a8d8f">${fmtNum(k)} من ${fmtNum(n)} يومًا</text>`;
 }
-function certFieldSvg(){
+export function certFieldSvg(){
   let g=''; const W=279,H=192,cx=W/2,cy=H/2+4,step=3.6;
   for(let y=8;y<=H-8;y+=step) for(let x=8;x<=W-8;x+=step){ const dx=(x-cx)/(W*.5), dy=(y-cy)/(H*.5), d=Math.sqrt(dx*dx*.9+dy*dy*1.25); if(d<.86) continue; const k=Math.min(1,(d-.86)/.5);
     g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(.18+.32*k).toFixed(2)}" fill="#59A598" opacity="${(.16+.3*k).toFixed(2)}"/>`; }
@@ -43,7 +54,7 @@ function certFieldSvg(){
   const star=(t,s,c)=>`<path transform="translate(${t}) scale(${s})" d="M50 0C54 34 66 46 100 50 66 54 54 66 50 100 46 66 34 54 0 50 34 46 46 34 50 0z" fill="${c}"/>`;
   return g+star('22 22',.13,'#8FCBBE')+star('250 15',.07,'#C9A24A');
 }
-function certificateHtml(cert){
+export function certificateHtml(cert){
   const t=AD.trainees.find(x=>x.id===cert.trainee_id), p=progOf(cert.program_id), c=AD.cohorts.find(x=>x.id===cert.cohort_id), e=AD.enrollments.find(x=>x.id===cert.enrollment_id);
   const days=sessionDays(c).filter(d=>d>=e.created_at.slice(0,10)), att=days.map(d=>AD.attendance.some(a=>a.enrollment_id===e.id&&a.att_date===d));
   const fem=t.gender==='أنثى', ord=['','الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة','الثامنة','التاسعة','العاشرة'][c.number]||fmtNum(c.number);
@@ -68,7 +79,7 @@ function certificateHtml(cert){
     <div class="cz-note">${CENTER.name} · ${CENTER.address} · ${CENTER.phones.join(' · ')}</div>
   </div></div></div>`;
 }
-function printCertificates(certs, title){
+export function printCertificates(certs, title){
   if(!certs.length) return toast('لا توجد شهادات صادرة للطباعة');
   printDocs(certs.map(certificateHtml), title);
   $$('#printRoot [data-qr]').forEach(el=>makeQR(el, el.dataset.qr, 240));
@@ -77,7 +88,7 @@ function printCertificates(certs, title){
 /* =====================================================================
    صفحة التحقق من الشهادة (عامة)
    ===================================================================== */
-async function viewVerify(serial){
+export async function viewVerify(serial){
   const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
   let r=null; if(serial){ try{ r=await Store.verifyCertificate(serial); }catch(e){ r={error:e.message}; } }
   const ok = r && !r.error && !r.revoked;
@@ -107,8 +118,8 @@ async function viewVerify(serial){
 /* =====================================================================
    صفحة «حضوري» للمتدرب
    ===================================================================== */
-const toLatin = v => String(v||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-async function viewMe(){
+export const toLatin = v => String(v||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+export async function viewMe(){
   const app=$('#app');
   app.innerHTML = `<div class="wrap"><div class="card checkin rv" style="max-width:560px;margin:0 auto" id="meCard">
       <div class="head" style="padding-bottom:24px"><img src="${LOGO}" alt="شعار مركز سما القدرات"><h2>حضوري</h2><div class="hint">نسبة حضورك في برامجك، وتنبيهات الغياب</div></div>
@@ -128,7 +139,7 @@ async function viewMe(){
     setBusy(b,false); renderMe(r);
   };
 }
-function renderMe(r){
+export function renderMe(r){
   const box=$('#mRes');
   if(!r.ok){ box.innerHTML=`<div class="pad" style="padding-top:0">${emptyBox(r.reason==='error'?'تعذّر الاتصال':'لم نعثر على تسجيل بهذا الرقم', r.reason==='error'?esc(r.msg||''):'تأكد من رقم السجل المدني الذي سجّلت به في البرنامج.')}</div>`; liveSay('لم نعثر على تسجيل بهذا الرقم'); return; }
   box.innerHTML = `<div class="pad" style="padding-top:0"><h3 class="ctitle" style="margin-bottom:12px">${ic('user')}أهلًا ${esc(r.first_name)}</h3>
@@ -146,9 +157,9 @@ function renderMe(r){
 /* =====================================================================
    لوحة الإدارة: آلية احتساب الحضور ورسائل التنبيه + سجل حضور متدرب
    ===================================================================== */
-const MSG_FIELDS = [['msg_ok','منتظم','ok'],['msg_low','نسبة دون الحد','warn'],['msg_consec','غياب متتالٍ','warn'],['msg_last','لا مجال لغياب آخر','bad'],['msg_lost','لا يمكن بلوغ الحد','bad'],['msg_upcoming','دفعة لم تبدأ','info'],['msg_done','أتمّ البرنامج','ok'],['msg_below','انتهت دون الحد','g']];
-const PLACEHOLDERS = ['الاسم','البرنامج','النسبة','الحد','الغياب','المتتالي','المطلوب','المتبقي','البداية'];
-function pageRules(){
+export const MSG_FIELDS = [['msg_ok','منتظم','ok'],['msg_low','نسبة دون الحد','warn'],['msg_consec','غياب متتالٍ','warn'],['msg_last','لا مجال لغياب آخر','bad'],['msg_lost','لا يمكن بلوغ الحد','bad'],['msg_upcoming','دفعة لم تبدأ','info'],['msg_done','أتمّ البرنامج','ok'],['msg_below','انتهت دون الحد','g']];
+export const PLACEHOLDERS = ['الاسم','البرنامج','النسبة','الحد','الغياب','المتتالي','المطلوب','المتبقي','البداية'];
+export function pageRules(){
   const m=$('#main'), C=calcSet(AD.settings);
   m.innerHTML = titleBar(`${ic('settings')}آلية الاحتساب`, 'احتساب الحضور <em>ورسائل التنبيه</em>', 'تحدد هنا كيف تُحسب نسبة الحضور ومتى يُنبَّه المتدرب. لا يرى المتدرب في صفحة «حضوري» إلا نسبته ورسالة التنبيه الخاصة بحالته.', '')+
   `<div class="grid g2" style="align-items:start">
@@ -185,7 +196,7 @@ function pageRules(){
     if(!validSaudiId(nid)){ box.innerHTML=`<div class="errtxt">الرقم غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.</div>`; return; }
     const r=traineeAttendanceLogic(AD,nid); box.innerHTML = r.ok ? traineeDetailHtml(r) : emptyBox('لا يوجد متدرب بهذا الرقم','تأكد من الرقم أو ابحث في صفحة المتدربين.'); };
 }
-function traineeDetailHtml(r){
+export function traineeDetailHtml(r){
   const thr=r.threshold;
   return `<div style="margin-bottom:10px"><b>${esc(r.trainee.full_name)}</b><div class="hint" dir="ltr" style="text-align:right">${esc(r.trainee.phone||'')}</div></div>`+
    (r.items.length ? r.items.map(x=>{ const tone=LEVEL_TONE[x.level], rr=x.state==='archived'?x.finalRate:(x.rate??0);
@@ -202,8 +213,8 @@ function traineeDetailHtml(r){
 /* =====================================================================
    قائمة المتابعة (المدير): المتدربون الأقرب إلى فقدان الشهادة
    ===================================================================== */
-const waLink = (phone, text) => { const p=String(phone||'').replace(/\D/g,''); const intl = p.startsWith('05') ? '966'+p.slice(1) : p.startsWith('5') ? '966'+p : p; return `https://wa.me/${intl}?text=${encodeURIComponent(text)}`; };
-function followupRows(){
+export const waLink = (phone, text) => { const p=String(phone||'').replace(/\D/g,''); const intl = p.startsWith('05') ? '966'+p.slice(1) : p.startsWith('5') ? '966'+p : p; return `https://wa.me/${intl}?text=${encodeURIComponent(text)}`; };
+export function followupRows(){
   const today=riyadhNow().date, thr=AD.settings.cert_threshold ?? 75;
   return AD.cohorts.filter(c=>!cohortArchived(c,today) && c.start_date<=today).flatMap(c=>enrollsOf(AD,c.id).map(e=>{ const s=enrollmentStats(AD,e,c), t=AD.trainees.find(x=>x.id===e.trainee_id); if(!t||!s.held) return null;
     const lv=attendanceLevel(s,'running',AD.settings); if(!['low','consec','last','lost'].includes(lv)) return null;
@@ -212,8 +223,8 @@ function followupRows(){
     const msg = levelMessage(lv,s,AD.settings,{'الاسم':t.full_name.split(' ')[0],'البرنامج':progName(c.program_id),'البداية':fmtDate(c.start_date)});
     return {c,e,t,s,level,why,msg}; }).filter(Boolean)).sort((a,b)=>(a.level==='bad'?0:1)-(b.level==='bad'?0:1)||(a.s.rate??0)-(b.s.rate??0));
 }
-let fuP='all', fuL='all';
-function pageFollowup(){
+export let fuP='all', fuL='all';
+export function pageFollowup(){
   const m=$('#main'), all=followupRows(), thr=AD.settings.cert_threshold ?? 75;
   const list=all.filter(x=>(fuP==='all'||x.c.program_id===fuP)&&(fuL==='all'||x.level===fuL));
   const progs=[...new Set(all.map(x=>x.c.program_id))];
@@ -241,7 +252,7 @@ function pageFollowup(){
 /* =====================================================================
    الشهادات داخل كشف الدفعة
    ===================================================================== */
-function certSectionHtml(c){
+export function certSectionHtml(c){
   const certs=(AD.certificates||[]).filter(x=>x.cohort_id===c.id), thr=AD.settings.cert_threshold ?? 75, arch=cohortArchived(c);
   const elig=enrollsOf(AD,c.id).filter(e=>enrollmentStats(AD,e,c).finalRate>=thr).length;
   return `<div class="card pad rv" style="--i:6;margin-top:16px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="kic-lg t-gold">${ic('award')}</span>
@@ -251,7 +262,7 @@ function certSectionHtml(c){
       <td style="white-space:nowrap"><button class="btn sm" data-c1="${x.id}" ${x.revoked?'disabled':''}>${ic('form')} طباعة</button> <a class="btn sm" href="#v-${esc(x.serial)}">${ic('search')} التحقق</a> <button class="btn sm ${x.revoked?'':'danger soft'}" data-rv="${x.id}">${x.revoked?'إعادة تفعيل':'إلغاء'}</button></td></tr>`; }).join('')}</tbody></table></div>`:''}
   </div>`;
 }
-function bindCertSection(c, back){
+export function bindCertSection(c, back){
   const certs=()=>(AD.certificates||[]).filter(x=>x.cohort_id===c.id&&!x.revoked), t=`شهادات ${progName(c.program_id)} · ${cohortLabel(c)}`;
   if($('#ciss')) $('#ciss').onclick=async e=>{ const b=e.currentTarget; setBusy(b,true,'جارٍ الإصدار'); try{ const n=await Store.issueCertificates(c.id); await reloadAD(); toast(n?`صدرت ${fmtNum(n)} شهادة جديدة`:'لا توجد شهادات جديدة مستحقة'); back(); }catch(x){ setBusy(b,false); toast(x.message); } };
   if($('#cprt')) $('#cprt').onclick=()=>printCertificates(certs(), t);

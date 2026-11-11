@@ -1,6 +1,15 @@
+import { CATEGORIES, CAT_ICON, CAT_TONE } from './catalog.js';
+import { STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortState, cohortsOfProgram, priceTxt, progCode, takenOf } from './data2.js';
+import { setBusy } from './features.js';
+import { catalogHtml, printDocs } from './print.js';
+import { $, $$, esc, fmtMoney, fmtNum, fmtShort, riyadhNow } from './utils.js';
+import { AD, allCats, bindCohortActions, cohortModal, reloadAD, setAD, setCohortView } from './views2_admin.js';
+import { countUp, emptyBox, ic, toast } from './views2_head.js';
+import { catSort, cohortLabel, daysTxt, hoursTxt, kpiCard, short, titleBar } from './views2_main.js';
+
 /* ---------- البرامج والباقات ---------- */
-let pgQ='', pgC='all', pgS='all';
-function pagePrograms(){
+export let pgQ='', pgC='all', pgS='all';
+export function pagePrograms(){
   const m=$('#main'); const {programs,packages,enrollments}=AD, today=riyadhNow().date;
   const act=p=>activeCohortOf(AD,p.id,today);
   const nAct=programs.filter(act).length, nPriced=programs.filter(p=>Number(p.price)>0).length;
@@ -33,7 +42,7 @@ function pagePrograms(){
   $$('[data-ek]').forEach(b=>b.onclick=()=>packageModal(packages.find(p=>p.id===b.dataset.ek)));
   $$('[data-dk]').forEach(b=>b.onclick=()=>confirmBox('حذف الباقة','تُحذف الباقة، ويبقى المشتركون فيها في كشوف الدفعات.', async()=>{ await Store.deletePackage(b.dataset.dk); await reloadAD(); toast('حُذفت الباقة'); pagePrograms(); }));
 }
-function renderProgramList(){
+export function renderProgramList(){
   const {programs}=AD, today=riyadhNow().date, act=p=>activeCohortOf(AD,p.id,today);
   const list = programs.filter(p=>(pgC==='all'||p.category===pgC) && (!pgQ||p.name.includes(pgQ)||(p.accreditation_no||'').includes(pgQ))
     && (pgS==='all' || (pgS==='open'&&act(p)?.reg_open) || (pgS==='active'&&act(p)) || (pgS==='none'&&!act(p)) || (pgS==='noprice'&&!(Number(p.price)>0)) || (pgS==='off'&&!p.active)));
@@ -55,11 +64,11 @@ function renderProgramList(){
   $$('[data-addc]').forEach(b=>b.onclick=()=>programModal(null,b.dataset.addc));
   $$('[data-open]').forEach(b=>b.onclick=()=>cohortModal(AD.programs.find(p=>p.id===b.dataset.open), null, pagePrograms));
   bindCohortActions(()=>{ location.hash='#admin-cohorts'; });
-  $$('#pgList [data-cv]').forEach(b=>b.onclick=()=>{ cohortView=b.dataset.cv; location.hash='#admin-cohorts'; });
+  $$('#pgList [data-cv]').forEach(b=>b.onclick=()=>{ setCohortView(b.dataset.cv); location.hash='#admin-cohorts'; });
   $$('[data-dp]').forEach(b=>b.onclick=()=>confirmBox('حذف البرنامج','يُحذف البرنامج مع كل دفعاته وكشوفها وسجلات حضورها، ويُزال من الباقات.', async()=>{ await Store.deleteProgram(b.dataset.dp); await reloadAD(); toast('حُذف البرنامج'); pagePrograms(); }));
 }
-const swRow = (name, label, on, hint='') => `<label class="sw"><span><span style="font-weight:500">${label}</span>${hint?`<span class="hint" style="display:block">${hint}</span>`:''}</span><input type="checkbox" name="${name}" ${on?'checked':''}><i></i></label>`;
-function programModal(p, presetCat){
+export const swRow = (name, label, on, hint='') => `<label class="sw"><span><span style="font-weight:500">${label}</span>${hint?`<span class="hint" style="display:block">${hint}</span>`:''}</span><input type="checkbox" name="${name}" ${on?'checked':''}><i></i></label>`;
+export function programModal(p, presetCat){
   const isNew=!p; p = p || {name:'',category:presetCat||CATEGORIES[0],accreditation_no:'',hours:15,duration_days:3,description:'',price:null,active:true};
   modal(`<h3>${isNew?'برنامج تدريبي جديد':'تعديل البرنامج'}</h3><form id="pm" class="grid g2" novalidate>
     <div class="field" style="grid-column:1/-1"><label>اسم البرنامج <i>*</i></label><input class="inp" name="name" value="${esc(p.name)}"></div>
@@ -85,14 +94,14 @@ function programModal(p, presetCat){
     const sb=$('#pm button.pri'); setBusy(sb,true,'جارٍ الحفظ');
     try{ await Store.saveProgram(o); await reloadAD(); closeModal(); toast(isNew?'أُضيف البرنامج':'حُفظ البرنامج'); pagePrograms(); }catch(x){ setBusy(sb,false); E(x.message); } };
 }
-function modal(html){ $('#modalRoot').innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`; $('.modal-bg').onclick=e=>{ if(e.target.classList.contains('modal-bg')) closeModal(); }; }
-function closeModal(){ $('#modalRoot').innerHTML=''; }
-function confirmBox(title, msg, fn, label){ modal(`<div class="alert t-danger"><span class="aic">${ic('alert')}</span><div><b style="font-weight:600;font-size:16px">${esc(title)}</b><div class="hint">${esc(msg)}</div></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn" id="mc">إلغاء</button><button class="btn danger" id="mo">${ic(label?'x':'trash')} ${label||'حذف'}</button></div>`);
+export function modal(html){ $('#modalRoot').innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`; $('.modal-bg').onclick=e=>{ if(e.target.classList.contains('modal-bg')) closeModal(); }; }
+export function closeModal(){ $('#modalRoot').innerHTML=''; }
+export function confirmBox(title, msg, fn, label){ modal(`<div class="alert t-danger"><span class="aic">${ic('alert')}</span><div><b style="font-weight:600;font-size:16px">${esc(title)}</b><div class="hint">${esc(msg)}</div></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn" id="mc">إلغاء</button><button class="btn danger" id="mo">${ic(label?'x':'trash')} ${label||'حذف'}</button></div>`);
   $('#mc').onclick=closeModal; $('#mo').onclick=async ev=>{ setBusy(ev.currentTarget,true,'جارٍ التنفيذ'); try{ await fn(); }catch(e){ toast(e.message); } closeModal(); }; }
-const secHead = (icon, t) => `<div class="ctitle" style="grid-column:1/-1;font-size:15px;margin-top:6px;padding-top:12px;border-top:1px solid var(--border)">${ic(icon)}${t}</div>`;
+export const secHead = (icon, t) => `<div class="ctitle" style="grid-column:1/-1;font-size:15px;margin-top:6px;padding-top:12px;border-top:1px solid var(--border)">${ic(icon)}${t}</div>`;
 
 /* استيراد عدة برامج دفعة واحدة: سطر لكل برنامج، الحقول مفصولة بـ | أو Tab (من Excel) */
-function parseImport(txt){
+export function parseImport(txt){
   const rows=[], bad=[];
   txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).forEach((line,i)=>{
     const c=line.split(/\t|\|/).map(s=>s.trim());
@@ -103,7 +112,7 @@ function parseImport(txt){
   });
   return {rows,bad};
 }
-function importModal(){
+export function importModal(){
   modal(`<h3>استيراد برامج تدريبية</h3>
     <p class="hint" style="margin:-8px 0 12px">الصق سطرًا لكل برنامج، والحقول مفصولة بالرمز | أو منسوخة مباشرة من أعمدة Excel بالترتيب:<br><b>الاسم | المجال | الساعات | الأيام | رقم الاعتماد | السعر</b> — الحقول بعد الاسم اختيارية.</p>
     <textarea class="inp" id="impT" rows="8" style="padding:12px 14px;line-height:24px;resize:vertical" placeholder="مهارات العرض والتقديم | الإدارة والأعمال | 15 | 3 | 25300 | 950&#10;أساسيات البرمجة بلغة بايثون | الحاسب والتقنية | 30 | 5"></textarea>
@@ -119,10 +128,10 @@ function importModal(){
   $('#impGo').onclick=async e=>{ const b=e.currentTarget; setBusy(b,true,'جارٍ إضافة البرامج');
     const fresh=parsed.rows.filter(r=>!AD.programs.some(p=>p.name===r.name || (r.accreditation_no && p.accreditation_no===r.accreditation_no)));
     try{ for(const r of fresh){ await Store.saveProgram({ ...r, description:'', active:true }); }
-      AD=await Store.adminData(); closeModal(); toast(`أُضيف ${fmtNum(fresh.length)} برنامج`); pagePrograms(); }catch(x){ $('#impE').textContent=x.message; setBusy(b,false); } };
+      setAD(await Store.adminData()); closeModal(); toast(`أُضيف ${fmtNum(fresh.length)} برنامج`); pagePrograms(); }catch(x){ $('#impE').textContent=x.message; setBusy(b,false); } };
 }
 
-function packageModal(k){
+export function packageModal(k){
   const isNew=!k; k = k || {name:'',description:'',price:'',program_ids:[],active:true};
   let sel=new Set(k.program_ids), mq='', mc='all';
   modal(`<h3>${isNew?'باقة تدريبية جديدة':'تعديل الباقة'}</h3><form id="km" class="grid" novalidate>

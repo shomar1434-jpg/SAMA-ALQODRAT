@@ -1,24 +1,29 @@
+import { catalogPrograms, computeEnd } from './catalog.js';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
+import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
+import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, toMin, uid, validSaudiId } from './utils.js';
+
 /* =====================================================================
    نموذج البيانات القائم على الدفعات
    البرنامج ← دفعة نشطة واحدة (مفتوحة أو منعقدة) + دفعات مؤرشفة
    الدفعة ← كشف المسجلين (enrollments) ← سجل الحضور اليومي
    المتدرب (trainee) شخص واحد بسجله المدني، يمكن أن يسجّل في دفعات عدة
    ===================================================================== */
-const progCode = p => p.code || ('p' + (p.accreditation_no || String(p.id).replace(/[^a-z0-9]/gi,'').slice(0,8)));
-const cohortArchived = (c, today=riyadhNow().date) => !!c.archived_at || (c.end_date && c.end_date < today);
-const cohortState = (c, today=riyadhNow().date) => cohortArchived(c,today) ? 'archived' : (c.start_date<=today ? 'running' : 'upcoming');
-const STATE_TXT = {archived:'مؤرشفة', running:'منعقدة', upcoming:'لم تبدأ'};
-const STATE_PILL = {archived:'g', running:'ok', upcoming:'info'};
-function isSessionDay(c, d){ return !!c && !!(c.start_date && c.end_date) && d>=c.start_date && d<=c.end_date && (c.days||[]).includes(dowOf(d)); }
-const activeCohortOf = (D, pid, today) => D.cohorts.filter(c=>c.program_id===pid && !cohortArchived(c,today)).sort((a,b)=>b.number-a.number)[0] || null;
-const cohortsOfProgram = (D, pid) => D.cohorts.filter(c=>c.program_id===pid).sort((a,b)=>b.number-a.number);
-const enrollsOf = (D, cid, all=false) => D.enrollments.filter(e=>e.cohort_id===cid && (all || e.status!=='ملغى'));
-const takenOf = (D, cid) => enrollsOf(D,cid).length;
-const sessionDays = (c, upTo) => { const out=[]; if(!c?.start_date) return out; for(let d=c.start_date; d<=c.end_date && (!upTo||d<=upTo); d=addDays(d,1)) if(isSessionDay(c,d)) out.push(d); return out; };
-const priceTxt = v => (v===null||v===undefined||v===''||Number(v)===0) ? 'السعر عند التواصل' : fmtMoney(v);
-const newRef = () => 'SQ-' + String(100000 + Math.floor(Math.random()*900000));
+export const progCode = p => p.code || ('p' + (p.accreditation_no || String(p.id).replace(/[^a-z0-9]/gi,'').slice(0,8)));
+export const cohortArchived = (c, today=riyadhNow().date) => !!c.archived_at || (c.end_date && c.end_date < today);
+export const cohortState = (c, today=riyadhNow().date) => cohortArchived(c,today) ? 'archived' : (c.start_date<=today ? 'running' : 'upcoming');
+export const STATE_TXT = {archived:'مؤرشفة', running:'منعقدة', upcoming:'لم تبدأ'};
+export const STATE_PILL = {archived:'g', running:'ok', upcoming:'info'};
+export function isSessionDay(c, d){ return !!c && !!(c.start_date && c.end_date) && d>=c.start_date && d<=c.end_date && (c.days||[]).includes(dowOf(d)); }
+export const activeCohortOf = (D, pid, today) => D.cohorts.filter(c=>c.program_id===pid && !cohortArchived(c,today)).sort((a,b)=>b.number-a.number)[0] || null;
+export const cohortsOfProgram = (D, pid) => D.cohorts.filter(c=>c.program_id===pid).sort((a,b)=>b.number-a.number);
+export const enrollsOf = (D, cid, all=false) => D.enrollments.filter(e=>e.cohort_id===cid && (all || e.status!=='ملغى'));
+export const takenOf = (D, cid) => enrollsOf(D,cid).length;
+export const sessionDays = (c, upTo) => { const out=[]; if(!c?.start_date) return out; for(let d=c.start_date; d<=c.end_date && (!upTo||d<=upTo); d=addDays(d,1)) if(isSessionDay(c,d)) out.push(d); return out; };
+export const priceTxt = v => (v===null||v===undefined||v===''||Number(v)===0) ? 'السعر عند التواصل' : fmtMoney(v);
+export const newRef = () => 'SQ-' + String(100000 + Math.floor(Math.random()*900000));
 /* نسبة حضور تسجيل واحد: المحاضرات المنعقدة منذ تسجيله حتى اليوم */
-function enrollmentStats(D, e, c){
+export function enrollmentStats(D, e, c){
   c = c || D.cohorts.find(x=>x.id===e.cohort_id); const n=riyadhNow(), from=e.created_at.slice(0,10);
   // الدفعة المؤرشفة يدويًا قبل نهايتها: تُحسب أيامها حتى تاريخ الأرشفة فقط
   const cut = (c.archived_at && !c.archived_auto && c.archived_at.slice(0,10) < c.end_date) ? c.archived_at.slice(0,10) : c.end_date;
@@ -36,7 +41,7 @@ function enrollmentStats(D, e, c){
     reachable: needed <= Math.max(0,remaining) };
 }
 /* ===== آلية الاحتساب ورسائل التنبيه: يضبطها مسؤول النظام ===== */
-const CALC_DEFAULTS = { cert_threshold:75, late_weight:1, warn_consec:2,
+export const CALC_DEFAULTS = { cert_threshold:75, late_weight:1, warn_consec:2,
   msg_ok:'نسبة حضورك {النسبة}٪ وأنت على المسار الصحيح للحصول على الشهادة. واصل الحضور.',
   msg_low:'تنبيه: نسبة حضورك {النسبة}٪ دون حد الشهادة {الحد}٪. احرص على حضور المحاضرات القادمة.',
   msg_consec:'تنبيه غياب: غبت {المتتالي} محاضرات متتالية. انتظم في الحضور حتى لا تفقد أهلية الشهادة.',
@@ -44,10 +49,10 @@ const CALC_DEFAULTS = { cert_threshold:75, late_weight:1, warn_consec:2,
   msg_lost:'لم يعد بالإمكان بلوغ حد الشهادة {الحد}٪ في هذه الدفعة. يُرجى مراجعة إدارة المركز.',
   msg_done:'أتممت البرنامج بنسبة حضور {النسبة}٪.', msg_below:'انتهت الدفعة بنسبة حضور {النسبة}٪، وهي دون حد الشهادة {الحد}٪.',
   msg_upcoming:'تبدأ دفعتك {البداية}. احرص على حضور أول محاضرة.' };
-const calcSet = st => { const o={}; for(const k in CALC_DEFAULTS) o[k] = (st && st[k]!=null && st[k]!=='') ? st[k] : CALC_DEFAULTS[k]; return o; };
-const LEVEL_TXT = { ok:'منتظم', low:'نسبة منخفضة', consec:'غياب متتالٍ', last:'لا مجال للغياب', lost:'لا يبلغ الحد', done:'أتمّ البرنامج', below:'دون الحد', upcoming:'لم تبدأ', none:'لم تنعقد محاضرات' };
-const LEVEL_TONE = { ok:'ok', low:'warn', consec:'warn', last:'bad', lost:'bad', done:'ok', below:'g', upcoming:'info', none:'info' };
-function attendanceLevel(s, state, st){
+export const calcSet = st => { const o={}; for(const k in CALC_DEFAULTS) o[k] = (st && st[k]!=null && st[k]!=='') ? st[k] : CALC_DEFAULTS[k]; return o; };
+export const LEVEL_TXT = { ok:'منتظم', low:'نسبة منخفضة', consec:'غياب متتالٍ', last:'لا مجال للغياب', lost:'لا يبلغ الحد', done:'أتمّ البرنامج', below:'دون الحد', upcoming:'لم تبدأ', none:'لم تنعقد محاضرات' };
+export const LEVEL_TONE = { ok:'ok', low:'warn', consec:'warn', last:'bad', lost:'bad', done:'ok', below:'g', upcoming:'info', none:'info' };
+export function attendanceLevel(s, state, st){
   const C=calcSet(st), thr=+C.cert_threshold;
   if(state==='upcoming') return 'upcoming';
   if(state==='archived') return s.finalRate>=thr ? 'done' : 'below';
@@ -58,26 +63,26 @@ function attendanceLevel(s, state, st){
   if(s.rate!==null && s.rate<thr) return 'low';
   return 'ok';
 }
-function fillMsg(tpl, v){ return String(tpl||'').replace(/\{([^}]+)\}/g,(m,k)=> v[k]!=null ? v[k] : m); }
-function levelMessage(level, s, st, extra={}){
+export function fillMsg(tpl, v){ return String(tpl||'').replace(/\{([^}]+)\}/g,(m,k)=> v[k]!=null ? v[k] : m); }
+export function levelMessage(level, s, st, extra={}){
   const C=calcSet(st), key={ok:'msg_ok',low:'msg_low',consec:'msg_consec',last:'msg_last',lost:'msg_lost',done:'msg_done',below:'msg_below',upcoming:'msg_upcoming'}[level];
   if(!key) return 'لم تنعقد محاضرات دفعتك بعد.';
   const rate = level==='done'||level==='below' ? s.finalRate : (s.rate??0);
   return fillMsg(C[key], { 'النسبة':fmtNum(rate), 'الحد':fmtNum(C.cert_threshold), 'المتتالي':fmtNum(s.consec), 'المطلوب':fmtNum(s.needed), 'المتبقي':fmtNum(s.remaining), 'الغياب':fmtNum(s.absent), ...extra });
 }
-const maskName = n => { const p=String(n||'').trim().split(/\s+/); return p.length<=2 ? p.join(' ') : `${p[0]} ${'•'.repeat(3)} ${p[p.length-1]}`; };
-function issueCertificatesLocal(D, c){
+export const maskName = n => { const p=String(n||'').trim().split(/\s+/); return p.length<=2 ? p.join(' ') : `${p[0]} ${'•'.repeat(3)} ${p[p.length-1]}`; };
+export function issueCertificatesLocal(D, c){
   D.certificates = D.certificates || []; const p=D.programs.find(x=>x.id===c.program_id); const thr=D.settings.cert_threshold ?? 75; let k=0;
   const seq0 = D.certificates.filter(x=>x.cohort_id===c.id).length;
   enrollsOf(D,c.id).forEach(e=>{ if(D.certificates.some(x=>x.enrollment_id===e.id)) return; const s=enrollmentStats(D,e,c); if(s.finalRate<thr) return;
     k++; D.certificates.push({id:uid(), serial:`SQ-${p?.accreditation_no||progCode(p).slice(1)}-${c.number}-${String(seq0+k).padStart(3,'0')}`, enrollment_id:e.id, cohort_id:c.id, program_id:c.program_id, trainee_id:e.trainee_id, rate:s.finalRate, issued_at:new Date().toISOString(), revoked:false}); });
   return k;
 }
-function certPublic(D, cert){
+export function certPublic(D, cert){
   if(!cert) return null; const p=D.programs.find(x=>x.id===cert.program_id), c=D.cohorts.find(x=>x.id===cert.cohort_id), t=D.trainees.find(x=>x.id===cert.trainee_id);
   return {serial:cert.serial, revoked:cert.revoked, issued_at:cert.issued_at, rate:cert.rate, name_masked:maskName(t?.full_name), gender:t?.gender, program:p?.name, category:p?.category, accreditation_no:p?.accreditation_no, hours:p?.hours, number:c?.number, start_date:c?.start_date, end_date:c?.end_date};
 }
-function traineeAttendanceLogic(D, nid){
+export function traineeAttendanceLogic(D, nid){
   const t=D.trainees.find(x=>x.national_id===nid);
   if(!t) return {ok:false, reason:'no_match'};
   const list = D.enrollments.filter(e=>e.trainee_id===t.id && e.status!=='ملغى').map(e=>{ const c=D.cohorts.find(x=>x.id===e.cohort_id), p=D.programs.find(x=>x.id===e.program_id); if(!c||!p) return null;
@@ -89,14 +94,14 @@ function traineeAttendanceLogic(D, nid){
   return {ok:true, trainee:t, first_name:t.full_name.split(' ')[0], threshold:calcSet(D.settings).cert_threshold, items:list};
 }
 /* ما يراه المتدرب فقط: نسبة الحضور ورسالة التنبيه */
-function myAttendanceLogic(D, nid){
+export function myAttendanceLogic(D, nid){
   const r=traineeAttendanceLogic(D,nid); if(!r.ok) return r;
   return {ok:true, first_name:r.first_name, items:r.items.map(x=>({program:x.program, number:x.number, state:x.state, start_date:x.start_date, end_date:x.end_date,
     rate: x.state==='archived' ? x.finalRate : x.state==='upcoming' ? null : x.rate, level:x.level, message:x.message}))};
 }
 
 /* منطق التحضير المشترك: يطابق السجل المدني مع كشف الدفعة المنعقدة اليوم */
-function checkinLogic(D, nid, code, programCode, dayCode){
+export function checkinLogic(D, nid, code, programCode, dayCode){
   const st=D.settings, n=riyadhNow(), now=toMin(n.hm);
   if(st.require_code && code!==dayCode) return {ok:false, reason:'bad_code'};
   const t = D.trainees.find(x=>x.national_id===nid);
@@ -129,7 +134,7 @@ function checkinLogic(D, nid, code, programCode, dayCode){
   return {ok:true, already:false, ...base, status, time:n.hm, _rec:rec};
 }
 
-const LocalStore = {
+export const LocalStore = {
   key:'sama_qudrat_v4', mode:'local', data:null, admin:false,
   load(){
     try{ this.data = JSON.parse(localStorage.getItem(this.key)||'null'); }catch(e){ this.data=null; }
@@ -212,7 +217,7 @@ const LocalStore = {
 };
 
 /* ---------------- Supabase: نفس الواجهة عبر دوال آمنة وجداول محمية بالصلاحيات ---------------- */
-const CloudStore = {
+export const CloudStore = {
   mode:'cloud', sb:null,
   init(){ this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); },
   _e(r){ if(r.error) throw new Error(r.error.message); return r.data; },
@@ -257,7 +262,7 @@ const CloudStore = {
 };
 
 /* ---------------- بيانات تجريبية: البرامج حقيقية من دليل المركز، والدفعات والمتدربون والحضور تجريبيون ---------------- */
-function makeDemo(){
+export function makeDemo(){
   const today = riyadhNow().date, rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1)), pick=a=>a[Math.floor(Math.random()*a.length)];
   const programs = catalogPrograms(); programs.forEach(p=>p.code=progCode(p));
   const cohorts=[], trainees=[], enrollments=[], attendance=[];
@@ -309,6 +314,9 @@ function makeDemo(){
   return D;
 }
 
-let Store = LocalStore;
-if(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase){ CloudStore.init(); Store = CloudStore; }
-else LocalStore.load();
+export let Store = LocalStore;
+/* يُستدعى مرة واحدة من boot() بعد تحميل كل الوحدات */
+export function initStore(){
+  if(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase){ CloudStore.init(); Store = CloudStore; }
+  else LocalStore.load();
+}

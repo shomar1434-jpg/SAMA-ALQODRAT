@@ -1,10 +1,18 @@
+import { CAT_ICON, CAT_TONE, CENTER } from './catalog.js';
+import { Store } from './data2.js';
+import { LOGOS } from './logos.js';
+import { DEFAULT_ABOUT, aboutSectionHtml, initPartnerMarquee, partnersSectionHtml } from './partners.js';
+import { $, $$, esc, fmtNum } from './utils.js';
+import { countUp, ic, reduceMotion } from './views2_head.js';
+import { cat, catSort, cohortPublicState } from './views2_main.js';
+
 /* =====================================================================
    الصفحات الافتتاحية — مستوحاة من صفحتي الغلاف والرؤية في دليل برامج المركز
    ===================================================================== */
-const X_URL = 'https://x.com/' + CENTER.x;
-const MAP_URL = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('مركز سما القدرات للتدريب جازان حي الصفا');
+export const X_URL = 'https://x.com/' + CENTER.x;
+export const MAP_URL = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('مركز سما القدرات للتدريب جازان حي الصفا');
 /* المصباح المضيء بعلامة الصح (من غلاف الدليل) مرسومًا بالمتجهات ومتحركًا */
-const BULB_SVG = `<svg class="bulb-art" viewBox="0 0 320 340" aria-hidden="true">
+export const BULB_SVG = `<svg class="bulb-art" viewBox="0 0 320 340" aria-hidden="true">
   <defs><radialGradient id="bg1" cx="42%" cy="38%" r="70%"><stop offset="0" stop-color="#FFE27A"/><stop offset=".55" stop-color="#FCC23E"/><stop offset="1" stop-color="#E17D32"/></radialGradient>
   <radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FCD147" stop-opacity=".55"/><stop offset="1" stop-color="#FCD147" stop-opacity="0"/></radialGradient>
   <linearGradient id="base" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#151515"/></linearGradient></defs>
@@ -18,11 +26,11 @@ const BULB_SVG = `<svg class="bulb-art" viewBox="0 0 320 340" aria-hidden="true"
     <path class="b-check" d="M128 140l22 22 42-46" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
     <rect x="118" y="252" width="84" height="18" rx="9" fill="url(#base)"/><rect x="122" y="274" width="76" height="16" rx="8" fill="url(#base)"/><path d="M134 294h52l-8 14h-36z" fill="#151515"/></g>
 </svg>`;
-const STAR_SVG = (cls='') => `<svg class="star ${cls}" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C1E1DC"/><stop offset="1" stop-color="#59A598"/></linearGradient></defs><path d="M50 0C54 34 66 46 100 50 66 54 54 66 50 100 46 66 34 54 0 50 34 46 46 34 50 0z" fill="url(#sg)"/></svg>`;
-const SCROLL_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><rect x="34" y="14" width="74" height="84" rx="8" fill="#C1E1DC"/><path d="M108 22v-2a8 8 0 0 0-16 0v70" fill="none" stroke="#1A746B" stroke-width="5"/><rect x="48" y="34" width="44" height="5" rx="2.5" fill="#1A746B"/><rect x="48" y="48" width="36" height="5" rx="2.5" fill="#1A746B"/><rect x="48" y="62" width="40" height="5" rx="2.5" fill="#1A746B"/><path d="M30 98h70" stroke="#59A598" stroke-width="6" stroke-linecap="round"/><g class="medal"><path d="M18 52l-8 22 12-5 6 11 6-22zM46 52l8 22-12-5-6 11-6-22z" fill="#E17D32"/><circle cx="32" cy="40" r="20" fill="#FCD147" stroke="#E1A732" stroke-width="3"/><path d="M32 29l3.4 7 7.6 1.1-5.5 5.3 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.5-5.3 7.6-1.1z" fill="#fff"/></g></svg>`;
-const QUOTE_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><circle cx="60" cy="55" r="46" fill="#C1E1DC"/><g class="medal" fill="#1A746B"><path d="M36 74V58c0-14 8-24 20-28l3 7c-7 3-10 8-10 14h10v23zM66 74V58c0-14 8-24 20-28l3 7c-7 3-10 8-10 14h10v23z"/></g><circle cx="96" cy="22" r="7" fill="#FCD147"/><circle cx="20" cy="88" r="5" fill="#59A598"/></svg>`;
+export const STAR_SVG = (cls='') => `<svg class="star ${cls}" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C1E1DC"/><stop offset="1" stop-color="#59A598"/></linearGradient></defs><path d="M50 0C54 34 66 46 100 50 66 54 54 66 50 100 46 66 34 54 0 50 34 46 46 34 50 0z" fill="url(#sg)"/></svg>`;
+export const SCROLL_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><rect x="34" y="14" width="74" height="84" rx="8" fill="#C1E1DC"/><path d="M108 22v-2a8 8 0 0 0-16 0v70" fill="none" stroke="#1A746B" stroke-width="5"/><rect x="48" y="34" width="44" height="5" rx="2.5" fill="#1A746B"/><rect x="48" y="48" width="36" height="5" rx="2.5" fill="#1A746B"/><rect x="48" y="62" width="40" height="5" rx="2.5" fill="#1A746B"/><path d="M30 98h70" stroke="#59A598" stroke-width="6" stroke-linecap="round"/><g class="medal"><path d="M18 52l-8 22 12-5 6 11 6-22zM46 52l8 22-12-5-6 11-6-22z" fill="#E17D32"/><circle cx="32" cy="40" r="20" fill="#FCD147" stroke="#E1A732" stroke-width="3"/><path d="M32 29l3.4 7 7.6 1.1-5.5 5.3 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.5-5.3 7.6-1.1z" fill="#fff"/></g></svg>`;
+export const QUOTE_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><circle cx="60" cy="55" r="46" fill="#C1E1DC"/><g class="medal" fill="#1A746B"><path d="M36 74V58c0-14 8-24 20-28l3 7c-7 3-10 8-10 14h10v23zM66 74V58c0-14 8-24 20-28l3 7c-7 3-10 8-10 14h10v23z"/></g><circle cx="96" cy="22" r="7" fill="#FCD147"/><circle cx="20" cy="88" r="5" fill="#59A598"/></svg>`;
 
-function siteFooter(){
+export function siteFooter(){
   const ph = CENTER.phones;
   return `<footer class="sfoot">
     <div class="sfoot-in">
@@ -43,9 +51,9 @@ function siteFooter(){
     <div class="sfoot-bar"><span>© ${new Date().getFullYear()} ${CENTER.name}. جميع الحقوق محفوظة.</span><span dir="ltr">${ph.join(' · ')} · ${CENTER.email}</span></div>
   </footer>`;
 }
-const X_LOGO = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.8-6.3L5.4 21H2.3l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>`;
+export const X_LOGO = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.8-6.3L5.4 21H2.3l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>`;
 
-async function viewHome(){
+export async function viewHome(){
   const app=$('#app');
   let data={programs:[],packages:[]}, site={about:DEFAULT_ABOUT, partners:[]}; try{ [data, site] = await Promise.all([Store.catalog(), Store.publicSite().catch(()=>site)]); }catch(e){}
   const P=data.programs, open=P.filter(p=>cohortPublicState(p.cohort).k==='open'), cats=[...new Set(P.map(p=>p.category))].sort(catSort);
@@ -108,7 +116,7 @@ async function viewHome(){
   initPartnerMarquee(site.partners||[]);
 }
 /* الكشف عند التمرير + عدّ الأرقام عند ظهورها */
-function revealOnScroll(root){
+export function revealOnScroll(root){
   const els=$$('[data-reveal]',root);
   if(reduceMotion() || !('IntersectionObserver' in window)){ els.forEach(e=>e.classList.add('in')); countUp(root); return; }
   const io=new IntersectionObserver(ents=>ents.forEach(en=>{ if(!en.isIntersecting) return; en.target.classList.add('in'); if(en.target.querySelector('[data-count]')) countUp(en.target); io.unobserve(en.target); }),{threshold:.15, rootMargin:'0px 0px -40px 0px'});
