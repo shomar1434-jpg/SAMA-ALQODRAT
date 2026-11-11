@@ -933,3 +933,15 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .rate-it{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;font-size:14px}
 .rate-sum{display:grid;gap:8px}.rate-sum > div{display:grid;grid-template-columns:140px 1fr 40px;gap:8px;align-items:center}
 .rate-sum > div:first-child{grid-template-columns:auto 1fr}.rate-sum > div:first-child b{font-size:34px}
+/* مركز السياسات */
+.pol-card{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit}
+.pol-card:hover{border-color:var(--pt)}
+.pol-wrap{max-width:860px}
+.pol-doc h2{font-size:clamp(22px,4vw,28px);font-weight:700;margin:6px 0 10px}
+.pol-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.pol-body{line-height:2;font-size:16px}
+.pol-body h3{font-size:18px;font-weight:600;margin:20px 0 6px}
+.pol-body ul{padding-inline-start:22px;margin:6px 0}
+.pol-hist{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
+.pol-hist li{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px dashed var(--border);padding:6px 0}
+#rfPol a{color:var(--pt);text-decoration:underline}

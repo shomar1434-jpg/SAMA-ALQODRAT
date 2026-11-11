@@ -15,6 +15,7 @@
 - `src/*.js` وحدات ES. **لا شيفرة تُنفَّذ عند التحميل** خارج `boot()`؛ التعريفات فقط، تجنبًا لمشكلات ترتيب الاستيراد الدائري.
 - `src/qudurat.js` منطق باقات القدرات والتحصيلي (الباقات، جداول البنين والبنات، الاشتراكات، الإحصاء) ↔ `supabase/migrations/…_qudurat.sql` (`sub_end`، `session_on`، `sub_stats`، `checkin`).
 - `src/learning_logic.js` منطق الواجبات وبنك الأسئلة والمحاولات والتقييم والمراسلة ↔ `supabase/migrations/…_learning.sql`؛ وواجهاتها في `src/learning_views.js` (تبويبات بوابتي الطالب والمعلم).
+- `src/policy_logic.js` ↔ `supabase/migrations/…_policies.sql` مركز السياسات (`currentPolicies` ↔ `current_policies`، `checkAcceptance` ↔ `check_policy_acceptance`)؛ وواجهاته في `src/policy_views.js` (`#policies`، `#policy-<slug>[~<إصدار>]`، `#admin-policies`، وخانة القبول في نموذج التسجيل).
 - `src/qudurat_views.js` شريط الباقات، وصفحة الباقة، وصفحة الإدارة `#admin-qudurat`. `src/marquee.js` الشريط المنزلق العام.
 - `supabase/migrations/` ترحيلات مرقّمة بالتاريخ. `supabase/seed.sql` البرامج الـ 73 والباقات وقالب الجداول. `supabase/tests/` اختبارات SQL (`npm run test:sql`، يحتاج PostgreSQL محليًا).
 - `docs/` الخطة، والحالة، وبيانات الباقات.
@@ -25,7 +26,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)
@@ -42,6 +43,7 @@ npm run check    # فحص ثابت + بناء + اختبارات (شغّله ق�
 التحضير الموحد: `#checkin` = باركود واحد ثابت. يبحث في اشتراكات لها جلسة الآن ثم الدفعات، ويطلب الاختيار عند التعدد، ويسجّل كل محاولة في `checkin_attempts` (السجل المدني مجزّأ).
 تقرير اليوم: `src/report_logic.js` ↔ `build_daily_report()`؛ لقطة واحدة لكل تاريخ ثم مراجعات مرقّمة (`daily_reports`)، وتُجدول عند 17:30 UTC = 20:30 الرياض.
 التعليم: النطاق = القسم × المقرر من اشتراك قائم. محاولة الاختبار تحفظ نسخة الأسئلة (`snapshot`)، ولا تُرسل الإجابة الصحيحة قبل التسليم. تقييم واحد لكل (طالب، معلم، شهر).
+السياسات: مسودة ← نشر بإصدار (يلزم جهة اعتماد ونص مكتمل)، والمنشور ثابت. التسجيل يُرفض دون قبول الإصدار الساري لكل سياسة «يلزم قبولها»، ويُوثَّق القبول في `policy_acceptances`.
 لا حذف لسجل تاريخي: الحذف يُرفض إن وُجد حضور أو شهادة (`on delete restrict`)، والبديل الإلغاء أو الأرشفة.
 
 ## قواعد لا تُكسر

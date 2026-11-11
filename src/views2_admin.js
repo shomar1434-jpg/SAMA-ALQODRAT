@@ -12,6 +12,7 @@ import { pageSettings } from './views2_settings.js';
 import { pageQudurat } from './qudurat_views.js';
 import { pageUsers } from './admin_users.js';
 import { pageDaily } from './report_views.js';
+import { pagePolicies } from './policy_views.js';
 
 /* =====================================================================
    5) لوحة الإدارة
@@ -23,7 +24,7 @@ export const progName = id => progOf(id)?.name || '—';
 export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
 export async function viewAdmin(r){
   const app=$('#app');
-  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المعلمون وأولياء الأمور'],['admin-daily','form','تقرير اليوم'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
+  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المعلمون وأولياء الأمور'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
   app.innerHTML = `<div class="admin"><aside class="side">
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة</span></b></div>
       <div class="sec">الصفحات</div>
@@ -37,7 +38,7 @@ export async function viewAdmin(r){
   try{ AD = await Store.adminData(); }catch(e){ $('#main').innerHTML=emptyBox('تعذّر تحميل البيانات', esc(e.message)); return; }
   if(!flt.to){ flt.to=riyadhNow().date; flt.from=addDays(flt.to,-29); }
   const fu=$('.side a[href="#admin-followup"]'); if(fu){ const n=followupRows().filter(x=>x.level==='bad').length; if(n) fu.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} حالة حرجة">${fmtNum(n)}</span>`); }
-  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
+  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
 }
 export async function reloadAD(){ AD = await Store.adminData(); }
 
