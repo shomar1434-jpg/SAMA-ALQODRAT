@@ -1,0 +1,360 @@
+/* =====================================================================
+   أدوات العرض المشتركة
+   ===================================================================== */
+const daysTxt = n => n==null ? '—' : n===1 ? 'يوم واحد' : n===2 ? 'يومان' : n<=10 ? `${fmtNum(n)} أيام` : `${fmtNum(n)} يومًا`;
+const hoursTxt = n => n==null ? '—' : n<=10 && n>2 ? `${fmtNum(n)} ساعات` : `${fmtNum(n)} ساعة`;
+const catSort = (a,b) => { const ia=CATEGORIES.indexOf(a), ib=CATEGORIES.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b,'ar'); };
+const daysList = c => (c.days||[]).map(d=>DAYS[d]).join('، ');
+const baseUrl = s => ((s && s.checkin_url || '').trim().replace(/#.*$/,'')) || location.href.split('#')[0];
+const programUrl = (p, s) => baseUrl(s) + '#' + progCode(p);
+const fld = (n,l,req,html,hint='')=>`<div class="field"><label>${l} ${req?'<i>*</i>':''}</label>${html}${hint?`<span class="hint fh" data-h="${n}">${hint}</span>`:''}<div class="errtxt" data-e="${n}"></div></div>`;
+const rv = (l,v)=>`<div><span>${l}</span><b>${esc(v)}</b></div>`;
+const titleBar = (pill, title, p, extra='') => `<div class="ptitle rv"><div><span class="hero-pill">${pill}</span><h2>${title}</h2><p>${p}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">${extra}</div></div>`;
+const kpiCard = (i, icon, tone, label, val, suf, sub) => `<div class="kpi rv t-${tone}" style="--i:${i}"><span class="kic">${ic(icon)}</span><span>${label}</span><b class="num" data-count="${val}" data-suf="${suf||''}">0</b><small>${sub}</small></div>`;
+const short = s => s.length>24 ? s.slice(0,23)+'…' : s;
+const cohortLabel = c => `الدفعة ${fmtNum(c.number)}`;
+function makeQR(el, text, size=300){ try{ el.innerHTML=''; new QRCode(el,{text, width:size, height:size, colorDark:'#0D2F33', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); }catch(e){ el.innerHTML=`<div class="hint" style="max-width:260px;word-break:break-all;color:#0F2628">${esc(text)}</div>`; } }
+async function copyText(t, msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'نُسخ'); }catch(e){ toast('تعذّر النسخ في هذا المتصفح'); } }
+function centerFooter(){
+  return `<footer class="cfoot rv"><div class="cf-brand"><img src="${LOGO}" alt=""><div><b>${CENTER.name}</b><span class="hint">سجل تجاري ${CENTER.cr} · برامج معتمدة من ${CENTER.accreditor}</span></div></div>
+    <div class="cf-items"><span>${ic('pin')}${CENTER.address} · ص.ب ${CENTER.pobox}</span><span dir="ltr">${ic('activity')}${CENTER.phones.join('  ·  ')}</span><span dir="ltr">${ic('form')}${CENTER.email}</span></div></footer>`;
+}
+/* حالة الدفعة كما يراها المتدرب */
+function cohortPublicState(c, today=riyadhNow().date){
+  if(!c) return {k:'none', pill:'g', txt:'لا توجد دفعة حالية'};
+  const full = (c.taken||0) >= c.seats;
+  if(c.reg_open && !full) return {k:'open', pill:'ok', txt:`التسجيل مفتوح · ${cohortLabel(c)}`};
+  if(c.start_date<=today) return {k:'running', pill:'info', txt:`${cohortLabel(c)} منعقدة`};
+  return {k:'closed', pill:'warn', txt: full?`اكتملت مقاعد ${cohortLabel(c)}`:`التسجيل مغلق · ${cohortLabel(c)}`};
+}
+
+/* =====================================================================
+   التوجيه
+   ===================================================================== */
+const ROUTES = ['home','register','me','verify','checkin','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+let charts = [], timers = [];
+function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
+async function route(){
+  cleanup(); closeModal(); closePrint();
+  const h = (location.hash||'').slice(1);
+  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : (!h||h==='home') ? 'home' : 'register';
+  $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
+  $('#modeTag').textContent = Store.mode==='cloud' ? 'متصل بقاعدة البيانات' : 'بيانات تجريبية';
+  $('#modeTag').classList.toggle('cloud', Store.mode==='cloud');
+  window.scrollTo(0,0);
+  if(/^v-[A-Za-z0-9-]+$/.test(h)) return viewVerify(h.slice(2));
+  if(h==='verify') return viewVerify('');
+  if(h==='me') return viewMe();
+  if(/^p[a-z0-9]+$/i.test(h) && !ROUTES.includes(h)) return viewProgramPage(h);
+  if(h.startsWith('qr-')){ if(!(await Store.isAdmin())) return viewLogin(); return viewQR(h.slice(3)); }
+  const r = ROUTES.includes(h) ? h : 'home';
+  if(r==='home') return viewHome();
+  if(r==='register') return viewCatalog();
+  if(r==='checkin') return viewGeneralCheckin();
+  if(!(await Store.isAdmin())) return viewLogin(r);
+  if(r==='display') return viewDisplay();
+  return viewAdmin(r);
+}
+window.addEventListener('hashchange', route);
+
+/* =====================================================================
+   1) دليل البرامج (صفحة التسجيل الرئيسية)
+   ===================================================================== */
+const cat = { kind:'program', cf:'all', q:'', open:false, data:null, pkg:null };
+async function viewCatalog(){
+  const app=$('#app'); app.innerHTML = `<div class="wrap">${skeleton()}</div>`;
+  try{ cat.data = await Store.catalog(); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل البرامج', esc(e.message)+'. أعد تحميل الصفحة بعد قليل.')}</div>`; return; }
+  const {programs} = cat.data; const nOpen=programs.filter(p=>cohortPublicState(p.cohort).k==='open').length, nCats=new Set(programs.map(p=>p.category)).size;
+  const cats=[...new Set(programs.map(p=>p.category))].sort(catSort);
+  app.innerHTML = `<div class="wrap">
+    <section class="hero rv"><div class="logo"><img src="${LOGO}" alt="شعار مركز سما القدرات"></div><div>
+      <span class="hero-pill">${ic('award')}برامج معتمدة من ${CENTER.accreditor}</span>
+      <h1>سجّل في برامج مركز سما القدرات، <em>وابدأ مسارك المهني</em></h1>
+      <p>${CENTER.vision}.</p>
+      <ul class="stats"><li>${ic('book')}<b data-count="${programs.length}">0</b><span>برنامجًا معتمدًا</span></li><li>${ic('grid')}<b data-count="${nCats}">0</b><span>مجالات تدريبية</span></li><li>${ic('form')}<b data-count="${nOpen}">0</b><span>دفعات مفتوحة للتسجيل</span></li></ul></div></section>
+    <div style="height:18px"></div>
+    <div class="card pad rv"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px"><h2 class="sec-title" style="margin:0">اختر البرنامج للتسجيل في دفعته</h2>
+      <div class="seg" style="margin:0"><button data-k="program" class="${cat.kind==='program'?'on':''}">${ic('book')}البرامج</button><button data-k="package" class="${cat.kind==='package'?'on':''}">${ic('layers')}الباقات</button></div></div>
+      ${cat.kind==='program'?`<div class="cats" id="cats"><button data-c="all" class="${cat.cf==='all'?'on':''}">الكل <i>${fmtNum(programs.length)}</i></button>${cats.map(c=>`<button data-c="${esc(c)}" class="${cat.cf===c?'on':''}">${ic(CAT_ICON[c]||'book')}${esc(c)} <i>${fmtNum(programs.filter(p=>p.category===c).length)}</i></button>`).join('')}</div>
+      <div class="filters" style="box-shadow:none;margin:12px 0 16px"><span class="lbl">${ic('search')}</span><input class="inp" id="rq" placeholder="ابحث باسم البرنامج أو رقم الاعتماد" value="${esc(cat.q)}" style="flex:1;min-width:200px">
+        <label class="sw" style="min-height:38px;gap:10px"><span class="hint" style="font-size:14px">المفتوح للتسجيل فقط</span><input type="checkbox" id="ro" ${cat.open?'checked':''}><i></i></label><span class="pill g" id="resCount"></span></div>`:''}
+      <div class="grid g3" id="choices"></div><div id="pkgForm"></div></div>
+    </div>${siteFooter()}`;
+  countUp(app);
+  $$('.seg button').forEach(b=>b.onclick=()=>{ cat.kind=b.dataset.k; cat.pkg=null; viewCatalog(); });
+  $$('#cats button').forEach(b=>b.onclick=()=>{ cat.cf=b.dataset.c; $$('#cats button').forEach(x=>x.classList.toggle('on',x===b)); renderCatalogCards(); });
+  if($('#rq')) $('#rq').oninput=e=>{ cat.q=e.target.value; clearTimeout(window._rq); window._rq=setTimeout(renderCatalogCards,200); };
+  if($('#ro')) $('#ro').onchange=e=>{ cat.open=e.target.checked; renderCatalogCards(); };
+  renderCatalogCards();
+}
+function programCard(p, i){
+  const c=p.cohort, st=cohortPublicState(c), left=c?c.seats-(c.taken||0):0, pc=c?Math.min(100,Math.round((c.taken||0)/c.seats*100)):0;
+  return `<a class="choice rv" href="#${p.code}" style="--i:${Math.min(i,12)};text-decoration:none;color:inherit">
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill dot ${catPill(p.category)}">${esc(p.category)}</span><span class="pill dot ${st.pill}">${st.txt}</span></div>
+    <h3>${esc(p.name)}</h3>
+    <div class="meta"><span>${ic('hourglass')}${hoursTxt(p.hours)}</span><span>${ic('calendar')}${daysTxt(p.duration_days)}</span>${p.accreditation_no?`<span>${ic('award')}اعتماد ${esc(p.accreditation_no)}</span>`:''}</div>
+    ${c?`<div class="meta"><span>${ic('calendar')}${fmtShort(c.start_date)} – ${fmtShort(c.end_date)}</span><span>${ic('clock')}${t12(c.start_time)}</span></div>`:'<div class="hint">يُعلن عن الدفعة القادمة قريبًا.</div>'}
+    <div class="price ${priceTxt(p.price)==='السعر عند التواصل'?'tbd':''}" style="margin-top:auto">${priceTxt(p.price)}</div>
+    ${st.k==='open'?`<div class="bar"><i class="${pc>80?'hot':''}" style="width:${pc}%"></i></div><div class="hint" style="display:flex;justify-content:space-between"><span>متبقٍ ${fmtNum(left)} مقعد</span><span style="color:var(--brand);font-weight:500">التسجيل ${ic('next')}</span></div>`:`<div class="hint" style="text-align:left;color:var(--brand);font-weight:500">صفحة البرنامج ${ic('next')}</div>`}</a>`;
+}
+function renderCatalogCards(){
+  const {programs, packages} = cat.data; const box=$('#choices'); if(!box) return;
+  if(cat.kind==='package'){
+    box.innerHTML = packages.length ? packages.map((k,i)=>{ const ps=programs.filter(p=>k.program_ids.includes(p.id)), sum=ps.reduce((s,p)=>s+Number(p.price||0),0), hrs=ps.reduce((s,p)=>s+(p.hours||0),0);
+        const ready = ps.length && ps.every(p=>cohortPublicState(p.cohort).k==='open');
+        return `<div class="choice rv ${cat.pkg===k.id?'sel':''}" style="--i:${i}"><span class="pill dot ${ready?'ok':'g'}" style="align-self:flex-start">${ready?'التسجيل مفتوح':'التسجيل غير متاح حاليًا'} · ${fmtNum(ps.length)} برامج</span>
+          <h3>${esc(k.name)}</h3>${k.description?`<div class="hint">${esc(k.description)}</div>`:''}
+          <div class="meta">${ps.map(p=>`<span>${ic('book')}${esc(p.name)}${p.cohort?` · ${cohortLabel(p.cohort)}`:''}</span>`).join('')}</div><div class="hint">${hoursTxt(hrs)} تدريبية</div>
+          <div class="price" style="margin-top:auto">${priceTxt(k.price)} ${sum>Number(k.price||0)&&k.price?`<small><s>${fmtMoney(sum)}</s> · توفير ${fmtNum(Math.round((1-k.price/sum)*100))}٪</small>`:''}</div>
+          ${ready?`<button class="btn pri" data-pk="${k.id}">${ic('form')} التسجيل في الباقة</button>`:'<div class="hint">تُفتح الباقة حين تُفتح دفعات كل برامجها.</div>'}</div>`; }).join('')
+      : `<div style="grid-column:1/-1">${emptyBox('لا توجد باقات متاحة الآن','يضيف المركز الباقات وأسعارها قريبًا. يمكنك التسجيل في برنامج منفرد.')}</div>`;
+    $$('[data-pk]').forEach(b=>b.onclick=()=>{ cat.pkg=b.dataset.pk; const k=packages.find(x=>x.id===cat.pkg); renderCatalogCards();
+      const ps=programs.filter(p=>k.program_ids.includes(p.id));
+      $('#pkgForm').innerHTML=`<div style="height:18px"></div>`+regFormHtml(`التسجيل في ${esc(k.name)}`, ps.map(p=>`${p.name} (${cohortLabel(p.cohort)})`).join('، '));
+      bindRegForm({package_id:k.id}, ()=>ps.map(p=>p.cohort)); $('#pkgForm').scrollIntoView({behavior:'smooth'}); });
+    return;
+  }
+  const q=cat.q.trim(), rank={open:0,running:1,closed:2,none:3};
+  const list = programs.filter(p=>(cat.cf==='all'||p.category===cat.cf) && (!q||p.name.includes(q)||(p.accreditation_no||'').includes(q)) && (!cat.open||cohortPublicState(p.cohort).k==='open'))
+    .sort((a,b)=>rank[cohortPublicState(a.cohort).k]-rank[cohortPublicState(b.cohort).k] || catSort(a.category,b.category));
+  $('#resCount').textContent = `${fmtNum(list.length)} برنامج`;
+  box.innerHTML = list.length ? list.map(programCard).join('') : `<div style="grid-column:1/-1">${emptyBox('لا توجد برامج مطابقة','غيّر المجال أو كلمة البحث.')}</div>`;
+}
+
+/* =====================================================================
+   2) صفحة البرنامج: نموذج تسجيل الدفعة + تحقق الحضور (هدف الباركود)
+   ===================================================================== */
+function regFormHtml(title, sub){
+  return `<div class="card pad rv" id="regCard"><h2 class="sec-title">${title}</h2><p class="hint" style="margin:0 0 18px">${sub?esc(sub)+'. ':''}الحقول المعلّمة بـ <span style="color:var(--danger-ink)">*</span> مطلوبة. رقم السجل المدني هو ما يُحضَّر به المتدرب يوميًا في هذه الدفعة.</p>
+    <div class="errsum" id="rfSum" tabindex="-1" role="alert" hidden></div>
+    <form id="rf" class="grid g2" novalidate>
+      ${fld('full_name','الاسم الرباعي',true,`<input class="inp" name="full_name" type="text" maxlength="80" placeholder="محمد علي أحمد الحكمي" autocomplete="name" spellcheck="false">`,'حروف فقط، عربية أو إنجليزية، ثلاثة مقاطع على الأقل.')}
+      ${fld('national_id','رقم السجل المدني أو الإقامة',true,`<input class="inp num" name="national_id" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" dir="ltr" style="text-align:right" placeholder="1XXXXXXXXX" autocomplete="off">`,'أرقام فقط: 10 أرقام تبدأ بـ 1 للمواطن أو 2 للمقيم.')}
+      ${fld('phone','رقم الجوال',true,`<input class="inp num" name="phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" dir="ltr" style="text-align:right" placeholder="05XXXXXXXX" autocomplete="tel-national">`,'أرقام فقط: 10 أرقام تبدأ بـ 05.')}
+      ${fld('email','البريد الإلكتروني',false,`<input class="inp" name="email" type="email" inputmode="email" maxlength="100" dir="ltr" style="text-align:right" placeholder="name@example.com" autocomplete="email" autocapitalize="off" spellcheck="false">`,'يجب أن يحوي علامة @ ونطاقًا، مثل name@gmail.com')}
+      ${fld('gender','الجنس',true,`<select class="inp" name="gender"><option value="">اختر</option><option>ذكر</option><option>أنثى</option></select>`)}
+      ${fld('birth_date','تاريخ الميلاد',false,`<input class="inp" name="birth_date" type="date">`)}
+      ${fld('city','المدينة أو المحافظة',true,`<select class="inp" name="city"><option value="">اختر</option>${CITIES.map(x=>`<option>${x}</option>`).join('')}</select>`)}
+      ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
+      ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','طالب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
+      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود البرنامج والتحقق برقم سجلي المدني.</span></label>
+    </form>
+    <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
+    <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;
+}
+function bindRegForm(target, cohortsFn){
+  const f=$('#rf'); wireFormA11y(f,'rf');
+  /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
+  const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
+  const filters = {
+    full_name: v => v.replace(/\u0640/g,'').replace(NAME_RX,'').replace(/\s{2,}/g,' ').replace(/^\s+/,''),
+    national_id: v => toLatin(v).replace(/\D/g,'').slice(0,10),
+    phone: v => toLatin(v).replace(/\D/g,'').slice(0,10),
+    email: v => toLatin(v).replace(/[\s\u0600-\u06FF]/g,'').toLowerCase()
+  };
+  const blocked = { full_name:'تُقبل الحروف فقط في الاسم، دون أرقام أو رموز.', national_id:'تُقبل الأرقام فقط في السجل المدني.', phone:'تُقبل الأرقام فقط في رقم الجوال.', email:'لا تُقبل المسافات أو الحروف العربية في البريد.' };
+  const checks = {
+    full_name: v => { const parts=v.trim().split(/\s+/).filter(Boolean); if(!v.trim()) return 'اكتب اسمك الرباعي.'; if(/[^\p{L}\p{M}\s]/u.test(v)) return blocked.full_name;
+      if(/[a-zA-Z]/.test(v) && /[\u0621-\u06FF]/.test(v)) return 'اكتب الاسم بلغة واحدة: العربية أو الإنجليزية.'; if(parts.length<3) return 'اكتب الاسم الثلاثي على الأقل.'; if(parts.some(x=>x.replace(/[\u064B-\u0652]/g,'').length<2)) return 'كل مقطع في الاسم حرفان على الأقل.'; return ''; },
+    national_id: v => !v ? 'اكتب رقم السجل المدني.' : !/^\d+$/.test(v) ? blocked.national_id : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : !/^[12]/.test(v) ? 'يبدأ رقم السجل بـ 1 أو 2.' : !validSaudiId(v) ? 'رقم السجل غير صحيح. تحقق من الأرقام.' : '',
+    phone: v => !v ? 'اكتب رقم الجوال.' : !/^\d+$/.test(v) ? blocked.phone : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
+    email: v => !v ? '' : !v.includes('@') ? 'البريد يجب أن يحوي علامة @' : (v.match(/@/g)||[]).length>1 ? 'البريد يحوي علامة @ واحدة فقط.' : !/^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(v) ? 'صيغة البريد غير صحيحة، مثل name@gmail.com' : ''
+  };
+  const setState=(el,msg)=>{ const n=el.name, e=$(`[data-e=${n}]`,f); e.textContent=msg; el.classList.toggle('err',!!msg); el.classList.toggle('ok',!msg && !!el.value); msg?el.setAttribute('aria-invalid','true'):el.removeAttribute('aria-invalid'); };
+  Object.keys(filters).forEach(n=>{ const el=$(`[name=${n}]`,f); let t=0;
+    el.addEventListener('input',()=>{ const before=el.value, after=filters[n](before);
+      if(after!==before){ const pos=Math.max(0,(el.selectionStart||after.length)-(before.length-after.length)); el.value=after; try{ el.setSelectionRange(pos,pos); }catch(_){}
+        if(n!=='email'||/[\s\u0600-\u06FF]/.test(before)){ setState(el,blocked[n]); el.classList.add('shake'); clearTimeout(t); t=setTimeout(()=>{ el.classList.remove('shake'); if(el.dataset.touched) setState(el,checks[n](el.value)); else { $(`[data-e=${n}]`,f).textContent=''; el.classList.remove('err'); el.removeAttribute('aria-invalid'); } },1400); return; } }
+      if(el.dataset.touched) setState(el,checks[n](el.value)); else { el.classList.remove('err'); el.removeAttribute('aria-invalid'); } });
+    el.addEventListener('paste',()=>setTimeout(()=>el.dispatchEvent(new Event('input')),0));
+    el.addEventListener('blur',()=>{ if(n==='full_name') el.value=el.value.trim(); if(!el.value && !el.dataset.touched) return; el.dataset.touched='1'; setState(el,checks[n](el.value)); }); });
+  $$('select.inp',f).forEach(i=>i.addEventListener('change',()=>{ i.classList.remove('err'); i.removeAttribute('aria-invalid'); $(`[data-e=${i.name}]`,f).textContent=''; }));
+  $('#rfGo').onclick = async e=>{
+    const b=e.currentTarget, F=Object.fromEntries(new FormData(f)); let ok=true; const errs=[];
+    const err=(n,m)=>{ ok=false; const el=$(`[name=${n}]`,f); $(`[data-e=${n}]`,f).textContent=m; el.classList.add('err'); el.setAttribute('aria-invalid','true'); errs.push({id:el.id,label:$(`label[for="${el.id}"]`,f)?.textContent.replace('*','').trim()||n,msg:m}); };
+    $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
+    Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
+    ['gender','city','education'].forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
+    if(!F.agree){ ok=false; errs.push({id:'rf-agree',label:'الإقرار',msg:'أكّد صحة البيانات للمتابعة.'}); $('#rfE').textContent='أكّد صحة البيانات للمتابعة.'; }
+    showErrorSummary($('#rfSum'), errs);
+    if(!ok) return;
+    delete F.agree; F.full_name=F.full_name.trim().replace(/\s+/g,' ');
+    setBusy(b,true,'جارٍ حفظ التسجيل');
+    try{
+      const r = await Store.register({...F, ...target});
+      const cs = r.cohorts || cohortsFn().map(c=>({number:c.number, start:c.start_date}));
+      $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك</h2>
+        <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
+        <div class="grid" style="gap:6px;max-width:460px;margin:0 auto 12px">${cs.map(c=>`<div class="pill info" style="justify-content:center;padding:6px 12px">${c.program?esc(c.program)+' · ':''}${cohortLabel(c)} · تبدأ ${fmtShort(c.start)}</div>`).join('')}</div>
+        <p class="hint" style="max-width:480px;margin:0 auto">في أيام البرنامج امسح باركود البرنامج المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p></div>`;
+      liveSay('اكتمل تسجيلك. رقم طلبك '+r.ref);
+    }catch(er){ setBusy(b,false); showErrorSummary($('#rfSum'), [{id:'rf-full_name',label:'تعذّر التسجيل',msg:er.message}]); $('#rfE').textContent=er.message; }
+  };
+}
+function attendanceBoxHtml(st){
+  return `<div class="card checkin rv" style="max-width:520px;margin:0 auto" id="attCard">
+    <div class="head"><h2 style="margin-top:0">تحقق الحضور اليومي</h2><div class="hint" id="cDate"></div><div class="clock" id="cClock" dir="ltr"></div></div>
+    <form id="cf" class="pad" novalidate>
+      <div class="field"><label>رقم السجل المدني أو الإقامة</label><input class="inp nidinp num" id="nid" inputmode="numeric" maxlength="10" dir="ltr" placeholder="1XXXXXXXXX" autocomplete="off"></div>
+      ${st.require_code?`<div class="field" style="margin-top:16px"><label style="text-align:center">رمز اليوم الظاهر على شاشة القاعة</label><div class="codebox">${[0,1,2,3].map(i=>`<input maxlength="1" inputmode="numeric" aria-label="الرقم ${i+1}">`).join('')}</div></div>`:''}
+      <div class="errtxt" id="cErr" style="text-align:center;margin-top:10px"></div>
+      <button class="btn pri lg" style="width:100%;margin-top:12px" id="cBtn">${ic('check')} تسجيل الحضور</button>
+    </form><div id="cRes" class="pad hidden" aria-live="polite"></div><div class="pad" style="padding-top:0;text-align:center"><a href="#me" class="hint" style="color:var(--brand);font-weight:500">${ic('activity')} اطّلع على نسبة حضورك</a></div></div>`;
+}
+function bindAttendance(st, programCode, onBack){
+  const tick=()=>{ const n=riyadhNow(); if(!$('#cClock')) return; $('#cClock').textContent=t12(n.hm).replace(' ص',' AM').replace(' م',' PM'); $('#cDate').textContent=fmtDate(n.date); };
+  tick(); timers.push(setInterval(tick,1000));
+  const nid=$('#nid'); nid.addEventListener('input',()=>{ nid.value=toLatin(nid.value).replace(/\D/g,''); nid.classList.remove('err'); if(nid.value.length===10) $('.codebox input')?.focus(); });
+  $$('.codebox input').forEach((inp,i,all)=>{
+    inp.addEventListener('input',()=>{ inp.value=toLatin(inp.value).replace(/\D/g,'').slice(-1); if(inp.value && all[i+1]) all[i+1].focus(); });
+    inp.addEventListener('keydown',e=>{ if(e.key==='Backspace' && !inp.value && all[i-1]) all[i-1].focus(); });
+    inp.addEventListener('paste',e=>{ const t=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,4); if(t.length){ e.preventDefault(); all.forEach((x,j)=>x.value=t[j]||''); all[Math.min(t.length,3)].focus(); } });
+  });
+  $('#cf').onsubmit = async e=>{
+    e.preventDefault(); const er=$('#cErr'); er.textContent='';
+    const id=nid.value.trim(), code=$$('.codebox input').map(x=>x.value).join('');
+    if(!validSaudiId(id)){ er.textContent='رقم السجل غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.'; nid.classList.add('err'); return; }
+    if(st.require_code && code.length!==4){ er.textContent='اكتب رمز اليوم المكوّن من 4 أرقام.'; return; }
+    const b=$('#cBtn'); setBusy(b,true,'جارٍ التحقق من السجل');
+    let r; try{ r = await Store.checkin(id, code, programCode); }catch(x){ r={ok:false,reason:'error',msg:x.message}; }
+    setBusy(b,false); liveSay(r.ok?'سُجّل حضورك':'تعذّر تسجيل الحضور');
+    showCheckinResult(r, onBack);
+  };
+}
+function showCheckinResult(r, onBack){
+  const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
+  const again = `<button class="btn" style="width:100%;margin-top:16px" id="cAgain">${ic('prev')} رجوع</button>`;
+  if(r.ok){
+    const late = r.status==='متأخر';
+    box.innerHTML = `<div style="text-align:center" class="rv"><div class="bigcheck ${late?'warn':''}">${ic(late?'timer':'check')}</div>
+      <h2 style="font-size:22px;font-weight:700">${r.already?'حضورك مسجّل مسبقًا اليوم':'سُجّل حضورك'}</h2>
+      <p class="hint" style="margin:4px 0 14px">أهلًا ${esc(r.name.split(' ')[0])}، يومًا تدريبيًا موفقًا.</p></div>
+      <div class="result-card rv" style="--i:2">
+        <div class="r"><span>${ic('user')}المتدرب</span><b>${esc(r.name)}</b></div>
+        <div class="r"><span>${ic('book')}البرنامج</span><b>${esc(r.program)}</b></div>
+        <div class="r"><span>${ic('users')}الدفعة</span><b>${cohortLabel(r)}</b></div>
+        ${r.package?`<div class="r"><span>${ic('layers')}الباقة</span><b>${esc(r.package)}</b></div>`:''}
+        ${r.hall?`<div class="r"><span>${ic('pin')}القاعة</span><b>${esc(r.hall)}</b></div>`:''}
+        <div class="r"><span>${ic('clock')}وقت الحضور</span><b class="num">${t12(r.time)}</b></div>
+        <div class="r"><span>${ic('activity')}الحالة</span><b><span class="pill dot ${late?'warn':'ok'}">${late?'متأخر':'في الوقت'}</span></b></div>
+      </div>${again}`;
+  } else {
+    const first = r.name ? `أهلًا ${esc(r.name.split(' ')[0])}. ` : '';
+    const M = {
+      bad_code:['رمز اليوم غير صحيح','اكتب الرمز الظاهر على شاشة القاعة.','bad','x'],
+      not_found:['السجل المدني غير موجود في كشف الدفعة', `لا يوجد تسجيل بهذا الرقم${r.program?` في ${cohortLabel(r)} من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
+      not_in_cohort:['السجل المدني غير موجود في كشف الدفعة', `هذا الرقم غير مسجّل في ${r.number?cohortLabel(r):'الدفعات المنعقدة اليوم'}${r.program?` من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
+      no_cohort:['لا توجد دفعة منعقدة', r.upcoming?`تبدأ ${cohortLabel(r.upcoming)} من «${esc(r.program)}» في ${fmtShort(r.upcoming.start)}.`:`لا توجد دفعة منعقدة حاليًا${r.program?` في «${esc(r.program)}»`:''}.`,'warn','calendar'],
+      no_program:['البرنامج غير موجود','الباركود لا يطابق أي برنامج. راجع الاستقبال.','bad','x'],
+      no_session:['لا توجد محاضرة الآن', `${first}${r.next?`المحاضرة القادمة ${fmtDate(r.next.date)} الساعة ${t12(r.next.time)}.`:'لا توجد محاضرات قادمة في دفعتك.'}`,'warn','timer'],
+      error:['تعذّر الاتصال', esc(r.msg||'')+' حاول مرة أخرى بعد قليل.','bad','alert'] }[r.reason] || ['تعذّر التسجيل','','bad','alert'];
+    box.innerHTML = `<div style="text-align:center" class="rv"><div class="bigcheck ${M[2]}">${ic(M[3])}</div>
+      <h2 style="font-size:21px;font-weight:700">${M[0]}</h2><p class="hint" style="font-size:14px">${M[1]}</p></div>${again}`;
+  }
+  $('#cAgain').onclick = onBack;
+}
+async function viewProgramPage(code, tab){
+  const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
+  let p, st={require_code:false};
+  try{ [p, st] = await Promise.all([Store.publicProgram(code), Store.publicSettings()]); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل البرنامج', esc(e.message))}</div>`; return; }
+  if(!p){ app.innerHTML=`<div class="wrap">${emptyBox('البرنامج غير موجود','تحقق من الرابط أو الباركود.')}<div style="text-align:center;margin-top:14px"><a class="btn pri" href="#register">${ic('book')} دليل البرامج</a></div></div>${siteFooter()}`; return; }
+  const c=p.cohort, today=riyadhNow().date, ps=cohortPublicState(c,today), sessionToday = c && isSessionDay(c,today);
+  tab = tab || (sessionToday || (c && c.start_date<=today && !c.reg_open) ? 'att' : 'reg');
+  app.innerHTML = `<div class="wrap">
+    <section class="hero rv" style="align-items:flex-start"><div class="logo"><img src="${LOGO}" alt="" style="height:96px"></div><div style="flex:1;min-width:0">
+      <span class="hero-pill">${ic(CAT_ICON[p.category]||'book')}${esc(p.category)}${p.accreditation_no?` · رقم الاعتماد ${esc(p.accreditation_no)}`:''}</span>
+      <h1>${esc(p.name)}</h1>
+      ${p.description?`<p>${esc(p.description)}</p>`:''}
+      <ul class="stats" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+        <li>${ic('hourglass')}<b>${p.hours==null?'—':fmtNum(p.hours)}</b><span>ساعة تدريبية</span></li>
+        <li>${ic('calendar')}<b>${p.duration_days==null?'—':fmtNum(p.duration_days)}</b><span>أيام</span></li>
+        <li>${ic('wallet')}<b style="font-size:${Number(p.price)>0?24:16}px">${Number(p.price)>0?fmtNum(p.price):'عند التواصل'}</b><span>${Number(p.price)>0?'ريال سعودي':'السعر'}</span></li>
+        ${c?`<li>${ic('users')}<b>${fmtNum(Math.max(0,c.seats-(c.taken||0)))}</b><span>مقعدًا متبقيًا في ${cohortLabel(c)}</span></li>`:''}
+      </ul>
+      ${c?`<div class="cohort-strip"><span class="pill dot ${ps.pill}" style="background:rgba(255,255,255,.12);color:#fff">${ps.txt}</span><span>${ic('calendar')}${fmtShort(c.start_date)} – ${fmtShort(c.end_date)}</span><span>${ic('clock')}${t12(c.start_time)} – ${t12(c.end_time)}</span><span>${ic('grid')}${daysList(c)}</span>${c.hall?`<span>${ic('pin')}${esc(c.hall)}</span>`:''}</div>`:''}
+    </div></section>
+    <div class="tabs rv" style="--i:1;margin:18px 0" role="tablist"><button class="tab" role="tab" data-t="reg" aria-selected="${tab==='reg'}">${ic('form')}التسجيل في الدفعة</button><button class="tab" role="tab" data-t="att" aria-selected="${tab==='att'}">${ic('qr')}تسجيل الحضور</button></div>
+    <div id="pBody"></div></div>${siteFooter()}`;
+  $$('.tabs .tab').forEach(b=>b.onclick=()=>{ cleanup(); viewProgramPage(code, b.dataset.t); });
+  const body=$('#pBody');
+  if(tab==='att'){ body.innerHTML=attendanceBoxHtml(st); bindAttendance(st, code, ()=>viewProgramPage(code,'att')); return; }
+  if(ps.k==='open'){ body.innerHTML=regFormHtml(`التسجيل في ${cohortLabel(c)}`, `تبدأ ${fmtDate(c.start_date)}`); bindRegForm({program_id:p.id}, ()=>[c]); }
+  else body.innerHTML = emptyBox(ps.k==='none'?'التسجيل غير مفتوح حاليًا':ps.k==='running'?`${cohortLabel(c)} منعقدة الآن`:'التسجيل مغلق',
+      ps.k==='none'?'يُعلن عن الدفعة القادمة لهذا البرنامج قريبًا. تابعنا أو تواصل مع المركز.':ps.k==='running'?'انتهى التسجيل في هذه الدفعة. إذا كنت مسجّلًا فاختر «تسجيل الحضور».':'اكتمل التسجيل في هذه الدفعة. تُفتح دفعة جديدة بعد انتهائها.');
+}
+async function viewGeneralCheckin(){
+  const app=$('#app'); let st={require_code:false}; try{ st=await Store.publicSettings(); }catch(e){}
+  app.innerHTML=`<div class="wrap"><div style="text-align:center;margin-bottom:16px" class="rv"><img src="${LOGO}" alt="" style="height:84px;background:#fff;border-radius:20px;padding:8px;box-shadow:var(--shadow-card)"></div>${attendanceBoxHtml(st)}
+    <p class="hint" style="text-align:center;margin-top:14px">يُطابق النظام سجلك المدني مع كشوف الدفعات المنعقدة اليوم. الأفضل مسح باركود برنامجك في القاعة.</p></div>${siteFooter()}`;
+  bindAttendance(st, null, viewGeneralCheckin);
+}
+
+/* =====================================================================
+   3) شاشة باركود البرنامج (ثابت لكل برنامج، يخدم كل دفعاته)
+   ===================================================================== */
+async function viewQR(code){
+  const app=$('#app'); const D=await Store.adminData(); const p=D.programs.find(x=>progCode(x)===code);
+  if(!p){ app.innerHTML=`<div class="wrap">${emptyBox('البرنامج غير موجود')}</div>`; return; }
+  const st=D.settings, url=programUrl(p,st), today=riyadhNow().date, c=activeCohortOf(D,p.id,today);
+  app.innerHTML = `<div class="display">
+    <div class="qrpanel rv"><img src="${LOGO}" alt="" style="height:72px;background:#fff;border-radius:16px;padding:6px;margin-bottom:14px">
+      <span class="hero-pill">${ic('qr')}${c?`${cohortLabel(c)} · ${STATE_TXT[cohortState(c,today)]}`:'لا توجد دفعة نشطة'}</span>
+      <h2>${esc(p.name)}</h2>
+      <p style="color:var(--hero-muted);margin:4px 0 18px">امسح الباركود للتسجيل في الدفعة أو لتسجيل حضورك اليومي</p>
+      <div class="qrbox"><div id="qr"></div><div class="beam"></div></div>
+      ${st.require_code?`<div class="daycode"><span>رمز اليوم</span><b id="dCode">····</b></div>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card pad rv" style="--i:1;text-align:center"><div class="clock" id="dClock" dir="ltr" style="font-size:46px;color:var(--ink)"></div><div class="hint" style="font-size:15px;margin-top:6px">${fmtDate(today)}</div></div>
+      ${c?`<div class="card pad rv" style="--i:2"><h3 class="ctitle" style="margin-bottom:10px">${ic('users')}${cohortLabel(c)}</h3>
+        <div class="grid g2" style="gap:10px">${kpiCard(0,'users','info','المسجلون',takenOf(D,c.id),'',`من ${fmtNum(c.seats)} مقعد`)}${kpiCard(1,'check','success','حضور اليوم',0,'',isSessionDay(c,today)?`${t12(c.start_time)} – ${t12(c.end_time)}`:'لا محاضرة اليوم')}</div></div>
+      <div class="card pad rv" style="--i:3"><div style="display:flex;justify-content:space-between;align-items:center"><h3 class="ctitle">${ic('activity')}آخر الحضور</h3></div><div class="livefeed" id="feed"></div></div>`
+      : `<div class="rv">${emptyBox('لا توجد دفعة نشطة','افتح دفعة جديدة من صفحة الدفعات، ويبقى هذا الباركود نفسه.')}</div>`}
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><a class="btn sm" href="#admin-cohorts">${ic('prev')} الدفعات</a><button class="btn sm" id="cp">${ic('copy')} نسخ الرابط</button><button class="btn sm" id="fs">${ic('expand')} ملء الشاشة</button></div>
+      <div class="hint" style="text-align:center;word-break:break-all" dir="ltr">${esc(url)}</div>
+    </div></div>`;
+  makeQR($('#qr'), url, 320); countUp(app);
+  $('#cp').onclick=()=>copyText(url,'نُسخ رابط البرنامج');
+  $('#fs').onclick=()=>{ (document.documentElement.requestFullscreen?.()||Promise.reject()).catch(()=>toast('ملء الشاشة غير متاح في هذا العرض')); };
+  const tick=()=>{ const el=$('#dClock'); if(el) el.textContent=t12(riyadhNow().hm).replace(' ص',' AM').replace(' م',' PM'); }; tick(); timers.push(setInterval(tick,1000));
+  if(st.require_code) Store.todayCode().then(x=>{ if($('#dCode')) $('#dCode').textContent=x; }).catch(()=>{});
+  if(!c) return;
+  let last=null;
+  const refresh=async()=>{ const d=await Store.adminData(); const td=riyadhNow().date; const att=d.attendance.filter(a=>a.cohort_id===c.id&&a.att_date===td).sort((a,b)=>b.time.localeCompare(a.time));
+    const k=$$('.kpi b')[1]; if(k) k.textContent=fmtNum(att.length);
+    const ids=att.slice(0,8).map(a=>a.id).join(); if(ids===last) return; last=ids;
+    $('#feed').innerHTML = att.slice(0,8).map((a,i)=>{ const t=d.trainees.find(x=>x.id===a.trainee_id); return `<div class="f" style="animation-delay:${i*60}ms"><b style="font-weight:600">${esc(t?.full_name.split(' ').slice(0,2).join(' ')||'—')}</b><span class="pill dot ${a.status==='متأخر'?'warn':'ok'} num">${t12(a.time.slice(0,5))}</span></div>`; }).join('') || emptyBox('لم يُسجَّل حضور اليوم بعد'); };
+  refresh(); timers.push(setInterval(refresh,8000));
+}
+/* شاشة محاضرات اليوم: باركود كل برنامج منعقد */
+async function viewDisplay(){
+  const app=$('#app'); const D=await Store.adminData(); const today=riyadhNow().date;
+  const todays = D.cohorts.filter(c=>!cohortArchived(c,today) && isSessionDay(c,today)).sort((a,b)=>toMin(a.start_time)-toMin(b.start_time));
+  app.innerHTML = `<div class="wrap">${titleBar(`${ic('calendar')}${fmtDate(today)}`,'محاضرات اليوم، <em>وباركود كل برنامج</em>','افتح باركود البرنامج على شاشة القاعة، أو اطبعه وعلّقه. الباركود ثابت للبرنامج ويخدم كل دفعاته.',`<a class="btn sm" href="#admin-cohorts">${ic('prev')} الدفعات</a>`)}
+    <div class="grid g3">${todays.map((c,i)=>{ const p=D.programs.find(x=>x.id===c.program_id); const n=D.attendance.filter(a=>a.cohort_id===c.id&&a.att_date===today).length;
+      return `<div class="card pad rv" style="--i:${i+1};display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center">
+        <span class="pill dot ${catPill(p.category)}">${esc(p.category)}</span><h3 style="font-size:17px;font-weight:600">${esc(p.name)}</h3>
+        <div class="hint">${cohortLabel(c)} · ${t12(c.start_time)} – ${t12(c.end_time)}${c.hall?` · ${esc(c.hall)}`:''}</div>
+        <div class="qrmini" data-qr="${esc(programUrl(p,D.settings))}"></div>
+        <span class="pill dot ok">${fmtNum(n)} من ${fmtNum(takenOf(D,c.id))} حاضر</span>
+        <a class="btn pri sm" href="#qr-${progCode(p)}">${ic('expand')} عرض على الشاشة</a></div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد محاضرات اليوم','تظهر هنا الدفعات المنعقدة في أيام محاضراتها.')}</div>`}</div></div>`;
+  $$('[data-qr]').forEach(el=>makeQR(el, el.dataset.qr, 150));
+}
+
+/* =====================================================================
+   4) دخول المدير
+   ===================================================================== */
+function viewLogin(){
+  const cloud = Store.mode==='cloud';
+  $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
+    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>دخول مدير النظام</h2><div class="hint">الدفعات والحضور والتحليلات وإدارة البرامج</div></div></div>
+    <form id="lf" class="grid pad">
+      ${cloud?`<div class="field"><label>البريد الإلكتروني</label><input class="inp" name="u" type="email" dir="ltr" required></div>`:''}
+      <div class="field"><label>${cloud?'كلمة المرور':'رمز الدخول'}</label><input class="inp" name="p" type="password" ${cloud?'':'inputmode="numeric"'} required></div>
+      <div class="errtxt" id="lErr"></div>
+      <button class="btn pri">${ic('lock')} دخول</button>
+      ${cloud?'':`<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>البيانات تجريبية. رمز الدخول الافتراضي <b>1234</b>، وتغيّره من الإعدادات.</span></div>`}
+    </form></div></div>`;
+  $('#lf').onsubmit = async e=>{ e.preventDefault(); const F=Object.fromEntries(new FormData(e.target)), b=$('#lf button');
+    setBusy(b,true,'جارٍ الدخول'); try{ await Store.login(F.u, F.p); route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } };
+}
