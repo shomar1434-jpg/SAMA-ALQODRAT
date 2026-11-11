@@ -1,7 +1,9 @@
+import { $, $$, esc, fmtNum } from './utils.js';
+
 /* =====================================================================
    الأيقونات الخطية (سماكة 2) والعناصر الإيضاحية — من نظام تصميم سِجِل
    ===================================================================== */
-const IC = {
+export const IC = {
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8"/><path d="M22 21a7 7 0 0 0-5-6.7"/>',
   pin:'<path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>',
@@ -45,16 +47,16 @@ const IC = {
   spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/>',
   hourglass:'<path d="M6 2h12M6 22h12M7 2c0 5 10 5 10 10S7 17 7 22M17 2c0 5-10 5-10 10s10 5 10 10"/>'
 };
-const ic = (n, cls='') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]||''}</svg>`;
-const EMPTY_ART = `<svg class="art" viewBox="0 0 120 96" aria-hidden="true"><rect x="18" y="20" width="84" height="62" rx="12" fill="var(--brand-tint)"/><rect x="30" y="34" width="44" height="7" rx="3.5" fill="var(--brand)" opacity=".55"/><rect x="30" y="49" width="60" height="7" rx="3.5" fill="var(--surface-track)"/><rect x="30" y="64" width="34" height="7" rx="3.5" fill="var(--surface-track)"/><circle cx="92" cy="22" r="12" fill="var(--gold-tint)"/><path d="M92 16v7l4 2" stroke="var(--gold)" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`;
-const emptyBox = (title, text='') => `<div class="empty box">${EMPTY_ART}<strong>${title}</strong>${text?`<span>${text}</span>`:''}</div>`;
-const skeleton = () => `<div class="card skel"><i></i><i></i><i></i><i></i><i></i></div>`;
-function ringSvg(pct, size=58, sw=6, tone){
+export const ic = (n, cls='') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]||''}</svg>`;
+export const EMPTY_ART = `<svg class="art" viewBox="0 0 120 96" aria-hidden="true"><rect x="18" y="20" width="84" height="62" rx="12" fill="var(--brand-tint)"/><rect x="30" y="34" width="44" height="7" rx="3.5" fill="var(--brand)" opacity=".55"/><rect x="30" y="49" width="60" height="7" rx="3.5" fill="var(--surface-track)"/><rect x="30" y="64" width="34" height="7" rx="3.5" fill="var(--surface-track)"/><circle cx="92" cy="22" r="12" fill="var(--gold-tint)"/><path d="M92 16v7l4 2" stroke="var(--gold)" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`;
+export const emptyBox = (title, text='') => `<div class="empty box">${EMPTY_ART}<strong>${title}</strong>${text?`<span>${text}</span>`:''}</div>`;
+export const skeleton = () => `<div class="card skel"><i></i><i></i><i></i><i></i><i></i></div>`;
+export function ringSvg(pct, size=58, sw=6, tone){
   const r=(size-sw)/2, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
   return `<div class="ring" style="width:${size}px;height:${size}px;${tone?`--c:var(--${tone})`:''}"><svg width="${size}" height="${size}"><circle class="bg" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke-width="${sw}"/><circle class="fg" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke-width="${sw}" stroke-dasharray="${c}" stroke-dashoffset="${off}" style="--rc:${c}"/></svg><b>${fmtNum(pct)}٪</b></div>`;
 }
-const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-function countUp(root=document){
+export const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export function countUp(root=document){
   $$('[data-count]', root).forEach(el=>{
     const target=+el.dataset.count, suf=el.dataset.suf||'';
     if(reduceMotion()){ el.textContent=fmtNum(target)+suf; return; }
@@ -63,16 +65,15 @@ function countUp(root=document){
     requestAnimationFrame(step);
   });
 }
-function toast(m){ const t=$('#toast'); t.innerHTML=`<span class="ti">${ic('check')}</span>${esc(m)}`; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2600); }
-const statusPill = s => ({'حاضر':'ok','متأخر':'warn','غائب':'bad','مسجل':'ok','ملغى':'bad'}[s]||'g');
+export function toast(m){ const t=$('#toast'); t.innerHTML=`<span class="ti">${ic('check')}</span>${esc(m)}`; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2600); }
+export const statusPill = s => ({'حاضر':'ok','متأخر':'warn','غائب':'bad','مسجل':'ok','ملغى':'bad'}[s]||'g');
 
 /* ---------- السمة: فاتح / داكن / تلقائي ---------- */
-function getTheme(){ try{ return localStorage.getItem('sama_theme')||'auto'; }catch(e){ return 'auto'; } }
-function applyTheme(t){
+export function getTheme(){ try{ return localStorage.getItem('sama_theme')||'auto'; }catch(e){ return 'auto'; } }
+export function applyTheme(t){
   const dark = t==='dark' || (t==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   const b=$('#themeBtn'); if(b){ b.innerHTML = ic(dark?'sun':'moon'); b.title = dark?'الوضع الفاتح':'الوضع الداكن'; }
 }
-function setTheme(t){ try{ localStorage.setItem('sama_theme',t); }catch(e){} applyTheme(t); }
-applyTheme(getTheme());
+export function setTheme(t){ try{ localStorage.setItem('sama_theme',t); }catch(e){} applyTheme(t); }
 

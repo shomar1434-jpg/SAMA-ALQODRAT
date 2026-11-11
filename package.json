@@ -2,6 +2,18 @@
   "name": "sama-platform",
   "private": true,
   "type": "module",
-  "scripts": { "build": "python build.py", "test": "node tests/smoke.mjs" },
-  "devDependencies": { "playwright": "^1.48.0" }
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "lint": "eslint src tests",
+    "test": "node tests/smoke.mjs && node tests/e2e.mjs",
+    "check": "npm run lint && npm run build && npm test"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
+    "playwright": "^1.48.0",
+    "vite": "^8.3.8"
+  }
 }

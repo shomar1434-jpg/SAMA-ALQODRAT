@@ -1,5 +1,12 @@
+import { Store } from './data2.js';
+import { $, $$, esc } from './utils.js';
+import { AD, reloadAD } from './views2_admin.js';
+import { getTheme, ic, setTheme, toast } from './views2_head.js';
+import { route, titleBar } from './views2_main.js';
+import { closeModal, confirmBox, modal, swRow } from './views2_programs.js';
+
 /* ---------- الإعدادات ---------- */
-function pageSettings(){
+export function pageSettings(){
   const m=$('#main'); const s=AD.settings; const cloud=Store.mode==='cloud'; const th=getTheme();
   m.innerHTML = titleBar(`${ic('settings')}الإعدادات`, 'سياسة الحضور <em>والمظهر</em>', 'رمز اليوم، مهلة التأخر، رابط الباركود، والوضع الفاتح أو الداكن.')+
    `<div class="grid g2"><form class="card pad grid rv" style="--i:1" id="sf">
@@ -35,7 +42,3 @@ function pageSettings(){
   }
 }
 
-/* تبديل السمة من الشريط العلوي، وإعادة رسم الرسوم بألوانها */
-$('#themeBtn').onclick=()=>{ const dark=document.documentElement.dataset.theme==='dark'; setTheme(dark?'light':'dark'); if((location.hash||'').startsWith('#admin')) route(); };
-if(window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{ if(getTheme()==='auto'){ applyTheme('auto'); } });
-route();

@@ -1,26 +1,38 @@
+import { LOGO } from './assets/logo.js';
+import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
+import { PAGE, adminBase, publicBase } from './config.js';
+import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
+import { liveSay, setBusy, showErrorSummary, toLatin, viewMe, viewVerify, wireFormA11y } from './features.js';
+import { siteFooter, viewHome } from './landing.js';
+import { closePrint } from './print.js';
+import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, validSaudiId } from './utils.js';
+import { viewAdmin } from './views2_admin.js';
+import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
+import { closeModal } from './views2_programs.js';
+
 /* =====================================================================
    أدوات العرض المشتركة
    ===================================================================== */
-const daysTxt = n => n==null ? '—' : n===1 ? 'يوم واحد' : n===2 ? 'يومان' : n<=10 ? `${fmtNum(n)} أيام` : `${fmtNum(n)} يومًا`;
-const hoursTxt = n => n==null ? '—' : n<=10 && n>2 ? `${fmtNum(n)} ساعات` : `${fmtNum(n)} ساعة`;
-const catSort = (a,b) => { const ia=CATEGORIES.indexOf(a), ib=CATEGORIES.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b,'ar'); };
-const daysList = c => (c.days||[]).map(d=>DAYS[d]).join('، ');
-const baseUrl = s => ((s && s.checkin_url || '').trim().replace(/#.*$/,'')) || location.href.split('#')[0];
-const programUrl = (p, s) => baseUrl(s) + '#' + progCode(p);
-const fld = (n,l,req,html,hint='')=>`<div class="field"><label>${l} ${req?'<i>*</i>':''}</label>${html}${hint?`<span class="hint fh" data-h="${n}">${hint}</span>`:''}<div class="errtxt" data-e="${n}"></div></div>`;
-const rv = (l,v)=>`<div><span>${l}</span><b>${esc(v)}</b></div>`;
-const titleBar = (pill, title, p, extra='') => `<div class="ptitle rv"><div><span class="hero-pill">${pill}</span><h2>${title}</h2><p>${p}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">${extra}</div></div>`;
-const kpiCard = (i, icon, tone, label, val, suf, sub) => `<div class="kpi rv t-${tone}" style="--i:${i}"><span class="kic">${ic(icon)}</span><span>${label}</span><b class="num" data-count="${val}" data-suf="${suf||''}">0</b><small>${sub}</small></div>`;
-const short = s => s.length>24 ? s.slice(0,23)+'…' : s;
-const cohortLabel = c => `الدفعة ${fmtNum(c.number)}`;
-function makeQR(el, text, size=300){ try{ el.innerHTML=''; new QRCode(el,{text, width:size, height:size, colorDark:'#0D2F33', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); }catch(e){ el.innerHTML=`<div class="hint" style="max-width:260px;word-break:break-all;color:#0F2628">${esc(text)}</div>`; } }
-async function copyText(t, msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'نُسخ'); }catch(e){ toast('تعذّر النسخ في هذا المتصفح'); } }
-function centerFooter(){
+export const daysTxt = n => n==null ? '—' : n===1 ? 'يوم واحد' : n===2 ? 'يومان' : n<=10 ? `${fmtNum(n)} أيام` : `${fmtNum(n)} يومًا`;
+export const hoursTxt = n => n==null ? '—' : n<=10 && n>2 ? `${fmtNum(n)} ساعات` : `${fmtNum(n)} ساعة`;
+export const catSort = (a,b) => { const ia=CATEGORIES.indexOf(a), ib=CATEGORIES.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b,'ar'); };
+export const daysList = c => (c.days||[]).map(d=>DAYS[d]).join('، ');
+export const baseUrl = s => ((s && s.checkin_url || '').trim().replace(/#.*$/,'')) || publicBase();
+export const programUrl = (p, s) => baseUrl(s) + '#' + progCode(p);
+export const fld = (n,l,req,html,hint='')=>`<div class="field"><label>${l} ${req?'<i>*</i>':''}</label>${html}${hint?`<span class="hint fh" data-h="${n}">${hint}</span>`:''}<div class="errtxt" data-e="${n}"></div></div>`;
+export const rv = (l,v)=>`<div><span>${l}</span><b>${esc(v)}</b></div>`;
+export const titleBar = (pill, title, p, extra='') => `<div class="ptitle rv"><div><span class="hero-pill">${pill}</span><h2>${title}</h2><p>${p}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">${extra}</div></div>`;
+export const kpiCard = (i, icon, tone, label, val, suf, sub) => `<div class="kpi rv t-${tone}" style="--i:${i}"><span class="kic">${ic(icon)}</span><span>${label}</span><b class="num" data-count="${val}" data-suf="${suf||''}">0</b><small>${sub}</small></div>`;
+export const short = s => s.length>24 ? s.slice(0,23)+'…' : s;
+export const cohortLabel = c => `الدفعة ${fmtNum(c.number)}`;
+export function makeQR(el, text, size=300){ try{ el.innerHTML=''; new QRCode(el,{text, width:size, height:size, colorDark:'#0D2F33', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); }catch(e){ el.innerHTML=`<div class="hint" style="max-width:260px;word-break:break-all;color:#0F2628">${esc(text)}</div>`; } }
+export async function copyText(t, msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'نُسخ'); }catch(e){ toast('تعذّر النسخ في هذا المتصفح'); } }
+export function centerFooter(){
   return `<footer class="cfoot rv"><div class="cf-brand"><img src="${LOGO}" alt=""><div><b>${CENTER.name}</b><span class="hint">سجل تجاري ${CENTER.cr} · برامج معتمدة من ${CENTER.accreditor}</span></div></div>
     <div class="cf-items"><span>${ic('pin')}${CENTER.address} · ص.ب ${CENTER.pobox}</span><span dir="ltr">${ic('activity')}${CENTER.phones.join('  ·  ')}</span><span dir="ltr">${ic('form')}${CENTER.email}</span></div></footer>`;
 }
 /* حالة الدفعة كما يراها المتدرب */
-function cohortPublicState(c, today=riyadhNow().date){
+export function cohortPublicState(c, today=riyadhNow().date){
   if(!c) return {k:'none', pill:'g', txt:'لا توجد دفعة حالية'};
   const full = (c.taken||0) >= c.seats;
   if(c.reg_open && !full) return {k:'open', pill:'ok', txt:`التسجيل مفتوح · ${cohortLabel(c)}`};
@@ -31,12 +43,17 @@ function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-const ROUTES = ['home','register','me','verify','checkin','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
-let charts = [], timers = [];
-function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
-async function route(){
+export const ROUTES = ['home','register','me','verify','checkin','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export let charts = [], timers = [];
+export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
+export async function route(){
   cleanup(); closeModal(); closePrint();
-  const h = (location.hash||'').slice(1);
+  let h = (location.hash||'').slice(1);
+  // كل صفحة تخدم مساراتها فقط: مسارات الإدارة في /admin/ وبقية المسارات في الصفحة العامة
+  const adminRoute = h.startsWith('admin')||h==='display'||h.startsWith('qr-');
+  if(PAGE==='public' && adminRoute){ location.replace(adminBase()+'#'+h); return; }
+  if(PAGE==='admin' && h && !adminRoute){ location.replace(publicBase()+'#'+h); return; }
+  if(PAGE==='admin' && !h) h='admin';
   const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : (!h||h==='home') ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
   $('#modeTag').textContent = Store.mode==='cloud' ? 'متصل بقاعدة البيانات' : 'بيانات تجريبية';
@@ -55,13 +72,12 @@ async function route(){
   if(r==='display') return viewDisplay();
   return viewAdmin(r);
 }
-window.addEventListener('hashchange', route);
 
 /* =====================================================================
    1) دليل البرامج (صفحة التسجيل الرئيسية)
    ===================================================================== */
-const cat = { kind:'program', cf:'all', q:'', open:false, data:null, pkg:null };
-async function viewCatalog(){
+export const cat = { kind:'program', cf:'all', q:'', open:false, data:null, pkg:null };
+export async function viewCatalog(){
   const app=$('#app'); app.innerHTML = `<div class="wrap">${skeleton()}</div>`;
   try{ cat.data = await Store.catalog(); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل البرامج', esc(e.message)+'. أعد تحميل الصفحة بعد قليل.')}</div>`; return; }
   const {programs} = cat.data; const nOpen=programs.filter(p=>cohortPublicState(p.cohort).k==='open').length, nCats=new Set(programs.map(p=>p.category)).size;
@@ -87,7 +103,7 @@ async function viewCatalog(){
   if($('#ro')) $('#ro').onchange=e=>{ cat.open=e.target.checked; renderCatalogCards(); };
   renderCatalogCards();
 }
-function programCard(p, i){
+export function programCard(p, i){
   const c=p.cohort, st=cohortPublicState(c), left=c?c.seats-(c.taken||0):0, pc=c?Math.min(100,Math.round((c.taken||0)/c.seats*100)):0;
   return `<a class="choice rv" href="#${p.code}" style="--i:${Math.min(i,12)};text-decoration:none;color:inherit">
     <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill dot ${catPill(p.category)}">${esc(p.category)}</span><span class="pill dot ${st.pill}">${st.txt}</span></div>
@@ -97,7 +113,7 @@ function programCard(p, i){
     <div class="price ${priceTxt(p.price)==='السعر عند التواصل'?'tbd':''}" style="margin-top:auto">${priceTxt(p.price)}</div>
     ${st.k==='open'?`<div class="bar"><i class="${pc>80?'hot':''}" style="width:${pc}%"></i></div><div class="hint" style="display:flex;justify-content:space-between"><span>متبقٍ ${fmtNum(left)} مقعد</span><span style="color:var(--brand);font-weight:500">التسجيل ${ic('next')}</span></div>`:`<div class="hint" style="text-align:left;color:var(--brand);font-weight:500">صفحة البرنامج ${ic('next')}</div>`}</a>`;
 }
-function renderCatalogCards(){
+export function renderCatalogCards(){
   const {programs, packages} = cat.data; const box=$('#choices'); if(!box) return;
   if(cat.kind==='package'){
     box.innerHTML = packages.length ? packages.map((k,i)=>{ const ps=programs.filter(p=>k.program_ids.includes(p.id)), sum=ps.reduce((s,p)=>s+Number(p.price||0),0), hrs=ps.reduce((s,p)=>s+(p.hours||0),0);
@@ -124,7 +140,7 @@ function renderCatalogCards(){
 /* =====================================================================
    2) صفحة البرنامج: نموذج تسجيل الدفعة + تحقق الحضور (هدف الباركود)
    ===================================================================== */
-function regFormHtml(title, sub){
+export function regFormHtml(title, sub){
   return `<div class="card pad rv" id="regCard"><h2 class="sec-title">${title}</h2><p class="hint" style="margin:0 0 18px">${sub?esc(sub)+'. ':''}الحقول المعلّمة بـ <span style="color:var(--danger-ink)">*</span> مطلوبة. رقم السجل المدني هو ما يُحضَّر به المتدرب يوميًا في هذه الدفعة.</p>
     <div class="errsum" id="rfSum" tabindex="-1" role="alert" hidden></div>
     <form id="rf" class="grid g2" novalidate>
@@ -142,7 +158,7 @@ function regFormHtml(title, sub){
     <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
     <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;
 }
-function bindRegForm(target, cohortsFn){
+export function bindRegForm(target, cohortsFn){
   const f=$('#rf'); wireFormA11y(f,'rf');
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
@@ -191,7 +207,7 @@ function bindRegForm(target, cohortsFn){
     }catch(er){ setBusy(b,false); showErrorSummary($('#rfSum'), [{id:'rf-full_name',label:'تعذّر التسجيل',msg:er.message}]); $('#rfE').textContent=er.message; }
   };
 }
-function attendanceBoxHtml(st){
+export function attendanceBoxHtml(st){
   return `<div class="card checkin rv" style="max-width:520px;margin:0 auto" id="attCard">
     <div class="head"><h2 style="margin-top:0">تحقق الحضور اليومي</h2><div class="hint" id="cDate"></div><div class="clock" id="cClock" dir="ltr"></div></div>
     <form id="cf" class="pad" novalidate>
@@ -201,7 +217,7 @@ function attendanceBoxHtml(st){
       <button class="btn pri lg" style="width:100%;margin-top:12px" id="cBtn">${ic('check')} تسجيل الحضور</button>
     </form><div id="cRes" class="pad hidden" aria-live="polite"></div><div class="pad" style="padding-top:0;text-align:center"><a href="#me" class="hint" style="color:var(--brand);font-weight:500">${ic('activity')} اطّلع على نسبة حضورك</a></div></div>`;
 }
-function bindAttendance(st, programCode, onBack){
+export function bindAttendance(st, programCode, onBack){
   const tick=()=>{ const n=riyadhNow(); if(!$('#cClock')) return; $('#cClock').textContent=t12(n.hm).replace(' ص',' AM').replace(' م',' PM'); $('#cDate').textContent=fmtDate(n.date); };
   tick(); timers.push(setInterval(tick,1000));
   const nid=$('#nid'); nid.addEventListener('input',()=>{ nid.value=toLatin(nid.value).replace(/\D/g,''); nid.classList.remove('err'); if(nid.value.length===10) $('.codebox input')?.focus(); });
@@ -221,7 +237,7 @@ function bindAttendance(st, programCode, onBack){
     showCheckinResult(r, onBack);
   };
 }
-function showCheckinResult(r, onBack){
+export function showCheckinResult(r, onBack){
   const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
   const again = `<button class="btn" style="width:100%;margin-top:16px" id="cAgain">${ic('prev')} رجوع</button>`;
   if(r.ok){
@@ -253,7 +269,7 @@ function showCheckinResult(r, onBack){
   }
   $('#cAgain').onclick = onBack;
 }
-async function viewProgramPage(code, tab){
+export async function viewProgramPage(code, tab){
   const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
   let p, st={require_code:false};
   try{ [p, st] = await Promise.all([Store.publicProgram(code), Store.publicSettings()]); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل البرنامج', esc(e.message))}</div>`; return; }
@@ -282,7 +298,7 @@ async function viewProgramPage(code, tab){
   else body.innerHTML = emptyBox(ps.k==='none'?'التسجيل غير مفتوح حاليًا':ps.k==='running'?`${cohortLabel(c)} منعقدة الآن`:'التسجيل مغلق',
       ps.k==='none'?'يُعلن عن الدفعة القادمة لهذا البرنامج قريبًا. تابعنا أو تواصل مع المركز.':ps.k==='running'?'انتهى التسجيل في هذه الدفعة. إذا كنت مسجّلًا فاختر «تسجيل الحضور».':'اكتمل التسجيل في هذه الدفعة. تُفتح دفعة جديدة بعد انتهائها.');
 }
-async function viewGeneralCheckin(){
+export async function viewGeneralCheckin(){
   const app=$('#app'); let st={require_code:false}; try{ st=await Store.publicSettings(); }catch(e){}
   app.innerHTML=`<div class="wrap"><div style="text-align:center;margin-bottom:16px" class="rv"><img src="${LOGO}" alt="" style="height:84px;background:#fff;border-radius:20px;padding:8px;box-shadow:var(--shadow-card)"></div>${attendanceBoxHtml(st)}
     <p class="hint" style="text-align:center;margin-top:14px">يُطابق النظام سجلك المدني مع كشوف الدفعات المنعقدة اليوم. الأفضل مسح باركود برنامجك في القاعة.</p></div>${siteFooter()}`;
@@ -292,7 +308,7 @@ async function viewGeneralCheckin(){
 /* =====================================================================
    3) شاشة باركود البرنامج (ثابت لكل برنامج، يخدم كل دفعاته)
    ===================================================================== */
-async function viewQR(code){
+export async function viewQR(code){
   const app=$('#app'); const D=await Store.adminData(); const p=D.programs.find(x=>progCode(x)===code);
   if(!p){ app.innerHTML=`<div class="wrap">${emptyBox('البرنامج غير موجود')}</div>`; return; }
   const st=D.settings, url=programUrl(p,st), today=riyadhNow().date, c=activeCohortOf(D,p.id,today);
@@ -327,7 +343,7 @@ async function viewQR(code){
   refresh(); timers.push(setInterval(refresh,8000));
 }
 /* شاشة محاضرات اليوم: باركود كل برنامج منعقد */
-async function viewDisplay(){
+export async function viewDisplay(){
   const app=$('#app'); const D=await Store.adminData(); const today=riyadhNow().date;
   const todays = D.cohorts.filter(c=>!cohortArchived(c,today) && isSessionDay(c,today)).sort((a,b)=>toMin(a.start_time)-toMin(b.start_time));
   app.innerHTML = `<div class="wrap">${titleBar(`${ic('calendar')}${fmtDate(today)}`,'محاضرات اليوم، <em>وباركود كل برنامج</em>','افتح باركود البرنامج على شاشة القاعة، أو اطبعه وعلّقه. الباركود ثابت للبرنامج ويخدم كل دفعاته.',`<a class="btn sm" href="#admin-cohorts">${ic('prev')} الدفعات</a>`)}
@@ -344,7 +360,7 @@ async function viewDisplay(){
 /* =====================================================================
    4) دخول المدير
    ===================================================================== */
-function viewLogin(){
+export function viewLogin(){
   const cloud = Store.mode==='cloud';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
     <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>دخول مدير النظام</h2><div class="hint">الدفعات والحضور والتحليلات وإدارة البرامج</div></div></div>

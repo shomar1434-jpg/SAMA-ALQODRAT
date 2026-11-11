@@ -1,9 +1,19 @@
+import { CENTER } from './catalog.js';
+import { Store } from './data2.js';
+import { setBusy, showErrorSummary, wireFormA11y } from './features.js';
+import { LOGOS } from './logos.js';
+import { $, $$, esc, fmtNum, uid } from './utils.js';
+import { AD, reloadAD } from './views2_admin.js';
+import { emptyBox, ic, reduceMotion, toast } from './views2_head.js';
+import { titleBar } from './views2_main.js';
+import { closeModal, confirmBox, modal, swRow } from './views2_programs.js';
+
 /* =====================================================================
    النبذة التعريفية + شركاء النجاح (شريط منزلق قابل للسحب، وتكبير الشريك)
    ===================================================================== */
-const PARTNER_TYPES = ['جهة اعتماد','شريك نجاح','جهة حكومية','جهة تعليمية','قطاع خاص','جهة مجتمعية'];
-const DEFAULT_ABOUT = `مركز سما القدرات للتدريب مركز تدريب في منطقة جازان، يقدّم ${'٧٣'} برنامجًا تدريبيًا معتمدًا من المؤسسة العامة للتدريب التقني والمهني في ستة مجالات: الإدارة والأعمال، والتربية والمجتمع، والحاسب والتقنية، والفنون والمهارات، والتهيئة لاختبارات قياس، والشريعة والقانون.\nيعمل المركز على أن يكون بيت الخبرة الأول في المنطقة، بتدريب بنّاء يقدّمه مدربون متخصصون، وبمتابعة منتظمة لحضور كل متدرب من التسجيل في دفعته حتى إتمام برنامجه وحصوله على شهادته.`;
-const defaultPartners = () => [
+export const PARTNER_TYPES = ['جهة اعتماد','شريك نجاح','جهة حكومية','جهة تعليمية','قطاع خاص','جهة مجتمعية'];
+export const DEFAULT_ABOUT = `مركز سما القدرات للتدريب مركز تدريب في منطقة جازان، يقدّم ${'٧٣'} برنامجًا تدريبيًا معتمدًا من المؤسسة العامة للتدريب التقني والمهني في ستة مجالات: الإدارة والأعمال، والتربية والمجتمع، والحاسب والتقنية، والفنون والمهارات، والتهيئة لاختبارات قياس، والشريعة والقانون.\nيعمل المركز على أن يكون بيت الخبرة الأول في المنطقة، بتدريب بنّاء يقدّمه مدربون متخصصون، وبمتابعة منتظمة لحضور كل متدرب من التسجيل في دفعته حتى إتمام برنامجه وحصوله على شهادته.`;
+export const defaultPartners = () => [
   {id:uid(), name:'المؤسسة العامة للتدريب التقني والمهني', name_en:'Technical and Vocational Training Corporation', type:'جهة اعتماد', logo:LOGOS.tvtc,
    description:'الجهة التي تعتمد البرامج التدريبية في المركز، ويحمل كل برنامج في دليلنا رقم اعتماد صادرًا عنها.', website:'https://www.tvtc.gov.sa', since:'', order:1, active:true},
   {id:uid(), name:'المركز الوطني للتعليم الإلكتروني', name_en:'National eLearning Center', type:'جهة اعتماد', logo:LOGOS.nelc,
@@ -11,7 +21,7 @@ const defaultPartners = () => [
 ];
 
 /* ---------- أقسام الصفحة الرئيسية ---------- */
-function aboutSectionHtml(about, P){
+export function aboutSectionHtml(about, P){
   const paras = String(about||DEFAULT_ABOUT).split(/\n+/).filter(Boolean);
   const cats = new Set(P.map(p=>p.category)).size;
   return `<section class="intro">
@@ -26,7 +36,7 @@ function aboutSectionHtml(about, P){
       </ul>
     </div></section>`;
 }
-function partnersSectionHtml(list){
+export function partnersSectionHtml(list){
   const ps = (list||[]).filter(p=>p.active!==false).sort((a,b)=>(a.order||0)-(b.order||0));
   if(!ps.length) return '';
   return `<section class="partners" aria-labelledby="ptTitle">
@@ -37,10 +47,10 @@ function partnersSectionHtml(list){
       <button class="pt-nav next" aria-label="الشريك التالي">${ic('next')}</button>
     </div></section>`;
 }
-const partnerCard = (p, clone) => `<button class="pt-card" data-pid="${p.id}" ${clone?'aria-hidden="true" tabindex="-1"':''} aria-label="${esc(p.name)}${p.type?'، '+esc(p.type):''}"><span class="pt-logo"><img src="${p.logo||LOGOS.sama}" alt="" draggable="false"></span><b>${esc(p.name)}</b>${p.type?`<span class="pill dot ${p.type==='جهة اعتماد'?'':'o'}">${esc(p.type)}</span>`:''}</button>`;
+export const partnerCard = (p, clone) => `<button class="pt-card" data-pid="${p.id}" ${clone?'aria-hidden="true" tabindex="-1"':''} aria-label="${esc(p.name)}${p.type?'، '+esc(p.type):''}"><span class="pt-logo"><img src="${p.logo||LOGOS.sama}" alt="" draggable="false"></span><b>${esc(p.name)}</b>${p.type?`<span class="pill dot ${p.type==='جهة اعتماد'?'':'o'}">${esc(p.type)}</span>`:''}</button>`;
 
 /* ---------- محرّك الشريط: انزلاق تلقائي + سحب باللمس + قصور ذاتي ---------- */
-function initPartnerMarquee(list){
+export function initPartnerMarquee(list){
   const view=$('#ptView'), track=$('#ptTrack'); if(!view||!track) return;
   const ps=list.filter(p=>p.active!==false).sort((a,b)=>(a.order||0)-(b.order||0));
   // كرّر المجموعة حتى تملأ عرض الشاشة، ثم ضاعفها للحلقة اللانهائية
@@ -79,7 +89,7 @@ function initPartnerMarquee(list){
 }
 
 /* ---------- تكبير الشريك من مكانه (FLIP) وعرض بياناته ---------- */
-function openPartner(p, card){
+export function openPartner(p, card){
   if(!p) return;
   const root=$('#modalRoot');
   root.innerHTML = `<div class="modal-bg pt-bg" id="ptBg"><div class="modal pt-modal" role="dialog" aria-modal="true" aria-labelledby="ptName">
@@ -110,13 +120,13 @@ function openPartner(p, card){
 }
 
 /* ---------- لوحة الإدارة: النبذة والشركاء ---------- */
-async function shrinkImage(file, max=360){
+export async function shrinkImage(file, max=360){
   const url=URL.createObjectURL(file); const img=new Image(); img.src=url; await img.decode();
   const k=Math.min(1,max/Math.max(img.width,img.height)), c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
   c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
   let d=c.toDataURL('image/webp',0.9); if(!d.startsWith('data:image/webp')) d=c.toDataURL('image/png'); return d;
 }
-function pagePartners(){
+export function pagePartners(){
   const m=$('#main'), list=(AD.partners||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0));
   m.innerHTML = titleBar(`${ic('award')}المحتوى التعريفي`, 'النبذة التعريفية <em>وشركاء النجاح</em>', 'ما يظهر للزوار في الصفحة الرئيسية: نص التعريف بالمركز، وشريط شركاء النجاح المنزلق.', `<a class="btn sm" href="#home">${ic('expand')} معاينة الرئيسية</a>`)+
     `<div class="grid g2" style="align-items:start">
@@ -139,7 +149,7 @@ function pagePartners(){
     for(const p of list) await Store.savePartner(p); await reloadAD(); pagePartners(); };
   $$('[data-up]').forEach(b=>b.onclick=()=>move(b.dataset.up,-1)); $$('[data-dn]').forEach(b=>b.onclick=()=>move(b.dataset.dn,1));
 }
-function partnerModal(p){
+export function partnerModal(p){
   const isNew=!p; p = p || {name:'',name_en:'',type:'شريك نجاح',logo:'',description:'',website:'',since:'',order:(AD.partners||[]).length+1,active:true};
   let logo=p.logo;
   modal(`<h3>${isNew?'شريك جديد':'تعديل الشريك'}</h3><form id="ptF" class="grid g2" novalidate>

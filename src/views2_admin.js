@@ -1,11 +1,24 @@
+import { LOGO } from './assets/logo.js';
+import { CATEGORIES, catPill, computeEnd } from './catalog.js';
+import { STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, enrollsOf, isSessionDay, progCode, sessionDays, takenOf } from './data2.js';
+import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules, setBusy } from './features.js';
+import { pagePartners } from './partners.js';
+import { exportCSV, pageReports, printDayModal, printSheets, traineesRows } from './print.js';
+import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin } from './utils.js';
+import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, statusPill, toast } from './views2_head.js';
+import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hoursTxt, kpiCard, makeQR, programUrl, route, short, titleBar } from './views2_main.js';
+import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
+import { pageSettings } from './views2_settings.js';
+
 /* =====================================================================
    5) لوحة الإدارة
    ===================================================================== */
-let AD=null; const flt={ from:null, to:null, prog:'all', cat:'all' };
-const progOf = id => AD.programs.find(p=>p.id===id);
-const progName = id => progOf(id)?.name || '—';
-const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
-async function viewAdmin(r){
+export let AD=null; export function setAD(v){ AD=v; }
+export const flt={ from:null, to:null, prog:'all', cat:'all' };
+export const progOf = id => AD.programs.find(p=>p.id===id);
+export const progName = id => progOf(id)?.name || '—';
+export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
+export async function viewAdmin(r){
   const app=$('#app');
   const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
   app.innerHTML = `<div class="admin"><aside class="side">
@@ -23,11 +36,11 @@ async function viewAdmin(r){
   const fu=$('.side a[href="#admin-followup"]'); if(fu){ const n=followupRows().filter(x=>x.level==='bad').length; if(n) fu.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} حالة حرجة">${fmtNum(n)}</span>`); }
   ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
 }
-async function reloadAD(){ AD = await Store.adminData(); }
+export async function reloadAD(){ AD = await Store.adminData(); }
 
 /* ---------- لوحة التحليلات ---------- */
-const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-function chartTheme(){
+export const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+export function chartTheme(){
   if(!window.Chart) return;
   Chart.defaults.font.family='"Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif'; Chart.defaults.font.size=12; Chart.defaults.color=cssv('--ink-muted');
   Chart.defaults.plugins.legend.labels.usePointStyle=true; Chart.defaults.plugins.legend.labels.boxWidth=8;
@@ -35,15 +48,15 @@ function chartTheme(){
   Chart.defaults.plugins.tooltip.padding=10; Chart.defaults.plugins.tooltip.cornerRadius=12;
   Chart.defaults.animation = reduceMotion() ? false : {duration:1000,easing:'easeOutCubic'};
 }
-const pal = () => ['--brand','--grad-start','--success','--gold','--early','--warning','--info','--ink-subtle'].map(cssv);
-function mk(id,cfg){ if(!window.Chart||!$('#'+id)) return null; const c=new Chart($('#'+id),cfg); charts.push(c); return c; }
-const gridOpt = () => ({ grid:{color:cssv('--border')}, border:{display:false} });
-const cLabel = c => `${short(progName(c.program_id))} · د${fmtNum(c.number)}`;
+export const pal = () => ['--brand','--grad-start','--success','--gold','--early','--warning','--info','--ink-subtle'].map(cssv);
+export function mk(id,cfg){ if(!window.Chart||!$('#'+id)) return null; const c=new Chart($('#'+id),cfg); charts.push(c); return c; }
+export const gridOpt = () => ({ grid:{color:cssv('--border')}, border:{display:false} });
+export const cLabel = c => `${short(progName(c.program_id))} · د${fmtNum(c.number)}`;
 /* الحضور المتوقع لدفعة في فترة: عدد المسجلين قبل كل يوم محاضرة */
-function expectedOf(c, from, to){ const today=riyadhNow().date, es=enrollsOf(AD,c.id); let e=0;
+export function expectedOf(c, from, to){ const today=riyadhNow().date, es=enrollsOf(AD,c.id); let e=0;
   sessionDays(c, today).forEach(d=>{ if(d<from||d>to) return; if(d===today && toMin(riyadhNow().hm)<toMin(c.start_time)) return; e+=es.filter(x=>x.created_at.slice(0,10)<=d).length; }); return e; }
 
-function pageDashboard(){
+export function pageDashboard(){
   const m=$('#main'); const {programs}=AD;
   m.innerHTML = titleBar(`${ic('chart')}التحليلات`, 'التسجيل والحضور، <em>لكل دفعة وبرنامج</em>', 'غيّر الفترة أو المجال أو البرنامج فتتحدث المؤشرات والرسوم. تشمل الدفعات المنعقدة في الفترة، النشطة منها والمؤرشفة.', `<button class="btn sm" id="rf">${ic('refresh')} تحديث</button>`)+
     `<div class="filters rv" style="--i:1"><span class="lbl">${ic('calendar')}الفترة</span><input type="date" class="inp" id="fFrom" value="${flt.from}"><span class="lbl">إلى</span><input type="date" class="inp" id="fTo" value="${flt.to}">
@@ -70,7 +83,7 @@ function pageDashboard(){
   $('#rf').onclick=()=>route();
   drawDashboard();
 }
-function drawDashboard(){
+export function drawDashboard(){
   chartTheme(); const P=pal(), G=gridOpt();
   const {programs,trainees,attendance,cohorts,enrollments}=AD; const {from,to,prog}=flt; const today=riyadhNow().date;
   const scopeIds=new Set(programs.filter(p=>(flt.cat==='all'||p.category===flt.cat)&&(prog==='all'||p.id===prog)).map(p=>p.id));
@@ -145,8 +158,8 @@ function drawDashboard(){
 }
 
 /* ---------- الحضور اليومي ---------- */
-let attDate=null, attQ='';
-function pageAttendance(){
+export let attDate=null, attQ='';
+export function pageAttendance(){
   const m=$('#main'); attDate = attDate || riyadhNow().date;
   const {trainees,attendance,cohorts}=AD; const today=riyadhNow().date, future=attDate>today;
   const sess = cohorts.filter(c=>isSessionDay(c,attDate)).sort((a,b)=>toMin(a.start_time)-toMin(b.start_time));
@@ -188,8 +201,9 @@ function pageAttendance(){
 }
 
 /* ---------- الدفعات: النشطة والمؤرشفة، وكشف كل دفعة ---------- */
-let cohortView=null, cohTab='active', cohQ='';
-function pageCohorts(){
+export let cohortView=null, cohTab='active', cohQ='';
+export function setCohortView(v){ cohortView=v; }
+export function pageCohorts(){
   if(cohortView && AD.cohorts.some(c=>c.id===cohortView)) return pageCohortDetail(cohortView);
   cohortView=null;
   const m=$('#main'), today=riyadhNow().date;
@@ -221,11 +235,11 @@ function pageCohorts(){
   $('#cq').oninput=e=>{ cohQ=e.target.value; clearTimeout(window._cq); window._cq=setTimeout(()=>{ pageCohorts(); const el=$('#cq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); };
   bindCohortActions(pageCohorts);
 }
-function cohortSummary(c){ const today=riyadhNow().date, es=enrollsOf(AD,c.id), ds=sessionDays(c,today), at=AD.attendance.filter(a=>a.cohort_id===c.id);
+export function cohortSummary(c){ const today=riyadhNow().date, es=enrollsOf(AD,c.id), ds=sessionDays(c,today), at=AD.attendance.filter(a=>a.cohort_id===c.id);
   const exp=expectedOf(c,c.start_date,c.end_date), rate=exp?Math.round(at.length/exp*100):0;
   const per=es.map(e=>{ const myDays=ds.filter(d=>d>=e.created_at.slice(0,10)); const n=at.filter(a=>a.enrollment_id===e.id).length; return {e, n, of:myDays.length, r:myDays.length?Math.round(n/myDays.length*100):0}; });
   return {n:es.length, rate, per, done75:per.filter(x=>x.of&&x.r>=75).length, days:ds}; }
-function bindCohortActions(back){
+export function bindCohortActions(back){
   $$('[data-cv]').forEach(b=>b.onclick=()=>{ cohortView=b.dataset.cv; pageCohorts(); window.scrollTo(0,0); });
   $$('[data-cp]').forEach(b=>b.onclick=()=>{ const p=AD.programs.find(x=>progCode(x)===b.dataset.cp); copyText(programUrl(p,AD.settings),'نُسخ رابط نموذج التسجيل'); });
   $$('[data-ro]').forEach(x=>x.onchange=async()=>{ const c=AD.cohorts.find(y=>y.id===x.dataset.ro); await Store.saveCohort({...c, reg_open:x.checked}); await reloadAD(); toast(x.checked?'فُتح التسجيل في الدفعة':'أُغلق التسجيل في الدفعة'); back(); });
@@ -234,7 +248,7 @@ function bindCohortActions(back){
     modal(`<div class="alert t-warning"><span class="aic">${ic('database')}</span><div><b style="font-weight:600;font-size:16px">أرشفة ${cohortLabel(c)} من «${esc(progName(c.program_id))}»</b><div class="hint">يُغلق التسجيل والتحضير في هذه الدفعة، ويُحفظ كشفها وسجل حضورها في الأرشيف. بعدها يمكنك فتح دفعة جديدة على الباركود نفسه.${c.end_date>riyadhNow().date?' لم تنتهِ مدة الدفعة بعد.':''}</div></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn" id="mc">إلغاء</button><button class="btn pri" id="mo">${ic('database')} أرشفة الدفعة</button></div>`);
     $('#mc').onclick=closeModal; $('#mo').onclick=async e=>{ setBusy(e.currentTarget,true,'جارٍ الأرشفة وإصدار الشهادات'); await Store.archiveCohort(c.id); await reloadAD(); closeModal(); const n=(AD.certificates||[]).filter(x=>x.cohort_id===c.id).length; toast(`أُرشفت الدفعة${n?` وصدرت ${fmtNum(n)} شهادة`:''}`); cohortView=null; back(); }; });
 }
-function pageCohortDetail(id){
+export function pageCohortDetail(id){
   const m=$('#main'), today=riyadhNow().date, c=AD.cohorts.find(x=>x.id===id), p=progOf(c.program_id), st=cohortState(c,today), arch=st==='archived';
   const s=cohortSummary(c), allDays=sessionDays(c), attOf=(eid,d)=>AD.attendance.find(a=>a.enrollment_id===eid&&a.att_date===d);
   const rows=s.per.map(x=>({...x,t:AD.trainees.find(t=>t.id===x.e.trainee_id)})).filter(x=>x.t).sort((a,b)=>a.t.full_name.localeCompare(b.t.full_name,'ar'));
@@ -271,7 +285,7 @@ function pageCohortDetail(id){
 }
 
 /* ---------- فتح دفعة / تعديلها ---------- */
-function cohortModal(p, c, back){
+export function cohortModal(p, c, back){
   const isNew=!c, today=riyadhNow().date, nextNum=Math.max(0,...AD.cohorts.filter(x=>x.program_id===p.id).map(x=>x.number))+1;
   c = c || {program_id:p.id, start_date:addDays(today,7), end_date:'', days:[0,1,2,3,4], start_time:'16:00', end_time:'19:00', seats:25, hall:'', trainer:'', reg_open:true};
   modal(`<h3>${isNew?`فتح التسجيل: الدفعة ${fmtNum(nextNum)}`:`تعديل ${cohortLabel(c)}`}</h3>
@@ -303,7 +317,7 @@ function cohortModal(p, c, back){
     const sb=$('#cm button.pri'); setBusy(sb,true,isNew?'جارٍ فتح الدفعة':'جارٍ الحفظ');
     try{ await Store.saveCohort(o); await reloadAD(); if(isNew) cohortOpened(p); else { closeModal(); toast('حُفظت الدفعة'); (back||pageCohorts)(); } }catch(x){ setBusy(sb,false); E(x.message); } };
 }
-function cohortOpened(p){
+export function cohortOpened(p){
   const url=programUrl(p,AD.settings), c=activeCohortOf(AD,p.id);
   modal(`<div style="text-align:center"><div class="bigcheck">${ic('check')}</div><h3 style="margin-bottom:4px">فُتحت ${cohortLabel(c)}</h3><p class="hint" style="margin:0 0 14px">${esc(p.name)} · تبدأ ${fmtDate(c.start_date)}</p>
     <div class="qrbox" style="display:inline-block;box-shadow:var(--shadow-card);border:1px solid var(--border)"><div id="qrM"></div></div>
@@ -316,8 +330,8 @@ function cohortOpened(p){
 }
 
 /* ---------- المتدربون ---------- */
-let trQ='', trP='all';
-function pageTrainees(){
+export let trQ='', trP='all';
+export function pageTrainees(){
   const m=$('#main'); const {programs,trainees,enrollments,attendance}=AD;
   const ensOf = t => enrollments.filter(e=>e.trainee_id===t.id);
   const list = trainees.filter(t=>(!trQ||t.full_name.includes(trQ)||t.national_id.includes(trQ)||t.phone.includes(trQ)||ensOf(t).some(e=>(e.ref||'').includes(trQ))) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))

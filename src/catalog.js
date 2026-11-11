@@ -1,8 +1,10 @@
+import { addDays, dowOf, uid } from './utils.js';
+
 /* =====================================================================
    دليل البرامج التدريبية المعتمدة — من ملف «البرامج التدريبية لمركز سما القدرات»
    [الاسم، الساعات، الأيام، رقم الاعتماد] — null = غير مذكور في الملف
    ===================================================================== */
-const CENTER = {
+export const CENTER = {
   name:'مركز سما القدرات للتدريب', cr:'5900112617',
   phones:['0508957822','0561606878'], email:'samaalgodrat@gmail.com', x:'smagodrat',
   address:'جازان - حي الصفا - شارع الملك فيصل (الستين) - جوار مطعم طحينة', pobox:'313',
@@ -10,8 +12,8 @@ const CENTER = {
   vision:'أن نكون بيت الخبرة الأول في منطقة جازان والذي يسهم في التقدم العلمي والمهاري لأفراد المجتمع',
   mission:'نحو دعم أفراد المجتمع بأحدث المعارف والمهارات اللازمة من خلال التدريب البنّاء على يد كفاءات علمية متخصصة'
 };
-const CATEGORIES = ['الإدارة والأعمال','التربية والمجتمع','الحاسب والتقنية','الفنون والمهارات','التهيئة لاختبارات قياس','الشريعة والقانون'];
-const CATALOG = {
+export const CATEGORIES = ['الإدارة والأعمال','التربية والمجتمع','الحاسب والتقنية','الفنون والمهارات','التهيئة لاختبارات قياس','الشريعة والقانون'];
+export const CATALOG = {
   'الإدارة والأعمال':[
     ['المهارات الأساسية في إدارة الموارد البشرية',20,4,'25212'],
     ['المدير التنفيذي',25,5,'25210'],
@@ -98,11 +100,11 @@ const CATALOG = {
     ['دعوى الإلغاء في القضاء الإداري السعودي',15,3,'126147']
   ]
 };
-const CAT_TONE = {'الإدارة والأعمال':'brand','التربية والمجتمع':'success','الحاسب والتقنية':'info','الفنون والمهارات':'early','التهيئة لاختبارات قياس':'gold','الشريعة والقانون':'warning'};
-const CAT_ICON = {'الإدارة والأعمال':'chart','التربية والمجتمع':'users','الحاسب والتقنية':'grid','الفنون والمهارات':'spark','التهيئة لاختبارات قياس':'award','الشريعة والقانون':'book'};
-const catPill = c => ({brand:'',success:'ok',info:'info',early:'early',gold:'o',warning:'warn'}[CAT_TONE[c]] ?? 'g');
-const catalogPrograms = () => Object.entries(CATALOG).flatMap(([cat,list])=>list.map(([name,hours,dd,acc])=>({
+export const CAT_TONE = {'الإدارة والأعمال':'brand','التربية والمجتمع':'success','الحاسب والتقنية':'info','الفنون والمهارات':'early','التهيئة لاختبارات قياس':'gold','الشريعة والقانون':'warning'};
+export const CAT_ICON = {'الإدارة والأعمال':'chart','التربية والمجتمع':'users','الحاسب والتقنية':'grid','الفنون والمهارات':'spark','التهيئة لاختبارات قياس':'award','الشريعة والقانون':'book'};
+export const catPill = c => ({brand:'',success:'ok',info:'info',early:'early',gold:'o',warning:'warn'}[CAT_TONE[c]] ?? 'g');
+export const catalogPrograms = () => Object.entries(CATALOG).flatMap(([cat,list])=>list.map(([name,hours,dd,acc])=>({
   id:uid(), name, category:cat, hours, duration_days:dd, accreditation_no:acc, description:'',
   price:null, active:true, created_at:new Date().toISOString() })));
 /* يحسب تاريخ النهاية من تاريخ البداية وعدد أيام البرنامج وأيام الانعقاد */
-function computeEnd(start, nDays, days){ if(!start||!nDays||!days?.length) return start; let d=start, c=0, guard=0; while(guard++<400){ if(days.includes(dowOf(d))){ c++; if(c>=nDays) return d; } d=addDays(d,1); } return d; }
+export function computeEnd(start, nDays, days){ if(!start||!nDays||!days?.length) return start; let d=start, c=0, guard=0; while(guard++<400){ if(days.includes(dowOf(d))){ c++; if(c>=nDays) return d; } d=addDays(d,1); } return d; }

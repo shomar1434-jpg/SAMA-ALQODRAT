@@ -1,16 +1,27 @@
+import { CENTER } from './catalog.js';
+import { STATE_TXT, activeCohortOf, cohortState, enrollsOf, isSessionDay, progCode, sessionDays } from './data2.js';
+import { printCertificates } from './features.js';
+import { X_LOGO } from './landing.js';
+import { LOGOS } from './logos.js';
+import { $, DAYS, addDays, dowOf, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin } from './utils.js';
+import { AD, cohortSummary, progName, progOf } from './views2_admin.js';
+import { ic, toast } from './views2_head.js';
+import { catSort, cohortLabel, short, titleBar } from './views2_main.js';
+import { closeModal, modal } from './views2_programs.js';
+
 /* =====================================================================
    مركز التقارير والطباعة — نماذج رسمية بهوية المركز (A4)
    الترويسة (الشعارات) والتذييل (التواصل) يتكرران في كل صفحة مطبوعة
    ===================================================================== */
-const fmtHijri = d => { try{ return new Date(d+'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}); }catch(e){ return ''; } };
-const fmtGreg = d => new Date(d+'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
-const fmtMonth = m => new Date(m+'-15T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory',{month:'long',year:'numeric',timeZone:'UTC'});
-const weekOf = d => { const s=addDays(d,-dowOf(d)); return {from:s, to:addDays(s,6)}; };            // الأسبوع من الأحد إلى السبت
-const monthOf = m => { const [y,mm]=m.split('-').map(Number); const last=new Date(Date.UTC(y,mm,0)).getUTCDate(); return {from:`${m}-01`, to:`${m}-${String(last).padStart(2,'0')}`}; };
-const gradeOf = r => r>=90?['ممتاز','ok']:r>=75?['جيد جدًا','ok']:r>=50?['يحتاج متابعة','warn']:['ضعيف','bad'];
-const nowStamp = () => { const n=riyadhNow(); return `${fmtGreg(n.date)} الساعة ${t12(n.hm)}`; };
+export const fmtHijri = d => { try{ return new Date(d+'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}); }catch(e){ return ''; } };
+export const fmtGreg = d => new Date(d+'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+export const fmtMonth = m => new Date(m+'-15T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory',{month:'long',year:'numeric',timeZone:'UTC'});
+export const weekOf = d => { const s=addDays(d,-dowOf(d)); return {from:s, to:addDays(s,6)}; };            // الأسبوع من الأحد إلى السبت
+export const monthOf = m => { const [y,mm]=m.split('-').map(Number); const last=new Date(Date.UTC(y,mm,0)).getUTCDate(); return {from:`${m}-01`, to:`${m}-${String(last).padStart(2,'0')}`}; };
+export const gradeOf = r => r>=90?['ممتاز','ok']:r>=75?['جيد جدًا','ok']:r>=50?['يحتاج متابعة','warn']:['ضعيف','bad'];
+export const nowStamp = () => { const n=riyadhNow(); return `${fmtGreg(n.date)} الساعة ${t12(n.hm)}`; };
 
-function docShell({docNo, title, sub, info, stats, body, note, land}){
+export function docShell({docNo, title, sub, info, stats, body, note, land}){
   return `<div class="pdoc ${land?'land':''}"><table class="pframe"><thead><tr><td>
       <div class="ph-logos"><img src="${LOGOS.tvtc}" alt=""><img src="${LOGOS.nelc}" alt=""><img src="${LOGOS.sama}" alt=""></div>
       <div class="ph-title"><div><h1>${title}</h1><span>${sub}</span></div><div class="ph-no"><span>رقم المستند</span><b dir="ltr">${docNo}</b></div></div>
@@ -27,12 +38,12 @@ function docShell({docNo, title, sub, info, stats, body, note, land}){
       <div class="psign"><div><span>مدير المركز</span><i></i><small>الاسم والتوقيع</small></div><div class="stamp"><span>ختم المركز</span><i></i></div></div>
     </td></tr></tbody></table></div>`;
 }
-const cohortInfo = (c, extra=[]) => { const p=progOf(c.program_id); return [['البرنامج التدريبي',p.name,'wide'],['المجال',p.category],['رقم الاعتماد',p.accreditation_no||'—'],
+export const cohortInfo = (c, extra=[]) => { const p=progOf(c.program_id); return [['البرنامج التدريبي',p.name,'wide'],['المجال',p.category],['رقم الاعتماد',p.accreditation_no||'—'],
   ['الدفعة',fmtNum(c.number)], ...extra, ['وقت المحاضرة',`${t12(c.start_time)} – ${t12(c.end_time)}`],['القاعة',c.hall||'—'],['المدرب',c.trainer||'—'],['مدة الدفعة',`${fmtShort(c.start_date)} – ${fmtShort(c.end_date)}`]]; };
-const docCode = (c, tag, d) => `${tag}-${progCode(progOf(c.program_id)).toUpperCase()}-${c.number}-${d.replace(/-/g,'')}`;
+export const docCode = (c, tag, d) => `${tag}-${progCode(progOf(c.program_id)).toUpperCase()}-${c.number}-${d.replace(/-/g,'')}`;
 
 /* ---------- 1) كشف الحضور اليومي ---------- */
-function sheetHtml(c, date){
+export function sheetHtml(c, date){
   const today=riyadhNow(), roster=enrollsOf(AD,c.id).filter(e=>e.created_at.slice(0,10)<=date);
   const rows=roster.map(e=>({e,t:AD.trainees.find(x=>x.id===e.trainee_id),a:AD.attendance.find(a=>a.enrollment_id===e.id&&a.att_date===date)})).filter(x=>x.t).sort((a,b)=>a.t.full_name.localeCompare(b.t.full_name,'ar'));
   const present=rows.filter(x=>x.a), late=present.filter(x=>x.a.status==='متأخر').length, pending=date===today.date && toMin(today.hm)<toMin(c.end_time);
@@ -47,7 +58,7 @@ function sheetHtml(c, date){
 }
 
 /* ---------- 2) الملخص الأسبوعي / الشهري: نسبة حضور كل متدرب ---------- */
-function periodStats(c, from, to){
+export function periodStats(c, from, to){
   const today=riyadhNow(), upTo = to<today.date ? to : today.date;
   const days=sessionDays(c, upTo).filter(d=>d>=from && !(d===today.date && toMin(today.hm)<toMin(c.end_time)));
   const rows=enrollsOf(AD,c.id).map(e=>{ const t=AD.trainees.find(x=>x.id===e.trainee_id); const my=days.filter(d=>d>=e.created_at.slice(0,10));
@@ -55,7 +66,7 @@ function periodStats(c, from, to){
     return {e,t,of:my.length,n:at.length,late,abs:my.length-at.length,r:my.length?Math.round(at.length/my.length*100):null}; }).filter(x=>x.t).sort((a,b)=>(b.r??-1)-(a.r??-1)||a.t.full_name.localeCompare(b.t.full_name,'ar'));
   return {days, rows};
 }
-function summaryHtml(c, from, to, kind){
+export function summaryHtml(c, from, to, kind){
   const {days, rows}=periodStats(c,from,to), rated=rows.filter(x=>x.r!==null);
   const avg=rated.length?Math.round(rated.reduce((s,x)=>s+x.r,0)/rated.length):0;
   const label = kind==='week' ? 'الملخص الأسبوعي للحضور' : kind==='month' ? 'الملخص الشهري للحضور' : 'ملخص حضور الدفعة';
@@ -74,7 +85,7 @@ function summaryHtml(c, from, to, kind){
 }
 
 /* ---------- 3) سجل الدفعة الكامل (أفقي) ---------- */
-function fullSheetHtml(c){
+export function fullSheetHtml(c){
   const today=riyadhNow().date, all=sessionDays(c), s=cohortSummary(c);
   const rows=s.per.map(x=>({...x,t:AD.trainees.find(t=>t.id===x.e.trainee_id)})).filter(x=>x.t).sort((a,b)=>a.t.full_name.localeCompare(b.t.full_name,'ar'));
   const cell=(e,d)=>{ if(d>today) return ''; if(d<e.created_at.slice(0,10)) return '·'; const a=AD.attendance.find(x=>x.enrollment_id===e.id&&x.att_date===d); return a?(a.status==='متأخر'?'<b class="cl w">م</b>':'<b class="cl o">✓</b>'):'<b class="cl x">غ</b>'; };
@@ -88,7 +99,7 @@ function fullSheetHtml(c){
 }
 
 /* ---------- 4) دليل البرامج المعتمدة ---------- */
-function catalogHtml(){
+export function catalogHtml(){
   const today=riyadhNow().date, cats=[...new Set(AD.programs.filter(p=>p.active).map(p=>p.category))].sort(catSort);
   return docShell({ docNo:`CAT-${today.replace(/-/g,'')}`, title:'دليل البرامج التدريبية المعتمدة', sub:`${fmtNum(AD.programs.filter(p=>p.active).length)} برنامجًا في ${fmtNum(cats.length)} مجالات`,
     body: cats.map(cat=>{ const ps=AD.programs.filter(p=>p.active&&p.category===cat); return `<div class="pcat">${esc(cat)} <small>${fmtNum(ps.length)} برنامج</small></div>
@@ -99,7 +110,7 @@ function catalogHtml(){
 }
 
 /* ---------- المعاينة والطباعة ---------- */
-function printDocs(docs, title){
+export function printDocs(docs, title){
   closeModal();
   const root=$('#printRoot');
   root.innerHTML = `<div class="pbar"><div><b>${esc(title)}</b><span class="hint" style="color:#cfe7e2">${fmtNum(docs.length)} ${docs.length===1?'مستند':'مستندات'} · A4 · احفظه PDF من نافذة الطباعة</span></div>
@@ -110,12 +121,12 @@ function printDocs(docs, title){
   $('#pbBack').onclick=closePrint;
   $('#pbGo').onclick=()=>{ try{ window.print(); }catch(e){ toast('الطباعة غير متاحة في هذا العرض'); } };
 }
-const printSheets = (items, title) => printDocs(items.map(({c,date})=>sheetHtml(c,date)), title);
-function closePrint(){ const r=$('#printRoot'); if(!r) return; r.classList.remove('on'); r.innerHTML=''; document.body.classList.remove('printing'); }
+export const printSheets = (items, title) => printDocs(items.map(({c,date})=>sheetHtml(c,date)), title);
+export function closePrint(){ const r=$('#printRoot'); if(!r) return; r.classList.remove('on'); r.innerHTML=''; document.body.classList.remove('printing'); }
 
 /* ---------- التصدير إلى Excel (CSV بترميز يقرؤه Excel العربي) ---------- */
-let _dlNs; const dlNs = () => _dlNs ?? (_dlNs = (window.claude && typeof window.claude.use==='function') ? window.claude.use('downloads').catch(()=>null) : Promise.resolve(null));
-async function exportCSV(name, rows){
+export let _dlNs; export const dlNs = () => _dlNs ?? (_dlNs = (window.claude && typeof window.claude.use==='function') ? window.claude.use('downloads').catch(()=>null) : Promise.resolve(null));
+export async function exportCSV(name, rows){
   const txt='\ufeff'+rows.map(r=>r.map(v=>{ const s=String(v??''); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; }).join(',')).join('\r\n');
   const msg=`صُدّر ${fmtNum(rows.length-1)} صفًا إلى ${name}.csv`;
   const dl = await Promise.race([dlNs(), new Promise(r=>setTimeout(()=>r(null),1500))]);
@@ -123,15 +134,15 @@ async function exportCSV(name, rows){
   try{ const url=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=url; a.download=name+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); toast(msg); }
   catch(e){ toast('تعذّر التنزيل هنا، استخدم زر النسخ'); }
 }
-const traineesRows = () => [['الاسم','السجل المدني','الجوال','البريد','الجنس','المدينة','المؤهل','جهة العمل','البرنامج','الدفعة','رقم الطلب','حالة التسجيل','تاريخ التسجيل'],
+export const traineesRows = () => [['الاسم','السجل المدني','الجوال','البريد','الجنس','المدينة','المؤهل','جهة العمل','البرنامج','الدفعة','رقم الطلب','حالة التسجيل','تاريخ التسجيل'],
   ...AD.enrollments.map(e=>{ const t=AD.trainees.find(x=>x.id===e.trainee_id), c=AD.cohorts.find(x=>x.id===e.cohort_id); return t?[t.full_name,t.national_id,t.phone,t.email,t.gender,t.city,t.education,t.employer,progName(e.program_id),c?.number,e.ref,e.status,e.created_at.slice(0,10)]:null; }).filter(Boolean)];
-const cohortRows = c => { const all=sessionDays(c), today=riyadhNow().date, s=cohortSummary(c);
+export const cohortRows = c => { const all=sessionDays(c), today=riyadhNow().date, s=cohortSummary(c);
   return [['الاسم','السجل المدني','الجوال',...all,'أيام الحضور','النسبة'], ...s.per.map(x=>{ const t=AD.trainees.find(y=>y.id===x.e.trainee_id); return [t.full_name,t.national_id,t.phone,...all.map(d=>{ if(d>today) return ''; const a=AD.attendance.find(z=>z.enrollment_id===x.e.id&&z.att_date===d); return a?(a.status==='متأخر'?'متأخر':'حاضر'):(d<x.e.created_at.slice(0,10)?'':'غائب'); }),x.n,x.r+'%']; })]; };
-const attendanceRows = (from,to) => [['التاريخ','اليوم','البرنامج','الدفعة','الاسم','السجل المدني','وقت الحضور','الحالة','طريقة التحضير'],
+export const attendanceRows = (from,to) => [['التاريخ','اليوم','البرنامج','الدفعة','الاسم','السجل المدني','وقت الحضور','الحالة','طريقة التحضير'],
   ...AD.attendance.filter(a=>a.att_date>=from&&a.att_date<=to).sort((a,b)=>a.att_date.localeCompare(b.att_date)||a.time.localeCompare(b.time)).map(a=>{ const t=AD.trainees.find(x=>x.id===a.trainee_id), c=AD.cohorts.find(x=>x.id===a.cohort_id); return [a.att_date,DAYS[dowOf(a.att_date)],progName(a.program_id),c?.number,t?.full_name,t?.national_id,a.time.slice(0,5),a.status,a.manual?'يدوي':'باركود']; })];
 
 /* ---------- نافذة طباعة سريعة من كشف الدفعة ---------- */
-function printDayModal(c){
+export function printDayModal(c){
   const today=riyadhNow().date, ds=sessionDays(c,today).reverse();
   if(!ds.length) return toast('لم تبدأ محاضرات هذه الدفعة بعد');
   modal(`<h3>طباعة وتصدير ${cohortLabel(c)}</h3><p class="hint" style="margin:-8px 0 14px">${esc(progName(c.program_id))}</p>
@@ -154,7 +165,7 @@ function printDayModal(c){
 }
 
 /* ---------- صفحة «التقارير والطباعة» ---------- */
-function pageReports(){
+export function pageReports(){
   const m=$('#main'), today=riyadhNow().date;
   const progsWithC = AD.programs.filter(p=>AD.cohorts.some(c=>c.program_id===p.id)).sort((a,b)=>catSort(a.category,b.category)||a.name.localeCompare(b.name,'ar'));
   const progOpts = progsWithC.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
