@@ -1,3 +1,4 @@
+import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './policy_logic.js';
 import { catalogPrograms, computeEnd } from './catalog.js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
@@ -224,6 +225,13 @@ export function attemptRecord(nid, device, r){
   return { id:uid(), at:new Date().toISOString(), date:riyadhNow().date, nid_hash:String(hash32('sama:'+nid)), device:device||'', result: r.ok ? (r.already?'already':'ok') : r.reason, kind:r.kind||'cohort', trainee_hint:r.ok?(r._trainee||null):null };
 }
 
+/* إقرار قبول السياسات السارية عند التسجيل (الإصدار نفسه، مع السياق) */
+function acceptPolicies(D, f, trainee_id, context){
+  const ids = checkAcceptance(D.policies, riyadhNow().date, f.accepted_policies);
+  D.policy_acceptances = D.policy_acceptances || [];
+  ids.forEach(pid => { if(!D.policy_acceptances.some(a => a.policy_id===pid && a.trainee_id===trainee_id && a.context===context))
+    D.policy_acceptances.push({id:uid(), policy_id:pid, trainee_id, context, accepted_at:new Date().toISOString()}); });
+}
 export const LocalStore = {
   key:'sama_qudrat_v4', mode:'local', data:null, admin:false,
   load(){
@@ -233,7 +241,7 @@ export const LocalStore = {
     if(!this.data.partners) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
-    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D);
+    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies){ D.policies=demoPolicies(riyadhNow().date); D.policy_acceptances=[]; }
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
@@ -253,10 +261,12 @@ export const LocalStore = {
       if(!c || !c.reg_open) throw new Error(`التسجيل غير مفتوح حاليًا في «${p.name}»`);
       if(takenOf(D,c.id)>=c.seats) throw new Error(`اكتملت مقاعد الدفعة ${c.number} من «${p.name}»`);
     }
+    checkAcceptance(D.policies, today, f.accepted_policies);
     let t = D.trainees.find(x=>x.national_id===f.national_id);
     for(const {p,c} of targets){ if(t && D.enrollments.some(e=>e.cohort_id===c.id && e.trainee_id===t.id && e.status!=='ملغى')) throw new Error(`هذا السجل المدني مسجّل مسبقًا في الدفعة ${c.number} من «${p.name}»`); }
     const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||''};
     if(t) Object.assign(t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    acceptPolicies(D, f, t.id, 'registration');
     const ref = newRef();
     targets.forEach(({c})=>D.enrollments.push({id:uid(), ref, cohort_id:c.id, program_id:c.program_id, trainee_id:t.id, package_id:f.package_id||null, status:'مسجل', created_at:new Date().toISOString()}));
     this.save();
@@ -318,11 +328,12 @@ export const LocalStore = {
   async publicPlans(){ const D=this.data; return { plans:(D.plans||[]).filter(p=>p.active!==false).sort((a,b)=>a.sort-b.sort), schedule:D.schedule_templates||[] }; },
   async registerSubscription(f){
     const D=this.data; if(!validSaudiId(f.national_id)) throw new Error('رقم السجل المدني غير صحيح');
-    const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا');
+    const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا'); checkAcceptance(D.policies, riyadhNow().date, f.accepted_policies);
     let t=D.trainees.find(x=>x.national_id===f.national_id);
     if(t && D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`هذا السجل المدني مشترك مسبقًا في ${planName(plan)}`);
     const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||''};
     if(t) Object.assign(t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    acceptPolicies(D, f, t.id, 'subscription');
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:'pending', start_date:null, end_date:null, created_at:new Date().toISOString()};
     D.subscriptions.push(s); this.save();
     return {ok:true, subscription:true, ref:s.ref, plan:planName(plan), section:SECTIONS[s.section], schedule:sectionDaysTxt(D,s.section)};
@@ -357,6 +368,16 @@ export const LocalStore = {
     this.audit('attendance.manual', subscription_id, {date, before, after:status}); this.save(); },
   async requestCustomPlan(f){ (this.data.custom_requests=this.data.custom_requests||[]).push({id:uid(), name:String(f.name||'').trim().slice(0,80), phone:String(f.phone||''), program:f.program, section:f.section, mode:f.mode, notes:String(f.notes||'').slice(0,600), status:'new', created_at:new Date().toISOString()}); this.save(); return {ok:true}; },
   async setCustomRequestStatus(id, status){ const r=(this.data.custom_requests||[]).find(x=>x.id===id); if(r){ r.status=status; this.audit('custom_request.status', id, {status}); this.save(); } },
+  /* مركز السياسات: المنشور لا يُعدَّل، والتعديل يكون بمسودة إصدار جديد */
+  async publicPolicies(){ return (this.data.policies||[]).filter(p=>p.status==='published').map(p=>({...p})); },
+  async savePolicy(p){ const L=this.data.policies; validatePolicy(p, false);
+    const row={slug:p.slug, title:p.title.trim(), body:String(p.body).trim().slice(0,30000), effective_date:p.effective_date, approved_by:String(p.approved_by||'').trim().slice(0,120), requires_acceptance:!!p.requires_acceptance};
+    if(p.id){ const x=L.find(y=>y.id===p.id); if(!x) throw new Error('السياسة غير موجودة'); if(x.status!=='draft') throw new Error('النسخة المنشورة لا تُعدَّل؛ أنشئ إصدارًا جديدًا'); Object.assign(x,row); this.audit('policy.save', x.id); this.save(); return {ok:true, id:x.id}; }
+    if(L.some(y=>y.slug===p.slug&&y.status==='draft')) throw new Error('توجد مسودة لهذه السياسة؛ عدّلها بدل إنشاء أخرى');
+    const n={id:uid(), ...row, version:0, status:'draft', created_at:new Date().toISOString()}; L.push(n); this.audit('policy.save', n.id); this.save(); return {ok:true, id:n.id}; },
+  async publishPolicy(id){ const L=this.data.policies, x=L.find(y=>y.id===id); if(!x||x.status!=='draft') throw new Error('تُنشر المسودات فقط'); validatePolicy(x, true);
+    Object.assign(x,{version:nextVersion(L,x.slug), status:'published', published_at:new Date().toISOString()}); this.audit('policy.publish', id, {version:x.version}); this.save(); return {ok:true, version:x.version}; },
+  async deletePolicyDraft(id){ const L=this.data.policies, i=L.findIndex(y=>y.id===id&&y.status==='draft'); if(i<0) throw new Error('تُحذف المسودات فقط'); L.splice(i,1); this.save(); return {ok:true}; },
   /* ---- البوابات: دخول بالجوال ورمز تحقق (تجريبيًا الرمز 1234) ---- */
   async requestOtp(phone){ if(!/^05\d{8}$/.test(normPhone(phone))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05'); return {demo:true}; },
   async portalLogin(phone, code, role){
@@ -446,17 +467,17 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
       q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
       q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
       q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500)),
-      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false}))]);
+      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000))]);
     const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr)};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa)};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -501,6 +522,12 @@ export const CloudStore = {
   async portalLogout(){ await this.sb.auth.signOut(); },
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
   async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
+  async publicPolicies(){ return this._e(await this.sb.rpc('public_policies'))||[]; },
+  async savePolicy(p){ validatePolicy(p, false); const row={slug:p.slug, title:p.title.trim(), body:String(p.body).trim(), effective_date:p.effective_date, approved_by:String(p.approved_by||'').trim(), requires_acceptance:!!p.requires_acceptance};
+    const r=this._e(p.id ? await this.sb.from('policies').update(row).eq('id',p.id).eq('status','draft').select('id') : await this.sb.from('policies').insert({...row, status:'draft', version:0}).select('id'));
+    if(!r||!r.length) throw new Error('النسخة المنشورة لا تُعدَّل؛ أنشئ إصدارًا جديدًا'); return {ok:true, id:r[0].id}; },
+  async publishPolicy(id){ return this._e(await this.sb.rpc('publish_policy',{p_id:id})); },
+  async deletePolicyDraft(id){ this._e(await this.sb.from('policies').delete().eq('id',id).eq('status','draft')); return {ok:true}; },
   async markRead(role){ await this.sb.rpc('mark_read',{p_role:role}); },
   // التعليم: نفس توقيعات LocalStore، والتحقق من النطاق في دوال SQL
   async saveAssignment(a){ return this._e(await this.sb.rpc('teacher_save_assignment',{p:a})); },

@@ -10,6 +10,7 @@ import { viewAdmin } from './views2_admin.js';
 import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
+import { viewPolicies, viewPolicy, bindPolicyConsent } from './policy_views.js';
 
 /* =====================================================================
    أدوات العرض المشتركة
@@ -44,7 +45,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['home','register','me','verify','checkin','portals','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-daily','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['home','register','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-daily','admin-policies','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
@@ -55,7 +56,7 @@ export async function route(){
   if(PAGE==='public' && adminRoute){ location.replace(adminBase()+'#'+h); return; }
   if(PAGE==='admin' && h && !adminRoute){ location.replace(publicBase()+'#'+h); return; }
   if(PAGE==='admin' && !h) h='admin';
-  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : (!h||h==='home') ? 'home' : 'register';
+  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
   $('#modeTag').textContent = Store.mode==='cloud' ? 'متصل بقاعدة البيانات' : 'بيانات تجريبية';
   $('#modeTag').classList.toggle('cloud', Store.mode==='cloud');
@@ -64,6 +65,7 @@ export async function route(){
   if(h==='verify') return viewVerify('');
   if(h==='me') return viewMe();
   if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
+  if(h.startsWith('policy-')) return viewPolicy(h.slice(7));
   if(/^p[a-z0-9]+$/i.test(h) && !ROUTES.includes(h)) return viewProgramPage(h);
   if(h.startsWith('qr-')){ if(!(await Store.isAdmin())) return viewLogin(); return h==='qr-checkin' ? viewQRCheckin() : viewQR(h.slice(3)); }
   const r = ROUTES.includes(h) ? h : 'home';
@@ -71,6 +73,7 @@ export async function route(){
   if(r==='register') return viewCatalog();
   if(r==='checkin') return viewGeneralCheckin();
   if(r==='portals') return viewPortals();
+  if(r==='policies') return viewPolicies();
   if(!(await Store.isAdmin())) return viewLogin(r);
   if(r==='display') return viewDisplay();
   return viewAdmin(r);
@@ -156,13 +159,14 @@ export function regFormHtml(title, sub){
       ${fld('city','المدينة أو المحافظة',true,`<select class="inp" name="city"><option value="">اختر</option>${CITIES.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','طالب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
+      <div id="rfPol" style="grid-column:1/-1" hidden></div>
       <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود البرنامج والتحقق برقم سجلي المدني.</span></label>
     </form>
     <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
     <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;
 }
 export function bindRegForm(target, cohortsFn){
-  const f=$('#rf'); wireFormA11y(f,'rf');
+  const f=$('#rf'); wireFormA11y(f,'rf'); bindPolicyConsent($('#rfPol',f));
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
   const filters = {
@@ -194,9 +198,11 @@ export function bindRegForm(target, cohortsFn){
     $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
     Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
     ['gender','city','education'].forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
+    if($('#rf-pol',f) && !F.policies){ ok=false; errs.push({id:'rf-pol',label:'السياسات',msg:'اقرأ السياسات ووافق عليها للمتابعة.'}); $('#rfE').textContent='اقرأ السياسات ووافق عليها للمتابعة.'; }
     if(!F.agree){ ok=false; errs.push({id:'rf-agree',label:'الإقرار',msg:'أكّد صحة البيانات للمتابعة.'}); $('#rfE').textContent='أكّد صحة البيانات للمتابعة.'; }
     showErrorSummary($('#rfSum'), errs);
     if(!ok) return;
+    F.accepted_policies = F.policies ? F.policies.split(',') : []; delete F.policies;
     delete F.agree; F.full_name=F.full_name.trim().replace(/\s+/g,' ');
     setBusy(b,true,'جارٍ حفظ التسجيل');
     try{
