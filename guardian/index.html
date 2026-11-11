@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>بوابة ولي الأمر — مركز سما القدرات للتدريب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@160..700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="icon" href="/src/assets/logo.webp">
+</head>
+<body class="portal">
+<header class="topbar"><div class="in">
+  <a class="brand" id="homeLink" href="../#home"><img src="/src/assets/logo.webp" alt="شعار مركز سما القدرات"><div><b>مركز سما القدرات للتدريب</b><small id="portalTitle">بوابة ولي الأمر</small></div></a>
+  <span style="flex:1"></span>
+  <button class="btn sm" id="logoutBtn" hidden>تسجيل الخروج</button>
+  <button class="themebtn" id="themeBtn" aria-label="تبديل المظهر"></button>
+</div></header>
+<main id="app" class="pg-in"></main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="modalRoot"></div>
+<div id="printRoot"></div>
+<div id="live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="/src/entries/guardian.js"></script>
+</body>
+</html>

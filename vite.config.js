@@ -10,6 +10,9 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         admin: resolve(import.meta.dirname, 'admin/index.html'),
+        student: resolve(import.meta.dirname, 'student/index.html'),
+        teacher: resolve(import.meta.dirname, 'teacher/index.html'),
+        guardian: resolve(import.meta.dirname, 'guardian/index.html'),
       },
     },
   },

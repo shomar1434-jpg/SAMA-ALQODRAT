@@ -12,5 +12,6 @@ export function setPage(p){ PAGE = p; }
 
 /* رابط الصفحة العامة ورابط لوحة الإدارة، أيًّا كانت الصفحة الحالية */
 const here = () => location.href.split('#')[0];
-export const publicBase = () => PAGE === 'admin' ? new URL('../', here()).href : here();
+export const publicBase = () => PAGE === 'public' ? here() : new URL('../', here()).href;
 export const adminBase  = () => PAGE === 'admin' ? here() : new URL('admin/', publicBase()).href;
+export const portalBase = role => new URL(role + '/', publicBase()).href;

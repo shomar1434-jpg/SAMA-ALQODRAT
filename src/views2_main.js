@@ -1,6 +1,6 @@
 import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
-import { PAGE, adminBase, publicBase } from './config.js';
+import { PAGE, adminBase, publicBase, portalBase } from './config.js';
 import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
 import { liveSay, setBusy, showErrorSummary, toLatin, viewMe, viewVerify, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
@@ -44,7 +44,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['home','register','me','verify','checkin','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['home','register','me','verify','checkin','portals','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
@@ -55,7 +55,7 @@ export async function route(){
   if(PAGE==='public' && adminRoute){ location.replace(adminBase()+'#'+h); return; }
   if(PAGE==='admin' && h && !adminRoute){ location.replace(publicBase()+'#'+h); return; }
   if(PAGE==='admin' && !h) h='admin';
-  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : (!h||h==='home') ? 'home' : 'register';
+  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : (!h||h==='home') ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
   $('#modeTag').textContent = Store.mode==='cloud' ? 'متصل بقاعدة البيانات' : 'بيانات تجريبية';
   $('#modeTag').classList.toggle('cloud', Store.mode==='cloud');
@@ -70,6 +70,7 @@ export async function route(){
   if(r==='home') return viewHome();
   if(r==='register') return viewCatalog();
   if(r==='checkin') return viewGeneralCheckin();
+  if(r==='portals') return viewPortals();
   if(!(await Store.isAdmin())) return viewLogin(r);
   if(r==='display') return viewDisplay();
   return viewAdmin(r);
@@ -333,6 +334,12 @@ export async function viewGeneralCheckin(){
 /* =====================================================================
    3) شاشة باركود البرنامج (ثابت لكل برنامج، يخدم كل دفعاته)
    ===================================================================== */
+/* اختيار البوابة: الطالب، وولي الأمر، والمعلم (لكل منها صفحة ودور) */
+export function viewPortals(){
+  const C=[['student','user','بوابة الطالب','حضورك وواجباتك والمدة المتبقية من باقتك، وجلساتك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك والتنبيهات، بعد ربطك من المعهد.'],['teacher','book','بوابة المعلم','كشف حضور طلابك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
+  $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint" style="margin:8px 0 0">الدخول برقم جوالك المسجّل في المعهد ورمز تحقق.</p></div>
+    <div class="grid g3">${C.map(([k,i,t,d],n)=>`<a class="card pad portal-card rv" style="--i:${n}" href="${portalBase(k)}"><span class="kic-lg t-info">${ic(i)}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div>${siteFooter()}`;
+}
 /* الباركود الموحد لكل البرامج والباقات (D-03): يُطبع ويُعلَّق في المعهد ولا يتغير */
 export async function viewQRCheckin(){
   const app=$('#app'), D=await Store.adminData(), url=baseUrl(D.settings)+'#checkin', n=riyadhNow();

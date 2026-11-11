@@ -854,3 +854,33 @@ select.inp.ok{background-image:none;padding-left:14px}
 .fi b{flex:1;font-weight:500}
 @media print{ .display .qrpanel{break-inside:avoid} }
 @media(prefers-reduced-motion:reduce){.pl-card,.chip{transition:none}}
+
+/* =====================================================================
+   البوابات: الطالب، والمعلم، وولي الأمر
+   ===================================================================== */
+body.portal .topbar .in{gap:10px}
+.portal-hero{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.portal-hero h1{margin:8px 0 4px}
+.next-ses{display:grid;gap:2px;text-align:center;padding:14px 20px;border-radius:18px;background:rgba(255,255,255,.1);color:#fff;min-width:170px}
+.next-ses span{font-size:13px;opacity:.8}.next-ses b{font-size:20px}
+.ind3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+@media(max-width:860px){.ind3{grid-template-columns:1fr}}
+.ind{display:grid;gap:10px;align-content:start;justify-items:center;text-align:center}
+.ind-h{display:flex;align-items:center;gap:8px;justify-self:stretch;color:var(--ink)}.ind-h svg{width:20px;height:20px;color:var(--brand)}.ind-h b{font-size:16px}
+.ind-ring{display:grid;place-items:center}
+.ind-nums{display:flex;gap:18px}.ind-nums span{display:grid;font-size:12.5px;color:var(--ink-subtle)}.ind-nums b{font-size:20px;color:var(--ink)}
+.ind-empty{margin:18px 0;color:var(--ink-subtle);font-size:14.5px}
+.ind-big{font-size:14px;color:var(--ink-muted)}.ind-big b{font-size:34px;color:var(--ink);font-variant-numeric:tabular-nums}
+.ind .tbar{justify-self:stretch}.ind .hint{margin:0}
+.ses-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ses-list li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-radius:12px;background:var(--surface-sunken)}
+.ses-list b{font-weight:600;min-width:64px}
+.ntf{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ntf li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:10px 12px;border-radius:12px;border:1px solid var(--border)}
+.ntf li.new{border-color:var(--brand);background:var(--brand-tint)}
+.ntf p{margin:0;line-height:1.8}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--brand)}
+.portal-card{display:grid;gap:8px;text-decoration:none;color:var(--ink);transition:transform 300ms var(--ease),box-shadow 300ms var(--ease)}
+.portal-card:hover,.portal-card:focus-visible{transform:translateY(-4px);box-shadow:var(--shadow-lift)}
+.portal-card b{font-size:18px}
