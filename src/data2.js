@@ -4,6 +4,7 @@ import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
+import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -189,8 +190,12 @@ export function scopeData(D, role, phone){
   const tSafe=t=>({id:t.id, full_name:t.full_name, gender:t.gender});
   const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true}));
   const forTrainees=ids=>{ const subs=(D.subscriptions||[]).filter(s=>ids.includes(s.trainee_id)), sid=subs.map(s=>s.id);
+    const scopes=subs.flatMap(s=>(s.subjects||[]).map(x=>s.section+':'+x));
+    const units={}; (D.questions||[]).filter(q=>q.status==='published'&&scopes.includes(q.section+':'+q.subject)).forEach(q=>{ const k=q.section+'|'+q.subject+'|'+(q.unit||''); units[k]=(units[k]||0)+1; });
     return { trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs, sub_attendance:(D.sub_attendance||[]).filter(a=>sid.includes(a.subscription_id)),
-      assignments:D.assignments||[], submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), teachers:teachersPub }; };
+      assignments:(D.assignments||[]).filter(a=>scopes.includes(a.section+':'+a.subject)), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), teachers:teachersPub,
+      bank_units:Object.entries(units).map(([k,count])=>{ const [section,subject,unit]=k.split('|'); return {section,subject,unit,count}; }),
+      attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)).map(attemptPublic), ratings:(D.ratings||[]).filter(r=>ids.includes(r.trainee_id)), messages:(D.messages||[]).filter(m=>ids.includes(m.trainee_id)) }; };
   if(role==='student'){ const ids=D.trainees.filter(t=>normPhone(t.phone)===ph).map(t=>t.id);
     return {...base, ...forTrainees(ids), notifications:(D.notifications||[]).filter(x=>x.to==='student'&&ids.includes(x.trainee_id)), guardian_links:[]}; }
   if(role==='guardian'){ const links=(D.guardian_links||[]).filter(l=>l.status==='verified'&&normPhone(l.guardian_phone)===ph), ids=links.map(l=>l.trainee_id);
@@ -199,7 +204,11 @@ export function scopeData(D, role, phone){
     const subs=(D.subscriptions||[]).filter(s=>s.section===me.section&&(s.subjects||[]).some(x=>(me.subjects||[]).includes(x))), ids=[...new Set(subs.map(s=>s.trainee_id))];
     return {...base, me:{...me, phone:undefined}, teachers:[{...me}], trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs,
       sub_attendance:(D.sub_attendance||[]).filter(a=>subs.some(s=>s.id===a.subscription_id)), guardian_links:(D.guardian_links||[]).filter(l=>l.status==='verified'&&ids.includes(l.trainee_id)).map(l=>({id:l.id, trainee_id:l.trainee_id, status:l.status, relation:l.relation})),
-      assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id)}; }
+      assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&(D.assignments||[]).some(a=>a.id===x.assignment_id&&a.teacher_id===me.id)),
+      notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id),
+      questions:(D.questions||[]).filter(q=>q.section===me.section&&(me.subjects||[]).includes(q.subject)&&q.status!=='deleted'),
+      attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.section===me.section&&(me.subjects||[]).includes(a.subject)&&a.submitted_at),
+      rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id)}; }
   return null;
 }
 /* بيانات تجريبية: معلمو المقررات وأولياء أمور لعدد من الطلاب */
@@ -224,7 +233,7 @@ export const LocalStore = {
     if(!this.data.partners) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
-    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[];
+    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D);
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
@@ -377,6 +386,43 @@ export const LocalStore = {
     if(D.guardian_links.some(x=>x.status==='verified'&&x.trainee_id===t.id&&normPhone(x.guardian_phone)===normPhone(l.guardian_phone))) throw new Error('هذا الرابط موجود مسبقًا');
     D.guardian_links.push({id:uid(), guardian_name:l.guardian_name, guardian_phone:normPhone(l.guardian_phone), trainee_id:t.id, relation:l.relation||'ولي الأمر', status:'verified', verified_by:'admin', created_at:new Date().toISOString()});
     this.audit('guardian_link.create', t.id); this.save(); },
+  /* ---- الجانب التعليمي: كل عملية تتحقق من الدور والنطاق ---- */
+  async _me(){ const s=await this.portalSession('teacher'); const me=s&&this.data.teachers.find(t=>t.active!==false&&normPhone(t.phone)===s.phone); if(!me) throw new Error('انتهت الجلسة'); return me; },
+  async _student(trainee_id){ const s=await this.portalSession('student'); const t=s&&this.data.trainees.find(x=>x.id===trainee_id&&normPhone(x.phone)===s.phone); if(!t) throw new Error('غير مصرح'); return t; },
+  async saveAssignment(a){ const me=await this._me(); validateAssignment(a); if(!teacherCovers(me, me.section, a.subject)) throw new Error('المقرر خارج نطاقك');
+    const L=this.data.assignments, row={title:a.title.trim(), body:String(a.body||'').slice(0,4000), subject:a.subject, section:me.section, publish_date:a.publish_date, due_date:a.due_date, max_score:+a.max_score||10};
+    if(a.id){ const x=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row); } else L.push({id:uid(), teacher_id:me.id, ...row, created_at:new Date().toISOString()});
+    this.save(); return {ok:true}; },
+  async gradeSubmission(id, g){ const me=await this._me(), D=this.data, s=D.submissions.find(x=>x.id===id), a=s&&D.assignments.find(y=>y.id===s.assignment_id&&y.teacher_id===me.id); if(!a) throw new Error('غير مصرح');
+    if(!['graded','needs_revision'].includes(g.status)) throw new Error('حالة غير صالحة'); const sc=g.score===''||g.score==null?null:+g.score; if(sc!=null&&(sc<0||sc>a.max_score)) throw new Error(`الدرجة من 0 إلى ${a.max_score}`);
+    Object.assign(s,{status:g.status, score:sc, feedback:String(g.feedback||'').slice(0,1000), graded_at:new Date().toISOString()}); this.save(); return {ok:true}; },
+  async submitAssignment({trainee_id, assignment_id, answer, draft}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
+    if(!a||!studentHasScope(D,trainee_id,a.section,a.subject)||a.publish_date>riyadhNow().date) throw new Error('الواجب غير متاح لك');
+    let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s&&s.status==='graded') throw new Error('صُحّح الواجب ولا يمكن تعديله');
+    const txt=String(answer||'').trim(); if(!draft&&!txt) throw new Error('اكتب إجابتك قبل الإرسال');
+    const row={answer:txt.slice(0,6000), status:draft?'draft':'submitted', submitted_at:draft?null:new Date().toISOString(), late:!draft&&riyadhNow().date>a.due_date};
+    if(s) Object.assign(s,row); else D.submissions.push({id:uid(), assignment_id:a.id, trainee_id, ...row}); this.save(); return {ok:true}; },
+  async saveQuestion(q){ const me=await this._me(); validateQuestion(q); if(!teacherCovers(me, me.section, q.subject)) throw new Error('المقرر خارج نطاقك');
+    const L=this.data.questions, row={subject:q.subject, section:me.section, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
+    if(q.id){ const x=L.find(y=>y.id===q.id&&y.section===me.section&&me.subjects.includes(y.subject)); if(!x) throw new Error('غير مصرح'); Object.assign(x,row,{version:(x.version||1)+1}); }
+    else L.push({id:uid(), teacher_id:me.id, version:1, created_at:new Date().toISOString(), ...row}); this.save(); return {ok:true}; },
+  async setQuestionStatus(id, status){ const me=await this._me(), x=this.data.questions.find(y=>y.id===id&&y.section===me.section&&me.subjects.includes(y.subject)); if(!x) throw new Error('غير مصرح');
+    if(!['draft','published','deleted'].includes(status)) throw new Error('حالة غير صالحة'); x.status=status; this.save(); return {ok:true}; },
+  async startAttempt({trainee_id, section, subject, unit, count}){ await this._student(trainee_id); const D=this.data; if(!studentHasScope(D,trainee_id,section,subject)) throw new Error('هذا المقرر ليس ضمن اشتراكك');
+    const at=buildAttempt(D, trainee_id, section, subject, unit, count); (D.attempts=D.attempts||[]).push(at); this.save(); return attemptPublic(at); },
+  async finishAttempt({attempt_id, answers}){ const D=this.data, at=(D.attempts||[]).find(x=>x.id===attempt_id); if(!at) throw new Error('المحاولة غير موجودة'); await this._student(at.trainee_id);
+    if(at.submitted_at) return at; const g=gradeAttempt(at, answers); Object.assign(at, g); this.save(); return at; },
+  async rateTeacher({trainee_id, teacher_id, stars, items, comment}){ await this._student(trainee_id); const D=this.data, t=D.teachers.find(x=>x.id===teacher_id); const c=canRate(D, trainee_id, t); if(!c.ok) throw new Error(c.why);
+    const st=Math.round(+stars); if(!(st>=1&&st<=5)) throw new Error('اختر من نجمة إلى خمس نجوم'); const per=period();
+    const it=Object.fromEntries(Object.entries(items||{}).map(([k,v])=>[k, Math.min(5,Math.max(1,Math.round(+v)||st))]));
+    const ex=(D.ratings=D.ratings||[]).find(r=>r.trainee_id===trainee_id&&r.teacher_id===teacher_id&&r.period===per);
+    const row={stars:st, items:it, comment:String(comment||'').trim().slice(0,500), updated_at:new Date().toISOString()};
+    if(ex) Object.assign(ex,row); else D.ratings.push({id:uid(), trainee_id, teacher_id, period:per, created_at:new Date().toISOString(), ...row}); this.save(); return {ok:true, updated:!!ex}; },
+  async sendMessage({trainee_id, teacher_id, text}, role){ const D=this.data, body=validateMessage(text); let from;
+    if(role==='teacher'){ const me=await this._me(); if(me.id!==teacher_id||!teacherTeaches(D,me,trainee_id)) throw new Error('الطالب ليس ضمن طلابك'); from='teacher'; }
+    else { await this._student(trainee_id); const t=D.teachers.find(x=>x.id===teacher_id); if(!teacherTeaches(D,t,trainee_id)) throw new Error('المعلم لا يدرّسك'); from='student'; }
+    (D.messages=D.messages||[]).push({id:uid(), trainee_id, teacher_id, from, text:body, at:new Date().toISOString(), read_at:null}); this.save(); return {ok:true}; },
+  async markThreadRead({trainee_id, teacher_id}, role){ const s=await this.portalSession(role); if(!s) return; (this.data.messages||[]).forEach(m=>{ if(m.trainee_id===trainee_id&&m.teacher_id===teacher_id&&m.from!==role&&!m.read_at) m.read_at=new Date().toISOString(); }); this.save(); },
   async revokeGuardianLink(id){ const l=this.data.guardian_links.find(x=>x.id===id); if(l){ l.status='revoked'; l.revoked_at=new Date().toISOString(); this.audit('guardian_link.revoke', id); this.save(); } },
   audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'admin', action, entity:String(entity), detail:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
   async resetDemo(){ this.data = makeDemo(); this.autoArchive(); this.save(); },
@@ -456,6 +502,17 @@ export const CloudStore = {
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
   async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
   async markRead(role){ await this.sb.rpc('mark_read',{p_role:role}); },
+  // التعليم: نفس توقيعات LocalStore، والتحقق من النطاق في دوال SQL
+  async saveAssignment(a){ return this._e(await this.sb.rpc('teacher_save_assignment',{p:a})); },
+  async gradeSubmission(id, g){ return this._e(await this.sb.rpc('teacher_grade',{p_id:id, p:g})); },
+  async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
+  async saveQuestion(q){ return this._e(await this.sb.rpc('teacher_save_question',{p:q})); },
+  async setQuestionStatus(id, status){ this._e(await this.sb.rpc('teacher_question_status',{p_id:id, p_status:status})); return {ok:true}; },
+  async startAttempt(p){ return this._e(await this.sb.rpc('student_start_attempt',{p})); },
+  async finishAttempt({attempt_id, answers}){ return this._e(await this.sb.rpc('student_finish_attempt',{p_id:attempt_id, p_answers:answers||{}})); },
+  async rateTeacher(p){ return this._e(await this.sb.rpc('student_rate',{p})); },
+  async sendMessage(p, role){ return this._e(await this.sb.rpc('send_message',{p, p_role:role})); },
+  async markThreadRead({trainee_id, teacher_id}, role){ await this.sb.rpc('mark_thread_read',{p_trainee:trainee_id, p_teacher:teacher_id, p_role:role}); },
   async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
   async saveGuardianLink(l){ const t=this._e(await this.sb.from('trainees').select('id').eq('national_id',l.national_id).maybeSingle()); if(!t) throw new Error('لا يوجد طالب بهذا السجل المدني');
     const {data:{session}}=await this.sb.auth.getSession(); this._e(await this.sb.from('guardian_links').insert({guardian_name:l.guardian_name, guardian_phone:normPhone(l.guardian_phone), trainee_id:t.id, relation:l.relation, verified_by:session?.user?.id||null})); },
@@ -516,7 +573,7 @@ export function makeDemo(){
   const D={ programs, packages:[], trainees, cohorts, enrollments, attendance, certificates:[],
     settings:{ daily_secret:Math.random().toString(36).slice(2)+Date.now(), require_code:false, late_minutes:15, early_minutes:60, admin_pin:'1234', checkin_url:'', cert_threshold:75, late_weight:1, warn_consec:2, about:DEFAULT_ABOUT }, partners:defaultPartners() };
   demoQudurat(D, person, rnd);
-  D.teachers=[]; D.guardian_links=[]; D.notifications=[]; D.assignments=[]; D.submissions=[]; demoPeople(D);
+  D.teachers=[]; D.guardian_links=[]; D.notifications=[]; D.assignments=[]; D.submissions=[]; demoPeople(D); demoLearning(D);
   return D;
 }
 
