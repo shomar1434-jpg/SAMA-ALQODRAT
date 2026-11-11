@@ -1,7 +1,8 @@
 import { catalogPrograms, computeEnd } from './catalog.js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
-import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, toMin, uid, validSaudiId } from './utils.js';
+import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
+import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
    نموذج البيانات القائم على الدفعات
@@ -90,13 +91,14 @@ export function traineeAttendanceLogic(D, nid){
     const cert=(D.certificates||[]).find(x=>x.enrollment_id===e.id&&!x.revoked), level=attendanceLevel(s,state,D.settings);
     return {program:p.name, code:progCode(p), number:c.number, state, start_date:c.start_date, end_date:c.end_date, start_time:c.start_time, ...s, next: cohortArchived(c)?null:(next||null), cert: cert?cert.serial:null,
       level, message: levelMessage(level,s,D.settings,{'البرنامج':p.name,'الاسم':t.full_name.split(' ')[0],'البداية':fmtDate(c.start_date)})}; }).filter(Boolean)
-    .sort((a,b)=>({running:0,upcoming:1,archived:2}[a.state]-{running:0,upcoming:1,archived:2}[b.state]) || b.start_date.localeCompare(a.start_date));
+    .concat(subAttendanceItems(D,t))
+    .sort((a,b)=>({running:0,upcoming:1,archived:2}[a.state]-{running:0,upcoming:1,archived:2}[b.state]) || String(b.start_date||'9').localeCompare(String(a.start_date||'9')));
   return {ok:true, trainee:t, first_name:t.full_name.split(' ')[0], threshold:calcSet(D.settings).cert_threshold, items:list};
 }
 /* ما يراه المتدرب فقط: نسبة الحضور ورسالة التنبيه */
 export function myAttendanceLogic(D, nid){
   const r=traineeAttendanceLogic(D,nid); if(!r.ok) return r;
-  return {ok:true, first_name:r.first_name, items:r.items.map(x=>({program:x.program, number:x.number, state:x.state, start_date:x.start_date, end_date:x.end_date,
+  return {ok:true, first_name:r.first_name, items:r.items.map(x=>({kind:x.kind||'cohort', program:x.program, section:x.section||null, number:x.number, state:x.state, start_date:x.start_date, end_date:x.end_date,
     rate: x.state==='archived' ? x.finalRate : x.state==='upcoming' ? null : x.rate, level:x.level, message:x.message}))};
 }
 
@@ -134,6 +136,51 @@ export function checkinLogic(D, nid, code, programCode, dayCode){
   return {ok:true, already:false, ...base, status, time:n.hm, _rec:rec};
 }
 
+/* =====================================================================
+   التحضير الموحد (D-03): باركود ثابت واحد ← السجل المدني ← يتعرف النظام على
+   اشتراك الباقة أو تسجيل الدفعة الذي له جلسة الآن. عند التعدد يختار الطالب.
+   ===================================================================== */
+export function unifiedCheckin(D, nid, code, programCode, dayCode, choice){
+  if(programCode) return checkinLogic(D, nid, code, programCode, dayCode);       // باركود برنامج محدد: السلوك السابق
+  const n=riyadhNow(), t=D.trainees.find(x=>x.national_id===nid);
+  if(D.settings.require_code && code!==dayCode) return {ok:false, reason:'bad_code'};
+  if(!t) return {ok:false, reason:'not_in_cohort'};
+  const subs = subsInSession(D, t, n).map(x=>({id:'s:'+x.s.id, label:planName(D.plans.find(p=>p.id===x.s.plan_id)), x}));
+  const coh = checkinLogic(D, nid, code, null, dayCode);
+  const opts = [...subs, ...(coh.ok ? [{id:'c:'+(coh._rec?.enrollment_id||coh.enrollment_id||'x'), label:coh.program, coh}] : [])];
+  if(!opts.length){
+    const mine=(D.subscriptions||[]).filter(s=>s.trainee_id===t.id && ['pending','active'].includes(subStatus(s,n.date)));
+    if(mine.length){ let nx=null; for(const s of mine){ for(let d=n.date, i=0; i<21 && !nx; i++, d=addDays(d,1)){ const ses=sessionOn(D,s.section,d); if(ses && (d>n.date || toMin(n.hm)<toMin(ses.start)-(D.settings.early_minutes??60))) nx={date:d, time:ses.start}; } }
+      return {ok:false, reason:'no_session', name:t.full_name, program:planName(D.plans.find(p=>p.id===mine[0].plan_id)), next:nx}; }
+    return coh;
+  }
+  let pick = opts.length===1 ? opts[0] : opts.find(o=>o.id===choice);
+  if(!pick) return {ok:false, reason:'choose', name:t.full_name, options:opts.map(o=>({id:o.id, label:o.label}))};
+  if(pick.coh) return pick.coh;
+  const r = subCheckin(D, pick.x.s, pick.x.ses, n);
+  return {...r, name:t.full_name, _sub:pick.x.s.id};
+}
+/* اشتراكات الباقات ضمن «حضوري» وسجل المتدرب في الإدارة */
+export function subAttendanceItems(D, t){
+  const n=riyadhNow();
+  return (D.subscriptions||[]).filter(s=>s.trainee_id===t.id && s.status!=='cancelled').map(s=>{
+    const st=subStats(D,s,n), plan=st.plan, state = st.status==='ended'?'archived':st.status==='pending'?'upcoming':'running';
+    const level = st.status==='pending' ? 'none' : attendanceLevel(st, state, D.settings);
+    const message = st.status==='pending' ? `اشتراكك في ${planName(plan)} يبدأ من أول يوم تحضر فيه. مواعيد ${SECTIONS[s.section]}: ${sectionDaysTxt(D,s.section)}.`
+      : levelMessage(level, st, D.settings, {'البرنامج':planName(plan),'الاسم':t.full_name.split(' ')[0],'البداية':s.start_date?fmtDate(s.start_date):''});
+    return {kind:'subscription', id:s.id, program:planName(plan), section:SECTIONS[s.section], number:null, state, start_date:s.start_date, end_date:st.end||null, ...st, plan:undefined, att:undefined,
+      level, message, timePct:st.timePct, daysLeft:st.daysLeft};
+  });
+}
+export function sectionDaysTxt(D, section){
+  const DN=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  return (D.schedule_templates||[]).filter(x=>x.section===section).sort((a,b)=>((a.dow+1)%7)-((b.dow+1)%7)).map(x=>`${DN[x.dow]} من ${t12(x.start)} إلى ${t12(x.end)}`).join('، ');
+}
+/* سجل محاولات التحضير: يُخزَّن رقم السجل مجزّأً (hash) لا الرقم نفسه */
+export function attemptRecord(nid, device, r){
+  return { id:uid(), at:new Date().toISOString(), date:riyadhNow().date, nid_hash:String(hash32('sama:'+nid)), device:device||'', result: r.ok ? (r.already?'already':'ok') : r.reason, kind:r.kind||'cohort', trainee_hint:r.ok?(r._trainee||null):null };
+}
+
 export const LocalStore = {
   key:'sama_qudrat_v4', mode:'local', data:null, admin:false,
   load(){
@@ -141,6 +188,8 @@ export const LocalStore = {
     if(!this.data){ this.data = makeDemo(); }
     this.data.certificates = this.data.certificates || []; if(this.data.settings.cert_threshold==null) this.data.settings.cert_threshold=75;
     if(!this.data.partners) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
+    const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
+    D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
@@ -171,10 +220,15 @@ export const LocalStore = {
   },
   dayCode(date){ return String(hash32(this.data.settings.daily_secret + date) % 10000).padStart(4,'0'); },
   async todayCode(){ return this.dayCode(riyadhNow().date); },
-  async checkin(nid, code, programCode){
-    this.autoArchive();
-    const r = checkinLogic(this.data, nid, code, programCode, this.dayCode(riyadhNow().date));
-    if(r._rec){ this.data.attendance.push(r._rec); this.save(); delete r._rec; }
+  async checkin(nid, code, programCode, opts={}){
+    this.autoArchive(); const D=this.data;
+    const r = unifiedCheckin(D, nid, code, programCode, this.dayCode(riyadhNow().date), opts.choice);
+    if(r._rec){
+      if(r._sub){ D.sub_attendance.push(r._rec); const s=D.subscriptions.find(x=>x.id===r._sub); if(r._start && s && !s.start_date){ Object.assign(s, r._start, {status:'active'}); } r._trainee=r._rec.trainee_id; }
+      else { D.attendance.push(r._rec); r._trainee=r._rec.trainee_id; }
+    } else if(r.ok && r.already){ r._trainee = D.trainees.find(x=>x.national_id===nid)?.id; }
+    if(r.reason!=='choose'){ D.checkin_attempts.push(attemptRecord(nid, opts.device, r)); if(D.checkin_attempts.length>5000) D.checkin_attempts.splice(0, D.checkin_attempts.length-5000); }
+    this.save(); delete r._rec; delete r._sub; delete r._start; delete r._trainee;
     return r;
   },
   async isAdmin(){ return this.admin; },
@@ -182,7 +236,7 @@ export const LocalStore = {
   async logout(){ this.admin=false; try{sessionStorage.removeItem(this.key+'_adm');}catch(e){} },
   async adminData(){ this.autoArchive(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
   async saveProgram(p){ const a=this.data.programs, i=a.findIndex(x=>x.id===p.id); if(i>=0) a[i]={...a[i],...p}; else { const n={...p,id:uid(),created_at:new Date().toISOString()}; n.code=p.code||progCode(n); a.push(n); } this.save(); },
-  async deleteProgram(id){ const D=this.data; const cids=D.cohorts.filter(c=>c.program_id===id).map(c=>c.id);
+  async deleteProgram(id){ const D=this.data; if(D.enrollments.some(e=>e.program_id===id)) throw new Error('لا يمكن حذف برنامج له متدربون مسجّلون. أوقفه (غير نشط) بدل حذفه.'); const cids=D.cohorts.filter(c=>c.program_id===id).map(c=>c.id);
     D.programs=D.programs.filter(x=>x.id!==id); D.cohorts=D.cohorts.filter(c=>c.program_id!==id); D.enrollments=D.enrollments.filter(e=>!cids.includes(e.cohort_id)); D.attendance=D.attendance.filter(a=>!cids.includes(a.cohort_id));
     D.packages.forEach(k=>k.program_ids=k.program_ids.filter(x=>x!==id)); this.save(); },
   async savePackage(p){ const a=this.data.packages, i=a.findIndex(x=>x.id===p.id); if(i>=0) a[i]=p; else a.push({...p,id:uid(),created_at:new Date().toISOString()}); this.save(); },
@@ -198,34 +252,78 @@ export const LocalStore = {
   async revokeCertificate(id, on=true){ const x=(this.data.certificates||[]).find(y=>y.id===id); if(x){ x.revoked=on; this.save(); } },
   async verifyCertificate(serial){ const D=this.data; return certPublic(D,(D.certificates||[]).find(x=>x.serial.toUpperCase()===String(serial).trim().toUpperCase())); },
   async myAttendance(nid){ this.autoArchive(); return myAttendanceLogic(this.data, nid); },
-  async deleteCohort(id){ const D=this.data; D.cohorts=D.cohorts.filter(c=>c.id!==id); D.enrollments=D.enrollments.filter(e=>e.cohort_id!==id); D.attendance=D.attendance.filter(a=>a.cohort_id!==id); this.save(); },
+  async deleteCohort(id){ const D=this.data; if(D.attendance.some(a=>a.cohort_id===id)) throw new Error('لا يمكن حذف دفعة لها سجلات حضور. أرشفها بدل حذفها.'); D.cohorts=D.cohorts.filter(c=>c.id!==id); D.enrollments=D.enrollments.filter(e=>e.cohort_id!==id); D.attendance=D.attendance.filter(a=>a.cohort_id!==id); this.save(); },
   async setEnrollmentStatus(id, status){ const e=this.data.enrollments.find(x=>x.id===id); if(e){ e.status=status; this.save(); } },
-  async deleteEnrollment(id){ const D=this.data; D.enrollments=D.enrollments.filter(x=>x.id!==id); D.attendance=D.attendance.filter(a=>a.enrollment_id!==id); this.save(); },
+  async deleteEnrollment(id){ const D=this.data; if(D.attendance.some(a=>a.enrollment_id===id)||(D.certificates||[]).some(c=>c.enrollment_id===id)) throw new Error('لا يمكن حذف تسجيل له حضور أو شهادة. غيّر حالته إلى «ملغى».'); D.enrollments=D.enrollments.filter(x=>x.id!==id); D.attendance=D.attendance.filter(a=>a.enrollment_id!==id); this.save(); },
   async setAttendance(enrollment_id, date, status){ const D=this.data, e=D.enrollments.find(x=>x.id===enrollment_id); if(!e) return;
     const i=D.attendance.findIndex(a=>a.enrollment_id===enrollment_id && a.att_date===date);
     if(status===null){ if(i>=0) D.attendance.splice(i,1); }
     else if(i>=0) D.attendance[i].status=status;
     else { const c=D.cohorts.find(x=>x.id===e.cohort_id); D.attendance.push({id:uid(), enrollment_id, cohort_id:e.cohort_id, program_id:e.program_id, trainee_id:e.trainee_id, att_date:date, time:(c?.start_time||'00:00')+':00', checkin_at:new Date().toISOString(), status, manual:true}); }
     this.save(); },
-  async deleteTrainee(id){ const D=this.data; D.trainees=D.trainees.filter(x=>x.id!==id); D.enrollments=D.enrollments.filter(e=>e.trainee_id!==id); D.attendance=D.attendance.filter(a=>a.trainee_id!==id); this.save(); },
+  async deleteTrainee(id){ const D=this.data; if(D.attendance.some(a=>a.trainee_id===id)||(D.certificates||[]).some(c=>c.trainee_id===id)||(D.sub_attendance||[]).some(a=>a.trainee_id===id)) throw new Error('لا يمكن حذف متدرب له سجلات حضور أو شهادات. ألغِ تسجيله بدل حذفه.'); D.subscriptions=(D.subscriptions||[]).filter(s=>s.trainee_id!==id); D.trainees=D.trainees.filter(x=>x.id!==id); D.enrollments=D.enrollments.filter(e=>e.trainee_id!==id); D.attendance=D.attendance.filter(a=>a.trainee_id!==id); this.save(); },
   async saveSettings(s){ Object.assign(this.data.settings, s); this.save(); },
   async publicSite(){ const D=this.data; return { about:D.settings.about||DEFAULT_ABOUT, partners:(D.partners||[]).filter(p=>p.active!==false) }; },
   async savePartner(p){ const L=this.data.partners=this.data.partners||[]; if(p.id){ const i=L.findIndex(x=>x.id===p.id); if(i>=0) L[i]={...L[i],...p}; else L.push(p); } else L.push({...p,id:uid()}); this.save(); },
   async deletePartner(id){ this.data.partners=(this.data.partners||[]).filter(p=>p.id!==id); this.save(); },
+  /* ---- باقات القدرات والتحصيلي ---- */
+  async publicPlans(){ const D=this.data; return { plans:(D.plans||[]).filter(p=>p.active!==false).sort((a,b)=>a.sort-b.sort), schedule:D.schedule_templates||[] }; },
+  async registerSubscription(f){
+    const D=this.data; if(!validSaudiId(f.national_id)) throw new Error('رقم السجل المدني غير صحيح');
+    const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا');
+    let t=D.trainees.find(x=>x.national_id===f.national_id);
+    if(t && D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`هذا السجل المدني مشترك مسبقًا في ${planName(plan)}`);
+    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||''};
+    if(t) Object.assign(t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:'pending', start_date:null, end_date:null, created_at:new Date().toISOString()};
+    D.subscriptions.push(s); this.save();
+    return {ok:true, subscription:true, ref:s.ref, plan:planName(plan), section:SECTIONS[s.section], schedule:sectionDaysTxt(D,s.section)};
+  },
+  async savePlan(p){ const a=this.data.plans, i=a.findIndex(x=>x.id===p.id); if(i>=0) a[i]={...a[i],...p}; else a.push({...p, id:uid(), sort:p.sort??a.length}); this.audit('plan.save', p.id||'new'); this.save(); },
+  async saveTemplates(section, rows){ const D=this.data; D.schedule_templates=[...D.schedule_templates.filter(x=>x.section!==section), ...rows.map(r=>({id:uid(), section, ...r}))]; this.audit('schedule.save', section); this.save(); },
+  async saveException(x){ const a=this.data.schedule_exceptions; const i=a.findIndex(y=>y.id===x.id); if(i>=0) a[i]={...a[i],...x}; else a.push({...x, id:uid(), created_at:new Date().toISOString()}); this.audit('exception.save', x.date); this.save(); },
+  async deleteException(id){ this.data.schedule_exceptions=this.data.schedule_exceptions.filter(x=>x.id!==id); this.audit('exception.delete', id); this.save(); },
+  /* إضافة/تعديل اشتراك من الإدارة، ومنها الطلاب الحاليون بتاريخ بداية فعلي (D-10) */
+  async saveSubscription(f){
+    const D=this.data, plan=D.plans.find(p=>p.id===f.plan_id); if(!plan) throw new Error('اختر الباقة');
+    let t = f.trainee_id ? D.trainees.find(x=>x.id===f.trainee_id) : D.trainees.find(x=>x.national_id===f.national_id);
+    if(!t){ if(!validSaudiId(f.national_id||'')) throw new Error('رقم السجل المدني غير صحيح'); if(!f.full_name) throw new Error('اكتب اسم الطالب');
+      t={id:uid(), national_id:f.national_id, full_name:f.full_name, phone:f.phone||'', email:'', gender:f.gender||'ذكر', birth_date:'', city:f.city||'جازان', education:'ثانوي', employer:'', created_at:new Date().toISOString()}; D.trainees.push(t); }
+    else if(!f.id){ if(f.full_name) t.full_name=f.full_name; if(f.phone) t.phone=f.phone; if(f.gender) t.gender=f.gender; }
+    const start=f.start_date||null;
+    if(f.id){ const s=D.subscriptions.find(x=>x.id===f.id); if(!s) throw new Error('الاشتراك غير موجود');
+      Object.assign(s, {plan_id:plan.id, section:f.section||s.section, subjects:f.subjects||s.subjects, start_date:start, end_date:start?subEnd(plan,start):null, status:start?'active':'pending', start_manual:!!start});
+      this.audit('subscription.update', s.id); this.save(); return s; }
+    if(D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`${t.full_name} مشترك مسبقًا في ${planName(plan)}`);
+    const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:f.section||sectionOfGender(t.gender), subjects:f.subjects||[...(plan.subjects||[])], status:start?'active':'pending', start_date:start, end_date:start?subEnd(plan,start):null, start_manual:!!start, created_at:new Date().toISOString()};
+    D.subscriptions.push(s); this.audit('subscription.create', s.id); this.save(); return s;
+  },
+  async cancelSubscription(id, on=true){ const s=this.data.subscriptions.find(x=>x.id===id); if(s){ s.status = on ? 'cancelled' : (s.start_date?'active':'pending'); this.audit(on?'subscription.cancel':'subscription.restore', id); this.save(); } },
+  async setSubAttendance(subscription_id, date, status){ const D=this.data, s=D.subscriptions.find(x=>x.id===subscription_id); if(!s) return;
+    const i=D.sub_attendance.findIndex(a=>a.subscription_id===subscription_id && a.att_date===date);
+    const before = i>=0 ? D.sub_attendance[i].status : null;
+    if(status===null){ if(i>=0) D.sub_attendance.splice(i,1); }
+    else if(i>=0) D.sub_attendance[i].status=status;
+    else { const ses=sessionOn(D,s.section,date); D.sub_attendance.push({id:uid(), subscription_id, trainee_id:s.trainee_id, att_date:date, time:(ses?.start||'00:00')+':00', status, manual:true, checkin_at:new Date().toISOString()});
+      if(!s.start_date){ const plan=D.plans.find(p=>p.id===s.plan_id); Object.assign(s,{start_date:date, end_date:subEnd(plan,date), status:'active'}); } }
+    this.audit('attendance.manual', subscription_id, {date, before, after:status}); this.save(); },
+  async requestCustomPlan(f){ (this.data.custom_requests=this.data.custom_requests||[]).push({id:uid(), name:String(f.name||'').trim().slice(0,80), phone:String(f.phone||''), program:f.program, section:f.section, mode:f.mode, notes:String(f.notes||'').slice(0,600), status:'new', created_at:new Date().toISOString()}); this.save(); return {ok:true}; },
+  async setCustomRequestStatus(id, status){ const r=(this.data.custom_requests||[]).find(x=>x.id===id); if(r){ r.status=status; this.audit('custom_request.status', id, {status}); this.save(); } },
+  audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'admin', action, entity:String(entity), detail:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
   async resetDemo(){ this.data = makeDemo(); this.autoArchive(); this.save(); },
-  async clearPeople(){ const D=this.data; D.trainees=[]; D.enrollments=[]; D.attendance=[]; D.cohorts=[]; D.certificates=[]; this.save(); }
+  async clearPeople(){ const D=this.data; D.trainees=[]; D.enrollments=[]; D.attendance=[]; D.cohorts=[]; D.certificates=[]; D.subscriptions=[]; D.sub_attendance=[]; D.checkin_attempts=[]; this.save(); }
 };
 
 /* ---------------- Supabase: نفس الواجهة عبر دوال آمنة وجداول محمية بالصلاحيات ---------------- */
 export const CloudStore = {
   mode:'cloud', sb:null,
   init(){ this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); },
-  _e(r){ if(r.error) throw new Error(r.error.message); return r.data; },
+  _e(r){ if(r.error){ const m=r.error.message||''; throw new Error(/foreign key|violates/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
   async catalog(){ const d=this._e(await this.sb.rpc('public_catalog')); return {programs:d.programs||[], packages:d.packages||[]}; },
   async publicProgram(code){ return this._e(await this.sb.rpc('public_program',{p_code:code})); },
   async publicSettings(){ return this._e(await this.sb.rpc('public_settings')) || {}; },
   async register(f){ return this._e(await this.sb.rpc('register_trainee',{p:f})); },
-  async checkin(nid, code, programCode){ return this._e(await this.sb.rpc('checkin',{p_nid:nid, p_code:code||null, p_program:programCode||null})); },
+  async checkin(nid, code, programCode, opts={}){ return this._e(await this.sb.rpc('checkin',{p_nid:nid, p_code:code||null, p_program:programCode||null, p_device:opts.device||'', p_choice:opts.choice||null})); },
   async todayCode(){ return this._e(await this.sb.rpc('daily_code')); },
   async isAdmin(){ const {data:{session}} = await this.sb.auth.getSession(); if(!session) return false; const r=await this.sb.from('admins').select('user_id').eq('user_id',session.user.id); return !!(r.data&&r.data.length); },
   async login(email, pass){ const r=await this.sb.auth.signInWithPassword({email,password:pass}); if(r.error) throw new Error('بيانات الدخول غير صحيحة'); if(!(await this.isAdmin())){ await this.sb.auth.signOut(); throw new Error('هذا الحساب ليس مديرًا للنظام'); } return true; },
@@ -233,11 +331,16 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
-      q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order'))]);
+      q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
+      q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
+      q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500))]);
+    const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
-    return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order}))};
+    return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
+      plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[]};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -258,7 +361,19 @@ export const CloudStore = {
   async publicSite(){ const d=this._e(await this.sb.rpc('public_site'))||{}; return { about:d.about||DEFAULT_ABOUT, partners:(d.partners||[]).map(p=>({...p, order:p.sort_order})) }; },
   async savePartner(p){ const {id,order,created_at,...row}=p; row.sort_order=order||0; this._e(id ? await this.sb.from('partners').update(row).eq('id',id) : await this.sb.from('partners').insert(row)); },
   async deletePartner(id){ this._e(await this.sb.from('partners').delete().eq('id',id)); },
-  async saveSettings(s){ const {admin_pin,...rest}=s; this._e(await this.sb.from('settings').update(rest).eq('id',1)); }
+  async saveSettings(s){ const {admin_pin,...rest}=s; this._e(await this.sb.from('settings').update(rest).eq('id',1)); },
+  /* ---- باقات القدرات والتحصيلي ---- */
+  async publicPlans(){ const d=this._e(await this.sb.rpc('public_plans'))||{}; return {plans:d.plans||[], schedule:d.schedule||[]}; },
+  async registerSubscription(f){ return this._e(await this.sb.rpc('register_subscription',{p:f})); },
+  async savePlan(p){ const row=this._strip(p,['id','created_at']); this._e(p.id ? await this.sb.from('plans').update(row).eq('id',p.id) : await this.sb.from('plans').insert(row)); },
+  async saveTemplates(section, rows){ this._e(await this.sb.rpc('save_templates',{p_section:section, p_rows:rows})); },
+  async saveException(x){ const row={date:x.date, section:x.section, type:x.type, start_time:x.start||null, end_time:x.end||null, note:x.note||''}; this._e(x.id ? await this.sb.from('schedule_exceptions').update(row).eq('id',x.id) : await this.sb.from('schedule_exceptions').insert(row)); },
+  async deleteException(id){ this._e(await this.sb.from('schedule_exceptions').delete().eq('id',id)); },
+  async saveSubscription(f){ return this._e(await this.sb.rpc('admin_save_subscription',{p:{...f, plan:undefined}})); },
+  async cancelSubscription(id, on=true){ const s=this._e(await this.sb.from('subscriptions').select('start_date').eq('id',id).single()); this._e(await this.sb.from('subscriptions').update({status: on?'cancelled':(s.start_date?'active':'pending')}).eq('id',id)); },
+  async setSubAttendance(subscription_id, date, status){ this._e(await this.sb.rpc('set_sub_attendance',{p_sub:subscription_id, p_date:date, p_status:status})); },
+  async requestCustomPlan(f){ return this._e(await this.sb.rpc('request_custom_plan',{p:f})); },
+  async setCustomRequestStatus(id, status){ this._e(await this.sb.from('custom_requests').update({status}).eq('id',id)); }
 };
 
 /* ---------------- بيانات تجريبية: البرامج حقيقية من دليل المركز، والدفعات والمتدربون والحضور تجريبيون ---------------- */
@@ -311,6 +426,7 @@ export function makeDemo(){
         attendance.push({id:uid(), enrollment_id:e.id, cohort_id:c.id, program_id:c.program_id, trainee_id:e.trainee_id, att_date:d, time:tm, checkin_at:d+'T'+tm, status:late?'متأخر':'حاضر'}); }); }); });
   const D={ programs, packages:[], trainees, cohorts, enrollments, attendance, certificates:[],
     settings:{ daily_secret:Math.random().toString(36).slice(2)+Date.now(), require_code:false, late_minutes:15, early_minutes:60, admin_pin:'1234', checkin_url:'', cert_threshold:75, late_weight:1, warn_consec:2, about:DEFAULT_ABOUT }, partners:defaultPartners() };
+  demoQudurat(D, person, rnd);
   return D;
 }
 

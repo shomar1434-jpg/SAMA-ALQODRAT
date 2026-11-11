@@ -9,6 +9,7 @@ import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, statusPill, toa
 import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hoursTxt, kpiCard, makeQR, programUrl, route, short, titleBar } from './views2_main.js';
 import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
 import { pageSettings } from './views2_settings.js';
+import { pageQudurat } from './qudurat_views.js';
 
 /* =====================================================================
    5) لوحة الإدارة
@@ -20,7 +21,7 @@ export const progName = id => progOf(id)?.name || '—';
 export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
 export async function viewAdmin(r){
   const app=$('#app');
-  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
+  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
   app.innerHTML = `<div class="admin"><aside class="side">
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة</span></b></div>
       <div class="sec">الصفحات</div>
@@ -34,7 +35,7 @@ export async function viewAdmin(r){
   try{ AD = await Store.adminData(); }catch(e){ $('#main').innerHTML=emptyBox('تعذّر تحميل البيانات', esc(e.message)); return; }
   if(!flt.to){ flt.to=riyadhNow().date; flt.from=addDays(flt.to,-29); }
   const fu=$('.side a[href="#admin-followup"]'); if(fu){ const n=followupRows().filter(x=>x.level==='bad').length; if(n) fu.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} حالة حرجة">${fmtNum(n)}</span>`); }
-  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
+  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
 }
 export async function reloadAD(){ AD = await Store.adminData(); }
 
@@ -350,7 +351,7 @@ export function pageTrainees(){
   $('#tp').onchange=e=>{ trP=e.target.value; pageTrainees(); };
   $('#csvx').onclick=()=>exportCSV('المتدربون-وتسجيلاتهم', traineesRows());
   $$('[data-cv]').forEach(b=>b.onclick=()=>{ cohortView=b.dataset.cv; location.hash='#admin-cohorts'; });
-  $$('[data-del]').forEach(b=>b.onclick=()=>confirmBox('حذف المتدرب','يُحذف المتدرب من كل الكشوف مع سجلات حضوره نهائيًا.', async()=>{ await Store.deleteTrainee(b.dataset.del); await reloadAD(); toast('حُذف المتدرب'); pageTrainees(); }));
+  $$('[data-del]').forEach(b=>b.onclick=()=>confirmBox('حذف المتدرب','يُحذف المتدرب إذا لم يكن له حضور أو شهادات. من له سجلات يُلغى تسجيله ولا يُحذف حفاظًا على التاريخ.', async()=>{ await Store.deleteTrainee(b.dataset.del); await reloadAD(); toast('حُذف المتدرب'); pageTrainees(); }));
   $('#csv').onclick=()=>{ const head=['الاسم','السجل المدني','الجوال','البريد','الجنس','المدينة','المؤهل','جهة العمل','البرنامج','الدفعة','رقم الطلب','حالة التسجيل'];
     const rows=list.flatMap(t=>ensOf(t).map(e=>{ const c=AD.cohorts.find(x=>x.id===e.cohort_id); return [t.full_name,t.national_id,t.phone,t.email,t.gender,t.city,t.education,t.employer,progName(e.program_id),c?c.number:'',e.ref,e.status]; }));
     copyText([head,...rows].map(r=>r.join('\t')).join('\n'),'نُسخ '+fmtNum(rows.length)+' صفًا، الصقها في Excel'); };

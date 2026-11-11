@@ -769,3 +769,88 @@ select.inp.ok{background-image:none;padding-left:14px}
 .chip-v:hover{border-color:var(--brand)}
 .me-top .pill,.field label .pill{display:flex;width:fit-content;line-height:18px}
 #rlF .field label{display:flex;align-items:center;min-height:26px}
+
+/* =====================================================================
+   باقات القدرات والتحصيلي
+   ===================================================================== */
+.tblwrap{overflow:auto}
+.tb tr.muted td{opacity:.55}
+.plans{max-width:1240px;margin:0 auto;padding:64px 20px 0}
+.pl-filter{display:flex;gap:8px;justify-content:center;margin:18px 0 6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:14px;font-weight:500;padding:8px 16px;border-radius:999px;border:1px solid var(--border);background:var(--surface-card);color:var(--ink);cursor:pointer;transition:background 200ms,border-color 200ms,color 200ms}
+.chip svg{width:16px;height:16px}
+.chip.on{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.chip:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+.soon-tag{font-size:11px;padding:1px 8px;border-radius:999px;background:var(--gold-tint);color:var(--gold-ink)}
+.chip.on .soon-tag{background:rgba(255,255,255,.22);color:#fff}
+/* الشريط العام */
+.mq{position:relative;display:flex;align-items:center;gap:8px}
+.mq-view{flex:1;overflow:hidden;padding:14px 4px 22px;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;border-radius:24px;direction:ltr;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.mq-view.dragging{cursor:grabbing}
+.mq-view:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+.mq-track{display:flex;gap:16px;width:max-content;will-change:transform}
+.mq-toggle{position:absolute;top:-6px;inset-inline-start:52px;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surface-card);color:var(--ink);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow-sm);z-index:2}
+.mq-toggle .i-play{display:none}.mq-toggle[data-state=paused] .i-play{display:block}.mq-toggle[data-state=paused] .i-pause{display:none}
+.mq-toggle:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+@media(max-width:640px){.mq .pt-nav{display:none}.mq-toggle{inset-inline-start:8px}}
+/* بطاقة الباقة */
+.pl-card{--tc:var(--brand);--tt:var(--brand-tint);direction:rtl;position:relative;overflow:hidden;flex:none;width:272px;display:flex;flex-direction:column;gap:8px;padding:18px;text-align:start;
+  background:var(--surface-card);border:1px solid var(--border);border-top:5px solid var(--tc);border-radius:22px;box-shadow:var(--shadow-card);font:inherit;color:var(--ink);cursor:pointer;
+  transition:transform 300ms var(--ease),box-shadow 300ms var(--ease)}
+.pl-card:hover,.pl-card:focus-visible{transform:translateY(-6px);box-shadow:var(--shadow-lift)}
+.pl-card:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+.pl-card.t-basic{--tc:#2F8F86;--tt:#E2F2EF}.pl-card.t-silver{--tc:#8C99A3;--tt:#EEF1F3}.pl-card.t-gold{--tc:#C9971C;--tt:#FBF1DC}.pl-card.t-diamond{--tc:#3D6FB6;--tt:#E3ECF8}.pl-card.t-custom{--tc:#8A5CC0;--tt:#F0E9F8}
+[data-theme=dark] .pl-card{--tt:rgba(255,255,255,.07)}
+.pl-tier{display:inline-flex;align-items:center;gap:6px;width:fit-content;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--tt);color:var(--tc)}
+[data-theme=dark] .pl-tier{color:#fff}
+.pl-tier svg{width:14px;height:14px}
+.pl-name{font-size:19px;font-weight:700;line-height:1.4}
+.pl-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--ink-muted)}
+.pl-meta span{display:inline-flex;align-items:center;gap:4px}.pl-meta svg{width:15px;height:15px}
+.pl-sum{margin:0;font-size:14px;line-height:1.8;color:var(--ink-muted);min-height:50px}
+.pl-price{display:block;font-size:13px;color:var(--ink-muted)}
+.pl-price b{font-size:26px;color:var(--ink);font-variant-numeric:tabular-nums}
+.pl-price small{display:block;font-size:12px}
+.pl-cta{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--tc)}
+[data-theme=dark] .pl-cta{color:var(--brand)}
+.pl-cta svg{width:16px;height:16px}
+.pl-img{display:block;margin:-18px -18px 4px;height:120px;overflow:hidden;background:var(--tt)}
+.pl-img img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.pl-card.soon{cursor:not-allowed}
+.pl-card.soon > :not(.soon-ribbon){filter:grayscale(.75);opacity:.6}
+.soon-ribbon{position:absolute;top:20px;left:-42px;transform:rotate(-45deg);background:var(--gold);color:#fff;font-size:12.5px;font-weight:700;padding:4px 44px;z-index:2;box-shadow:0 4px 12px -4px rgba(0,0,0,.3)}
+/* صفحة الباقة */
+.pl-hero{gap:24px}
+.pl-hero-img{flex:none;width:min(320px,40%);border-radius:20px;overflow:hidden;box-shadow:0 20px 50px -24px rgba(0,0,0,.6)}
+.pl-hero-img img{display:block;width:100%;height:auto}
+@media(max-width:760px){.pl-hero{flex-direction:column}.pl-hero-img{width:100%}}
+.pl-feats{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.pl-feats li{display:flex;gap:10px;align-items:flex-start;line-height:1.8}
+.pl-feats svg{flex:none;width:18px;height:18px;margin-top:5px;color:var(--success)}
+.pl-sched{display:grid;gap:2px;padding:10px 12px;border-radius:12px;background:var(--surface-sunken);margin-bottom:8px}
+.pl-sched b{font-weight:600}.pl-sched span{color:var(--ink-muted);font-size:14px;line-height:1.8}
+/* الإدارة */
+.tbar{height:8px;border-radius:99px;background:var(--surface-sunken);overflow:hidden}
+.tbar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--brand),var(--pt2,#59A598))}
+.tbar.big{height:12px;margin-top:12px}
+.sub-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;align-items:center;text-align:center}
+.sub-kpis > div{display:grid;justify-items:center;gap:2px}
+.sub-kpis b{font-size:22px;font-weight:700}.sub-kpis span{font-size:12.5px;color:var(--ink-subtle)}
+@media(max-width:560px){.sub-kpis{grid-template-columns:repeat(3,1fr)}}
+.daygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px;max-height:260px;overflow:auto;padding:2px}
+.dg{font:inherit;font-size:12px;padding:8px 4px;border-radius:10px;border:1px solid var(--border);background:var(--surface-card);color:var(--ink);cursor:pointer}
+.dg.ok{background:var(--success-tint);border-color:var(--success);color:var(--success-ink)}
+.dg.late{background:var(--warning-tint);border-color:var(--warning);color:var(--warning-ink)}
+.dg.abs{background:var(--danger-tint);border-color:var(--danger);color:var(--danger-ink)}
+.dg.fut{opacity:.45;cursor:default}
+.dg:focus-visible{outline:3px solid var(--focus-ring);outline-offset:1px}
+.tpl-rows{display:grid;gap:8px}
+.tpl-row{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:6px;align-items:center}
+.pl-admin{border-top:5px solid var(--tc,var(--brand))}
+.pl-admin.t-basic{--tc:#2F8F86;--tt:#E2F2EF}.pl-admin.t-silver{--tc:#8C99A3;--tt:#EEF1F3}.pl-admin.t-gold{--tc:#C9971C;--tt:#FBF1DC}.pl-admin.t-diamond{--tc:#3D6FB6;--tt:#E3ECF8}
+.grid.g3{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.fi{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--border)}
+.fi b{flex:1;font-weight:500}
+@media print{ .display .qrpanel{break-inside:avoid} }
+@media(prefers-reduced-motion:reduce){.pl-card,.chip{transition:none}}

@@ -65,7 +65,7 @@ export function renderProgramList(){
   $$('[data-open]').forEach(b=>b.onclick=()=>cohortModal(AD.programs.find(p=>p.id===b.dataset.open), null, pagePrograms));
   bindCohortActions(()=>{ location.hash='#admin-cohorts'; });
   $$('#pgList [data-cv]').forEach(b=>b.onclick=()=>{ setCohortView(b.dataset.cv); location.hash='#admin-cohorts'; });
-  $$('[data-dp]').forEach(b=>b.onclick=()=>confirmBox('حذف البرنامج','يُحذف البرنامج مع كل دفعاته وكشوفها وسجلات حضورها، ويُزال من الباقات.', async()=>{ await Store.deleteProgram(b.dataset.dp); await reloadAD(); toast('حُذف البرنامج'); pagePrograms(); }));
+  $$('[data-dp]').forEach(b=>b.onclick=()=>confirmBox('حذف البرنامج','يُحذف البرنامج إذا لم يكن له متدربون مسجّلون. البرامج ذات السجلات تُوقَف ولا تُحذف حفاظًا على التاريخ.', async()=>{ await Store.deleteProgram(b.dataset.dp); await reloadAD(); toast('حُذف البرنامج'); pagePrograms(); }));
 }
 export const swRow = (name, label, on, hint='') => `<label class="sw"><span><span style="font-weight:500">${label}</span>${hint?`<span class="hint" style="display:block">${hint}</span>`:''}</span><input type="checkbox" name="${name}" ${on?'checked':''}><i></i></label>`;
 export function programModal(p, presetCat){

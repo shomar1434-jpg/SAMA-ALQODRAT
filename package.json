@@ -7,8 +7,9 @@
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "lint": "eslint src tests",
-    "test": "node tests/smoke.mjs && node tests/e2e.mjs",
-    "check": "npm run lint && npm run build && npm test"
+    "test": "node tests/smoke.mjs && node tests/e2e.mjs && node tests/qudurat.mjs",
+    "check": "npm run lint && npm run build && npm test",
+    "test:sql": "bash supabase/tests/run.sh"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

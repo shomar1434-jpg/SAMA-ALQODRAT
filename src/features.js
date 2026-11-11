@@ -145,7 +145,7 @@ export function renderMe(r){
   box.innerHTML = `<div class="pad" style="padding-top:0"><h3 class="ctitle" style="margin-bottom:12px">${ic('user')}أهلًا ${esc(r.first_name)}</h3>
     ${r.items.length ? r.items.map((x,i)=>{ const tone=LEVEL_TONE[x.level]||'info', alert=['low','consec','last','lost'].includes(x.level);
       return `<div class="mecard rv lv-${tone}" style="--i:${i}"><div class="me-top">${ringSvg(x.rate??0,72,7,tone==='bad'?'danger':tone==='warn'?'warning':'success')}
-        <div style="flex:1;min-width:0"><b class="me-p">${esc(x.program)}</b><div class="hint">${cohortLabel(x)} · ${fmtShort(x.start_date)} – ${fmtShort(x.end_date)}</div>
+        <div style="flex:1;min-width:0"><b class="me-p">${esc(x.program)}</b><div class="hint">${cohortLabel(x)}${x.start_date?` · ${fmtShort(x.start_date)} – ${fmtShort(x.end_date)}`:' · لم يبدأ بعد'}</div>
           <div class="me-rate">${x.rate==null?'—':fmtNum(x.rate)+'٪'}<span>نسبة الحضور</span></div></div></div>
         <div class="me-alert ${tone}" ${alert?'role="alert"':''}>${ic(alert?'alert':tone==='ok'?'check':'clock')}<p>${esc(x.message)}</p></div>
       </div>`; }).join('') : emptyBox('لا توجد تسجيلات','سجّل في برنامج من دليل البرامج.')}
@@ -201,7 +201,7 @@ export function traineeDetailHtml(r){
   return `<div style="margin-bottom:10px"><b>${esc(r.trainee.full_name)}</b><div class="hint" dir="ltr" style="text-align:right">${esc(r.trainee.phone||'')}</div></div>`+
    (r.items.length ? r.items.map(x=>{ const tone=LEVEL_TONE[x.level], rr=x.state==='archived'?x.finalRate:(x.rate??0);
     return `<div class="mecard lv-${tone}"><div class="me-top">${ringSvg(x.state==='upcoming'?0:rr,64,6,tone==='bad'?'danger':tone==='warn'?'warning':'success')}
-      <div style="flex:1;min-width:0"><b class="me-p">${esc(x.program)}</b><div class="hint">${cohortLabel(x)} · ${fmtShort(x.start_date)} – ${fmtShort(x.end_date)}</div><span class="pill dot ${tone}" style="margin-top:6px">${LEVEL_TXT[x.level]}</span></div></div>
+      <div style="flex:1;min-width:0"><b class="me-p">${esc(x.program)}</b><div class="hint">${cohortLabel(x)}${x.start_date?` · ${fmtShort(x.start_date)} – ${fmtShort(x.end_date)}`:' · لم يبدأ بعد'}</div><span class="pill dot ${tone}" style="margin-top:6px">${LEVEL_TXT[x.level]}</span></div></div>
       ${x.state!=='upcoming'?`<div class="me-grid"><div><b>${fmtNum(x.attended)}</b><span>حضور</span></div><div><b>${fmtNum(x.absent)}</b><span>غياب</span></div><div><b>${fmtNum(x.late)}</b><span>تأخر</span></div><div><b>${fmtNum(x.remaining)}</b><span>متبقية</span></div></div>
         <div class="me-bar" role="img" aria-label="الحضور ${fmtNum(x.attended)} من ${fmtNum(x.total)}، وحد الشهادة ${fmtNum(x.required)}"><i style="width:${Math.min(100,x.score/Math.max(1,x.total)*100)}%"></i><em style="inset-inline-start:${thr}%"></em></div>
         <div class="hint" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>المحتسب ${fmtNum(+x.score.toFixed(2))} من ${fmtNum(x.total)} محاضرة</span><span>حد الشهادة ${fmtNum(x.required)} (${fmtNum(thr)}٪) · يلزمه ${fmtNum(x.needed)}</span></div>`:''}

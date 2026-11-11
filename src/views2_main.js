@@ -5,10 +5,11 @@ import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessio
 import { liveSay, setBusy, showErrorSummary, toLatin, viewMe, viewVerify, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
 import { closePrint } from './print.js';
-import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, validSaudiId } from './utils.js';
+import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 import { viewAdmin } from './views2_admin.js';
 import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
+import { viewPlanPage } from './qudurat_views.js';
 
 /* =====================================================================
    أدوات العرض المشتركة
@@ -24,7 +25,7 @@ export const rv = (l,v)=>`<div><span>${l}</span><b>${esc(v)}</b></div>`;
 export const titleBar = (pill, title, p, extra='') => `<div class="ptitle rv"><div><span class="hero-pill">${pill}</span><h2>${title}</h2><p>${p}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">${extra}</div></div>`;
 export const kpiCard = (i, icon, tone, label, val, suf, sub) => `<div class="kpi rv t-${tone}" style="--i:${i}"><span class="kic">${ic(icon)}</span><span>${label}</span><b class="num" data-count="${val}" data-suf="${suf||''}">0</b><small>${sub}</small></div>`;
 export const short = s => s.length>24 ? s.slice(0,23)+'…' : s;
-export const cohortLabel = c => `الدفعة ${fmtNum(c.number)}`;
+export const cohortLabel = c => c.number==null ? (c.section ? `قسم ${c.section}` : 'اشتراك باقة') : `الدفعة ${fmtNum(c.number)}`;
 export function makeQR(el, text, size=300){ try{ el.innerHTML=''; new QRCode(el,{text, width:size, height:size, colorDark:'#0D2F33', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); }catch(e){ el.innerHTML=`<div class="hint" style="max-width:260px;word-break:break-all;color:#0F2628">${esc(text)}</div>`; } }
 export async function copyText(t, msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'نُسخ'); }catch(e){ toast('تعذّر النسخ في هذا المتصفح'); } }
 export function centerFooter(){
@@ -43,7 +44,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['home','register','me','verify','checkin','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['home','register','me','verify','checkin','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
@@ -62,8 +63,9 @@ export async function route(){
   if(/^v-[A-Za-z0-9-]+$/.test(h)) return viewVerify(h.slice(2));
   if(h==='verify') return viewVerify('');
   if(h==='me') return viewMe();
+  if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
   if(/^p[a-z0-9]+$/i.test(h) && !ROUTES.includes(h)) return viewProgramPage(h);
-  if(h.startsWith('qr-')){ if(!(await Store.isAdmin())) return viewLogin(); return viewQR(h.slice(3)); }
+  if(h.startsWith('qr-')){ if(!(await Store.isAdmin())) return viewLogin(); return h==='qr-checkin' ? viewQRCheckin() : viewQR(h.slice(3)); }
   const r = ROUTES.includes(h) ? h : 'home';
   if(r==='home') return viewHome();
   if(r==='register') return viewCatalog();
@@ -197,6 +199,15 @@ export function bindRegForm(target, cohortsFn){
     delete F.agree; F.full_name=F.full_name.trim().replace(/\s+/g,' ');
     setBusy(b,true,'جارٍ حفظ التسجيل');
     try{
+      if(target.plan_id){
+        const r = await Store.registerSubscription({...F, ...target});
+        $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل اشتراكك</h2>
+          <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
+          <div class="grid" style="gap:6px;max-width:480px;margin:0 auto 12px"><div class="pill info" style="justify-content:center;padding:6px 12px">${esc(r.plan)} · ${esc(r.section)}</div>
+            <div class="pill g" style="justify-content:center;padding:6px 12px;white-space:normal">مواعيدك: ${esc(r.schedule)}</div></div>
+          <p class="hint" style="max-width:480px;margin:0 auto">يبدأ اشتراكك من أول يوم تحضر فيه: امسح باركود الحضور في المعهد وأدخل رقم سجلك المدني.</p></div>`;
+        liveSay('اكتمل اشتراكك. رقم طلبك '+r.ref); return;
+      }
       const r = await Store.register({...F, ...target});
       const cs = r.cohorts || cohortsFn().map(c=>({number:c.number, start:c.start_date}));
       $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك</h2>
@@ -232,10 +243,24 @@ export function bindAttendance(st, programCode, onBack){
     if(!validSaudiId(id)){ er.textContent='رقم السجل غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.'; nid.classList.add('err'); return; }
     if(st.require_code && code.length!==4){ er.textContent='اكتب رمز اليوم المكوّن من 4 أرقام.'; return; }
     const b=$('#cBtn'); setBusy(b,true,'جارٍ التحقق من السجل');
-    let r; try{ r = await Store.checkin(id, code, programCode); }catch(x){ r={ok:false,reason:'error',msg:x.message}; }
-    setBusy(b,false); liveSay(r.ok?'سُجّل حضورك':'تعذّر تسجيل الحضور');
-    showCheckinResult(r, onBack);
+    const send = async choice => { let r; try{ r = await Store.checkin(id, code, programCode, {device:deviceId(), choice}); }catch(x){ r={ok:false,reason:'error',msg:x.message}; }
+      setBusy(b,false); liveSay(r.ok?'سُجّل حضورك':r.reason==='choose'?'اختر البرنامج':'تعذّر تسجيل الحضور');
+      if(r.reason==='choose') return showChoice(r, send, onBack);
+      showCheckinResult(r, onBack); };
+    await send();
   };
+}
+/* معرّف عشوائي لهذا المتصفح، لكشف تحضير أكثر من طالب من جهاز واحد (لا يحوي بيانات شخصية) */
+export function deviceId(){ try{ let d=localStorage.getItem('sama_device'); if(!d){ d=uid(); localStorage.setItem('sama_device',d); } return d; }catch(e){ return ''; } }
+/* عند وجود أكثر من تسجيل له جلسة الآن: يختار الطالب برنامجه */
+export function showChoice(r, send, onBack){
+  const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
+  box.innerHTML = `<div style="text-align:center" class="rv"><h2 style="font-size:21px;font-weight:700">أهلًا ${esc(r.name.split(' ')[0])}، اختر برنامج جلستك الآن</h2>
+    <p class="hint">لديك أكثر من تسجيل في هذا الوقت.</p></div>
+    <div class="grid" style="gap:8px;margin-top:12px">${r.options.map(o=>`<button class="btn lg" data-ch="${esc(o.id)}" style="width:100%">${ic('book')} ${esc(o.label)}</button>`).join('')}</div>
+    <button class="btn" style="width:100%;margin-top:12px" id="cAgain">${ic('prev')} رجوع</button>`;
+  $$('[data-ch]').forEach(b=>b.onclick=async()=>{ setBusy(b,true,'جارٍ التسجيل'); await send(b.dataset.ch); });
+  $('#cAgain').onclick = onBack; $('[data-ch]')?.focus();
 }
 export function showCheckinResult(r, onBack){
   const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
@@ -244,11 +269,11 @@ export function showCheckinResult(r, onBack){
     const late = r.status==='متأخر';
     box.innerHTML = `<div style="text-align:center" class="rv"><div class="bigcheck ${late?'warn':''}">${ic(late?'timer':'check')}</div>
       <h2 style="font-size:22px;font-weight:700">${r.already?'حضورك مسجّل مسبقًا اليوم':'سُجّل حضورك'}</h2>
-      <p class="hint" style="margin:4px 0 14px">أهلًا ${esc(r.name.split(' ')[0])}، يومًا تدريبيًا موفقًا.</p></div>
+      <p class="hint" style="margin:4px 0 14px">أهلًا ${esc(r.name.split(' ')[0])}، يومًا تدريبيًا موفقًا.</p>${r.started?`<p class="pill ok" style="justify-content:center;margin:0 auto 12px;width:fit-content">بدأ اشتراكك اليوم</p>`:''}</div>
       <div class="result-card rv" style="--i:2">
         <div class="r"><span>${ic('user')}المتدرب</span><b>${esc(r.name)}</b></div>
         <div class="r"><span>${ic('book')}البرنامج</span><b>${esc(r.program)}</b></div>
-        <div class="r"><span>${ic('users')}الدفعة</span><b>${cohortLabel(r)}</b></div>
+        ${r.kind==='subscription' ? `<div class="r"><span>${ic('users')}القسم</span><b>${esc(r.section)}</b></div>` : `<div class="r"><span>${ic('users')}الدفعة</span><b>${cohortLabel(r)}</b></div>`}
         ${r.package?`<div class="r"><span>${ic('layers')}الباقة</span><b>${esc(r.package)}</b></div>`:''}
         ${r.hall?`<div class="r"><span>${ic('pin')}القاعة</span><b>${esc(r.hall)}</b></div>`:''}
         <div class="r"><span>${ic('clock')}وقت الحضور</span><b class="num">${t12(r.time)}</b></div>
@@ -301,13 +326,35 @@ export async function viewProgramPage(code, tab){
 export async function viewGeneralCheckin(){
   const app=$('#app'); let st={require_code:false}; try{ st=await Store.publicSettings(); }catch(e){}
   app.innerHTML=`<div class="wrap"><div style="text-align:center;margin-bottom:16px" class="rv"><img src="${LOGO}" alt="" style="height:84px;background:#fff;border-radius:20px;padding:8px;box-shadow:var(--shadow-card)"></div>${attendanceBoxHtml(st)}
-    <p class="hint" style="text-align:center;margin-top:14px">يُطابق النظام سجلك المدني مع كشوف الدفعات المنعقدة اليوم. الأفضل مسح باركود برنامجك في القاعة.</p></div>${siteFooter()}`;
+    <p class="hint" style="text-align:center;margin-top:14px">باركود الحضور الموحد: يتعرف النظام من سجلك المدني على باقتك أو دفعتك وجلستك الحالية.</p></div>${siteFooter()}`;
   bindAttendance(st, null, viewGeneralCheckin);
 }
 
 /* =====================================================================
    3) شاشة باركود البرنامج (ثابت لكل برنامج، يخدم كل دفعاته)
    ===================================================================== */
+/* الباركود الموحد لكل البرامج والباقات (D-03): يُطبع ويُعلَّق في المعهد ولا يتغير */
+export async function viewQRCheckin(){
+  const app=$('#app'), D=await Store.adminData(), url=baseUrl(D.settings)+'#checkin', n=riyadhNow();
+  app.innerHTML = `<div class="display">
+    <div class="qrpanel rv"><img src="${LOGO}" alt="" style="height:72px;background:#fff;border-radius:16px;padding:6px;margin-bottom:14px">
+      <span class="hero-pill">${ic('qr')}باركود الحضور الموحد</span><h2>تسجيل الحضور اليومي</h2>
+      <p style="color:var(--hero-muted);margin:4px 0 18px">امسح الباركود، ثم أدخل رقم سجلك المدني</p>
+      <div class="qrbox"><div id="qr"></div><div class="beam"></div></div></div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card pad rv" style="--i:1;text-align:center"><div class="clock" id="dClock" dir="ltr" style="font-size:46px;color:var(--ink)"></div><div class="hint" style="font-size:15px;margin-top:6px">${fmtDate(n.date)}</div></div>
+      <div class="card pad rv" style="--i:2"><h3 class="ctitle">${ic('activity')}حضور اليوم</h3><div class="livefeed" id="feed"></div></div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><a class="btn sm" href="#admin-qudurat">${ic('prev')} القدرات والتحصيلي</a><button class="btn sm" id="cp">${ic('copy')} نسخ الرابط</button><button class="btn sm" id="pr">${ic('form')} طباعة</button></div>
+      <div class="hint" style="text-align:center;word-break:break-all" dir="ltr">${esc(url)}</div></div></div>`;
+  makeQR($('#qr'), url, 320);
+  $('#cp').onclick=()=>copyText(url,'نُسخ رابط التحضير'); $('#pr').onclick=()=>window.print();
+  const tick=()=>{ const el=$('#dClock'); if(el) el.textContent=t12(riyadhNow().hm).replace(' ص',' AM').replace(' م',' PM'); }; tick(); timers.push(setInterval(tick,1000));
+  const feed=async()=>{ const d=await Store.adminData(), td=riyadhNow().date;
+    const rows=[...(d.sub_attendance||[]).filter(a=>a.att_date===td).map(a=>({t:a.time, who:a.trainee_id, st:a.status})), ...d.attendance.filter(a=>a.att_date===td).map(a=>({t:a.time, who:a.trainee_id, st:a.status}))].sort((a,b)=>b.t.localeCompare(a.t)).slice(0,8);
+    const el=$('#feed'); if(!el) return;
+    el.innerHTML = rows.length ? rows.map(r=>`<div class="fi"><span class="pill dot ${r.st==='متأخر'?'warn':'ok'}">${esc(r.st)}</span><b>${esc((d.trainees.find(t=>t.id===r.who)?.full_name||'').split(' ').slice(0,2).join(' '))}</b><span class="num hint">${t12(r.t.slice(0,5))}</span></div>`).join('') : `<p class="hint">لم يُسجَّل حضور بعد اليوم.</p>`; };
+  feed(); timers.push(setInterval(feed, 8000));
+}
 export async function viewQR(code){
   const app=$('#app'); const D=await Store.adminData(); const p=D.programs.find(x=>progCode(x)===code);
   if(!p){ app.innerHTML=`<div class="wrap">${emptyBox('البرنامج غير موجود')}</div>`; return; }

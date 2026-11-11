@@ -76,3 +76,24 @@ insert into programs (code, name, category, hours, duration_days, accreditation_
   ('p126133', 'نظام الإجراءات الجزائية', 'الشريعة والقانون', 15, 3, '126133', true),
   ('p126147', 'دعوى الإلغاء في القضاء الإداري السعودي', 'الشريعة والقانون', 15, 3, '126147', true)
 on conflict (accreditation_no) where accreditation_no is not null and accreditation_no <> '' do nothing;
+
+-- =====================================================================
+-- باقات القدرات والتحصيلي (docs/PACKAGES.md) وقالب جداول البنين والبنات
+-- =====================================================================
+insert into plans (tier, mode, program, name, status, duration_unit, duration_value, hours, reg_fee, installments, installment_amount, summary, features, audience, subjects, sort)
+select v.tier, m.mode, v.program, v.name, case when m.mode = 'remote' then 'coming_soon' else 'open' end, v.unit, v.val, v.hours,
+       case when m.mode = 'remote' then v.reg_r else v.reg_p end, v.n, case when m.mode = 'remote' then 150 else 250 end * sign(v.n),
+       v.summary, v.features, v.audience, v.subjects, v.sort + case when m.mode = 'remote' then 10 else 0 end
+from (values
+  ('basic',  'qudurat',         'الأساسية', 'week',  5, 30,  690, 490, 0, 'بداية قوية وتأسيس متكامل لاختبار القدرات.', array['تأسيس في القسمين الكمي واللفظي','شرح المهارات والقواعد الأساسية','شرح وافٍ لأقسام الجزء الكمي واللفظي','شهادة معتمدة بنهاية الباقة'], '', array['كمي','لفظي'], 0),
+  ('silver', 'qudurat',         'الفضية',   'month', 3, 72,  690, 490, 2, 'إعداد متقدم لاختبار القدرات بقسميه الكمي واللفظي.', array['تتضمن باقة التأسيس واستراتيجيات الحل السريع','تدريبات مكثفة على أهم النماذج وأحدث التجميعات','اختبار قبلي لتحديد مستوى الطالب واحتياجاته','اختبارات تجريبية محاكية لاختبار قياس','تقارير دورية توضح مستوى التقدم والتحسن','المساعدة في اختيار الموعد المناسب للاختبار','شهادة معتمدة عند إتمام الباقة'], '', array['كمي','لفظي'], 1),
+  ('gold',   'qudurat',         'الذهبية',  'year',  1, 192, 690, 490, 4, 'أقوى الباقات للإعداد المميز لاختبار القدرات بقسميه.', array['تتضمن باقة التأسيس واستراتيجيات الحل السريع','تدريبات مكثفة على أهم النماذج وأحدث التجميعات','اختبار قبلي لتحديد مستوى الطالب واحتياجاته','اختبارات تجريبية محاكية لاختبار قياس','تقارير دورية توضح مستوى التقدم والتحسن','المساعدة في اختيار الموعد المناسب للاختبار','شهادة معتمدة عند إتمام الباقة'], '', array['كمي','لفظي'], 2),
+  ('diamond','qudurat_tahsili', 'الماسية',  'year',  1, 256, 690, 490, 6, 'أقوى باقاتنا: القدرات بقسميه مع التهيئة للاختبار التحصيلي.', array['تتضمن باقة التأسيس واستراتيجيات الحل السريع','تتضمن برنامج التهيئة للاختبار التحصيلي','تدريبات مكثفة على أهم النماذج وأحدث التجميعات','اختبار قبلي لتحديد مستوى الطالب واحتياجاته','اختبارات تجريبية محاكية لاختبار قياس','تقارير دورية توضح مستوى التقدم والتحسن','المساعدة في اختيار الموعد المناسب للاختبار','شهادة معتمدة عند إتمام الباقة'], 'مخصصة لطلاب الصف الثالث الثانوي', array['كمي','لفظي','تحصيلي'], 3)
+) as v(tier, program, name, unit, val, hours, reg_p, reg_r, n, summary, features, audience, subjects, sort)
+cross join (values ('in_person'), ('remote')) as m(mode)
+on conflict do nothing;
+
+insert into schedule_templates (section, dow, start_time, end_time) values
+  ('girls', 6, '18:30', '20:30'), ('girls', 0, '18:00', '20:00'), ('girls', 2, '18:00', '20:00'),
+  ('boys',  6, '16:30', '18:30'), ('boys',  1, '18:00', '20:00'), ('boys',  3, '18:00', '20:00')
+on conflict (section, dow) do nothing;
