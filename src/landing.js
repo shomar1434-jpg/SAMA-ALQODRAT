@@ -5,6 +5,7 @@ import { DEFAULT_ABOUT, aboutSectionHtml, initPartnerMarquee, partnersSectionHtm
 import { $, $$, esc, fmtNum } from './utils.js';
 import { countUp, ic, reduceMotion } from './views2_head.js';
 import { cat, catSort, cohortPublicState } from './views2_main.js';
+import { plansSectionHtml, initPlansMarquee } from './qudurat_views.js';
 
 /* =====================================================================
    الصفحات الافتتاحية — مستوحاة من صفحتي الغلاف والرؤية في دليل برامج المركز
@@ -55,7 +56,7 @@ export const X_LOGO = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" a
 
 export async function viewHome(){
   const app=$('#app');
-  let data={programs:[],packages:[]}, site={about:DEFAULT_ABOUT, partners:[]}; try{ [data, site] = await Promise.all([Store.catalog(), Store.publicSite().catch(()=>site)]); }catch(e){}
+  let data={programs:[],packages:[]}, site={about:DEFAULT_ABOUT, partners:[]}, pl={plans:[]}; try{ [data, site, pl] = await Promise.all([Store.catalog(), Store.publicSite().catch(()=>site), Store.publicPlans().catch(()=>pl)]); }catch(e){}
   const P=data.programs, open=P.filter(p=>cohortPublicState(p.cohort).k==='open'), cats=[...new Set(P.map(p=>p.category))].sort(catSort);
   const hours=P.reduce((s,p)=>s+(p.hours||0),0);
   app.innerHTML = `<div class="home">
@@ -99,6 +100,8 @@ export async function viewHome(){
         return `<button class="dom t-${CAT_TONE[c]==='brand'?'info':CAT_TONE[c]||'info'}" data-cat="${esc(c)}" data-reveal style="--i:${i}"><span class="kic-lg">${ic(CAT_ICON[c]||'book')}</span><b>${esc(c)}</b><span>${fmtNum(n)} برنامج${o?` · <em>${fmtNum(o)} مفتوح</em>`:''}</span><i class="go">${ic('next')}</i></button>`; }).join('')}</div>
     </section>
 
+    ${plansSectionHtml(pl.plans)}
+
     ${partnersSectionHtml(site.partners)}
 
     <section class="steps3">
@@ -114,6 +117,7 @@ export async function viewHome(){
   $$('.dom').forEach(b=>b.onclick=()=>{ cat.kind='program'; cat.cf=b.dataset.cat; location.hash='#register'; });
   revealOnScroll(app);
   initPartnerMarquee(site.partners||[]);
+  initPlansMarquee(pl.plans||[]);
 }
 /* الكشف عند التمرير + عدّ الأرقام عند ظهورها */
 export function revealOnScroll(root){
