@@ -7,6 +7,7 @@
 ## البنية
 - `index.html` الصفحة العامة: الرئيسية، دليل البرامج، صفحة البرنامج والتسجيل، التحضير، حضوري، التحقق من الشهادة.
 - `admin/index.html` لوحة الإدارة: كل مسارات `#admin*`، و`#qr-…`، و`#display`.
+- `student/` و`teacher/` و`guardian/` البوابات (`src/portals.js`): دخول برقم الجوال ورمز تحقق، وبيانات محصورة بالدور من `portalData(role)` (محليًا `scopeData`، وسحابيًا `portal_data()`)، والحساب في `src/portal_logic.js`.
 - كل صفحة تخدم مساراتها فقط؛ `route()` في `src/views2_main.js` يحوّل المسار إلى صفحته الصحيحة.
 - `src/entries/*.js` نقطة دخول كل صفحة ← `src/boot.js` (تهيئة المخزن، السمة، التوجيه).
 - `src/config.js` مفاتيح Supabase من متغيرات البيئة، والصفحة الحالية (`PAGE`)، و`publicBase()`/`adminBase()`.
@@ -23,7 +24,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `tests/smoke.mjs` (كل الصفحات) و`tests/e2e.mjs` (المسارات الكاملة).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)

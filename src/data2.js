@@ -2,6 +2,7 @@ import { catalogPrograms, computeEnd } from './catalog.js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
+import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -176,6 +177,38 @@ export function sectionDaysTxt(D, section){
   const DN=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   return (D.schedule_templates||[]).filter(x=>x.section===section).sort((a,b)=>((a.dow+1)%7)-((b.dow+1)%7)).map(x=>`${DN[x.dow]} من ${t12(x.start)} إلى ${t12(x.end)}`).join('، ');
 }
+/* =====================================================================
+   بيانات البوابة المحصورة بالدور (مصدر واحد للحساب: portal_logic.js).
+   في السحابة تعيدها الدالة portal_data(role) من الخادم بعد التحقق من الهوية.
+   ===================================================================== */
+export function scopeData(D, role, phone){
+  const ph=normPhone(phone), pick=(o,k)=>Object.fromEntries(k.map(x=>[x,o[x]]));
+  const base={ plans:D.plans||[], schedule_templates:D.schedule_templates||[], schedule_exceptions:D.schedule_exceptions||[],
+    settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes']) };
+  const tSafe=t=>({id:t.id, full_name:t.full_name, gender:t.gender});
+  const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true}));
+  const forTrainees=ids=>{ const subs=(D.subscriptions||[]).filter(s=>ids.includes(s.trainee_id)), sid=subs.map(s=>s.id);
+    return { trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs, sub_attendance:(D.sub_attendance||[]).filter(a=>sid.includes(a.subscription_id)),
+      assignments:D.assignments||[], submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), teachers:teachersPub }; };
+  if(role==='student'){ const ids=D.trainees.filter(t=>normPhone(t.phone)===ph).map(t=>t.id);
+    return {...base, ...forTrainees(ids), notifications:(D.notifications||[]).filter(x=>x.to==='student'&&ids.includes(x.trainee_id)), guardian_links:[]}; }
+  if(role==='guardian'){ const links=(D.guardian_links||[]).filter(l=>l.status==='verified'&&normPhone(l.guardian_phone)===ph), ids=links.map(l=>l.trainee_id);
+    return {...base, ...forTrainees(ids), guardian_links:links.map(l=>({...l, guardian_phone:ph})), notifications:(D.notifications||[]).filter(x=>x.to==='guardian'&&ids.includes(x.trainee_id))}; }
+  if(role==='teacher'){ const me=(D.teachers||[]).find(t=>t.active!==false&&normPhone(t.phone)===ph); if(!me) return null;
+    const subs=(D.subscriptions||[]).filter(s=>s.section===me.section&&(s.subjects||[]).some(x=>(me.subjects||[]).includes(x))), ids=[...new Set(subs.map(s=>s.trainee_id))];
+    return {...base, me:{...me, phone:undefined}, teachers:[{...me}], trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs,
+      sub_attendance:(D.sub_attendance||[]).filter(a=>subs.some(s=>s.id===a.subscription_id)), guardian_links:(D.guardian_links||[]).filter(l=>l.status==='verified'&&ids.includes(l.trainee_id)).map(l=>({id:l.id, trainee_id:l.trainee_id, status:l.status, relation:l.relation})),
+      assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id)}; }
+  return null;
+}
+/* بيانات تجريبية: معلمو المقررات وأولياء أمور لعدد من الطلاب */
+export function demoPeople(D){
+  const T=[['girls','كمي','هدى محمد علي النعمي','0501000001'],['girls','لفظي','منى أحمد حسن الصميلي','0501000002'],['boys','كمي','خالد يحيى محمد الحكمي','0501000003'],['boys','لفظي','فيصل علي أحمد المدخلي','0501000004'],['girls','تحصيلي','أمل حسن علي معافا','0501000005'],['boys','تحصيلي','ماجد موسى علي عريشي','0501000006']];
+  D.teachers=T.map(([section,subject,full_name,phone])=>({id:uid(), full_name, phone, section, subjects:[subject], active:true, created_at:new Date().toISOString()}));
+  (D.subscriptions||[]).slice(0,12).forEach((s,i)=>{ const t=D.trainees.find(x=>x.id===s.trainee_id); if(!t) return;
+    D.guardian_links.push({id:uid(), guardian_name:'ولي أمر '+t.full_name.split(' ').slice(1,2).join(''), guardian_phone:'05090000'+String(10+i).padStart(2,'0'), trainee_id:t.id, relation:i%3?'الأب':'الأم', status:'verified', created_at:new Date().toISOString()}); });
+}
+
 /* سجل محاولات التحضير: يُخزَّن رقم السجل مجزّأً (hash) لا الرقم نفسه */
 export function attemptRecord(nid, device, r){
   return { id:uid(), at:new Date().toISOString(), date:riyadhNow().date, nid_hash:String(hash32('sama:'+nid)), device:device||'', result: r.ok ? (r.already?'already':'ok') : r.reason, kind:r.kind||'cohort', trainee_hint:r.ok?(r._trainee||null):null };
@@ -190,6 +223,7 @@ export const LocalStore = {
     if(!this.data.partners) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
+    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[];
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
@@ -309,6 +343,36 @@ export const LocalStore = {
     this.audit('attendance.manual', subscription_id, {date, before, after:status}); this.save(); },
   async requestCustomPlan(f){ (this.data.custom_requests=this.data.custom_requests||[]).push({id:uid(), name:String(f.name||'').trim().slice(0,80), phone:String(f.phone||''), program:f.program, section:f.section, mode:f.mode, notes:String(f.notes||'').slice(0,600), status:'new', created_at:new Date().toISOString()}); this.save(); return {ok:true}; },
   async setCustomRequestStatus(id, status){ const r=(this.data.custom_requests||[]).find(x=>x.id===id); if(r){ r.status=status; this.audit('custom_request.status', id, {status}); this.save(); } },
+  /* ---- البوابات: دخول بالجوال ورمز تحقق (تجريبيًا الرمز 1234) ---- */
+  async requestOtp(phone){ if(!/^05\d{8}$/.test(normPhone(phone))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05'); return {demo:true}; },
+  async portalLogin(phone, code, role){
+    const ph=normPhone(phone); if(code!=='1234') throw new Error('رمز التحقق غير صحيح');
+    if(!rolesOfPhone(this.data, ph).includes(role)) throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}. راجع إدارة المعهد.`);
+    try{ sessionStorage.setItem(this.key+'_p_'+role, ph); }catch(e){} return {ok:true};
+  },
+  async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role); }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
+  async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); }catch(e){} },
+  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); return JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); },
+  /* إشعار من المعلم: يُرفض إن لم يكن الطالب في نطاقه أو لم يكن لولي الأمر رابط موثّق */
+  async teacherNotify({trainee_id, to, kind, note}){
+    const s=await this.portalSession('teacher'); if(!s) throw new Error('انتهت الجلسة'); const D=this.data, sc=scopeData(D,'teacher',s.phone);
+    if(!sc.trainees.some(t=>t.id===trainee_id)) throw new Error('الطالب ليس ضمن طلابك');
+    if(to==='guardian' && !sc.guardian_links.some(l=>l.trainee_id===trainee_id)) throw new Error('لا يوجد ولي أمر موثّق لهذا الطالب');
+    const today=riyadhNow().date, sender='teacher:'+sc.me.id;
+    if(D.notifications.some(x=>x.sender===sender&&x.trainee_id===trainee_id&&x.to===to&&x.kind===kind&&(x.date||x.at.slice(0,10))===today)) return {ok:true, duplicate:true};
+    D.notifications.push(makeNotification(D,{sender, to, trainee_id, kind, note})); this.save(); return {ok:true};
+  },
+  async markRead(role){ const s=await this.portalSession(role); if(!s) return; const sc=scopeData(this.data, role, s.phone); const ids=new Set(sc.notifications.map(x=>x.id)); this.data.notifications.forEach(x=>{ if(ids.has(x.id)&&!x.read_at) x.read_at=new Date().toISOString(); }); this.save(); },
+  /* إدارة المعلمين وأولياء الأمور */
+  async saveTeacher(t){ const a=this.data.teachers; if(!/^05\d{8}$/.test(normPhone(t.phone))) throw new Error('رقم الجوال غير صحيح');
+    if(a.some(x=>x.id!==t.id && x.active!==false && normPhone(x.phone)===normPhone(t.phone))) throw new Error('رقم الجوال مستخدم لمعلم آخر');
+    const i=a.findIndex(x=>x.id===t.id); if(i>=0) a[i]={...a[i],...t, phone:normPhone(t.phone)}; else a.push({...t, id:uid(), phone:normPhone(t.phone), active:true, created_at:new Date().toISOString()}); this.audit('teacher.save', t.id||'new'); this.save(); },
+  async saveGuardianLink(l){ const D=this.data; if(!/^05\d{8}$/.test(normPhone(l.guardian_phone))) throw new Error('رقم جوال ولي الأمر غير صحيح');
+    const t=D.trainees.find(x=>x.national_id===l.national_id||x.id===l.trainee_id); if(!t) throw new Error('لا يوجد طالب بهذا السجل المدني');
+    if(D.guardian_links.some(x=>x.status==='verified'&&x.trainee_id===t.id&&normPhone(x.guardian_phone)===normPhone(l.guardian_phone))) throw new Error('هذا الرابط موجود مسبقًا');
+    D.guardian_links.push({id:uid(), guardian_name:l.guardian_name, guardian_phone:normPhone(l.guardian_phone), trainee_id:t.id, relation:l.relation||'ولي الأمر', status:'verified', verified_by:'admin', created_at:new Date().toISOString()});
+    this.audit('guardian_link.create', t.id); this.save(); },
+  async revokeGuardianLink(id){ const l=this.data.guardian_links.find(x=>x.id===id); if(l){ l.status='revoked'; l.revoked_at=new Date().toISOString(); this.audit('guardian_link.revoke', id); this.save(); } },
   audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'admin', action, entity:String(entity), detail:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
   async resetDemo(){ this.data = makeDemo(); this.autoArchive(); this.save(); },
   async clearPeople(){ const D=this.data; D.trainees=[]; D.enrollments=[]; D.attendance=[]; D.cohorts=[]; D.certificates=[]; D.subscriptions=[]; D.sub_attendance=[]; D.checkin_attempts=[]; this.save(); }
@@ -331,16 +395,17 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
       q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
       q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
-      q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500))]);
+      q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500)),
+      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000))]);
     const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[]};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[]};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -373,7 +438,23 @@ export const CloudStore = {
   async cancelSubscription(id, on=true){ const s=this._e(await this.sb.from('subscriptions').select('start_date').eq('id',id).single()); this._e(await this.sb.from('subscriptions').update({status: on?'cancelled':(s.start_date?'active':'pending')}).eq('id',id)); },
   async setSubAttendance(subscription_id, date, status){ this._e(await this.sb.rpc('set_sub_attendance',{p_sub:subscription_id, p_date:date, p_status:status})); },
   async requestCustomPlan(f){ return this._e(await this.sb.rpc('request_custom_plan',{p:f})); },
-  async setCustomRequestStatus(id, status){ this._e(await this.sb.from('custom_requests').update({status}).eq('id',id)); }
+  async setCustomRequestStatus(id, status){ this._e(await this.sb.from('custom_requests').update({status}).eq('id',id)); },
+  /* ---- البوابات: Supabase Auth برقم الجوال ورمز SMS، والصلاحية من portal_roles() على الخادم ---- */
+  _e164(phone){ return '+966' + normPhone(phone).slice(1); },
+  async requestOtp(phone){ if(!/^05\d{8}$/.test(normPhone(phone))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05'); const r=await this.sb.auth.signInWithOtp({phone:this._e164(phone), options:{shouldCreateUser:true}}); if(r.error) throw new Error('تعذّر إرسال رمز التحقق. حاول بعد قليل.'); return {ok:true}; },
+  async portalLogin(phone, code, role){
+    const r=await this.sb.auth.verifyOtp({phone:this._e164(phone), token:code, type:'sms'}); if(r.error) throw new Error('رمز التحقق غير صحيح أو منتهٍ');
+    const roles=this._e(await this.sb.rpc('portal_roles'))||[]; if(!roles.includes(role)){ await this.sb.auth.signOut(); throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}. راجع إدارة المعهد.`); } return {ok:true};
+  },
+  async portalSession(role){ const {data:{session}}=await this.sb.auth.getSession(); if(!session) return null; const r=await this.sb.rpc('portal_roles'); return (r.data||[]).includes(role) ? {phone:normPhone(session.user.phone), role} : null; },
+  async portalLogout(){ await this.sb.auth.signOut(); },
+  async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
+  async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
+  async markRead(role){ await this.sb.rpc('mark_read',{p_role:role}); },
+  async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
+  async saveGuardianLink(l){ const t=this._e(await this.sb.from('trainees').select('id').eq('national_id',l.national_id).maybeSingle()); if(!t) throw new Error('لا يوجد طالب بهذا السجل المدني');
+    const {data:{session}}=await this.sb.auth.getSession(); this._e(await this.sb.from('guardian_links').insert({guardian_name:l.guardian_name, guardian_phone:normPhone(l.guardian_phone), trainee_id:t.id, relation:l.relation, verified_by:session?.user?.id||null})); },
+  async revokeGuardianLink(id){ this._e(await this.sb.from('guardian_links').update({status:'revoked', revoked_at:new Date().toISOString()}).eq('id',id)); }
 };
 
 /* ---------------- بيانات تجريبية: البرامج حقيقية من دليل المركز، والدفعات والمتدربون والحضور تجريبيون ---------------- */
@@ -427,6 +508,7 @@ export function makeDemo(){
   const D={ programs, packages:[], trainees, cohorts, enrollments, attendance, certificates:[],
     settings:{ daily_secret:Math.random().toString(36).slice(2)+Date.now(), require_code:false, late_minutes:15, early_minutes:60, admin_pin:'1234', checkin_url:'', cert_threshold:75, late_weight:1, warn_consec:2, about:DEFAULT_ABOUT }, partners:defaultPartners() };
   demoQudurat(D, person, rnd);
+  D.teachers=[]; D.guardian_links=[]; D.notifications=[]; D.assignments=[]; D.submissions=[]; demoPeople(D);
   return D;
 }
 
