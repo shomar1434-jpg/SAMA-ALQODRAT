@@ -216,6 +216,11 @@ export function scopeData(D, role, phone){
 export function demoPeople(D){
   const T=[['girls','كمي','هدى محمد علي النعمي','0501000001'],['girls','لفظي','منى أحمد حسن الصميلي','0501000002'],['boys','كمي','خالد يحيى محمد الحكمي','0501000003'],['boys','لفظي','فيصل علي أحمد المدخلي','0501000004'],['girls','تحصيلي','أمل حسن علي معافا','0501000005'],['boys','تحصيلي','ماجد موسى علي عريشي','0501000006']];
   D.teachers=T.map(([section,subject,full_name,phone])=>({id:uid(), full_name, phone, section, subjects:[subject], active:true, created_at:new Date().toISOString()}));
+  // حسابات تجريبية ثابتة: طالب بنين (كمي) بجوال 0550000001 وولي أمره 0509000010، وطالبة بجوال 0550000002
+  const S=D.subscriptions||[], days=id=>new Set((D.sub_attendance||[]).filter(a=>a.trainee_id===id).map(a=>a.att_date)).size;
+  const pickSub=sec=>S.filter(x=>x.section===sec&&x.start_date&&x.status!=='cancelled').sort((a,b)=>days(b.trainee_id)-days(a.trainee_id)).find(x=>sec==='girls'||x.subjects.includes('كمي'));
+  [['boys','0550000001'],['girls','0550000002']].forEach(([sec,ph])=>{ const x=pickSub(sec); if(!x) return; const t=D.trainees.find(y=>y.id===x.trainee_id); if(t) t.phone=ph; S.splice(S.indexOf(x),1); S.unshift(x); });
+  if(S[1]?.section==='boys') S.unshift(S.splice(1,1)[0]);
   (D.subscriptions||[]).slice(0,12).forEach((s,i)=>{ const t=D.trainees.find(x=>x.id===s.trainee_id); if(!t) return;
     D.guardian_links.push({id:uid(), guardian_name:'ولي أمر '+t.full_name.split(' ').slice(1,2).join(''), guardian_phone:'05090000'+String(10+i).padStart(2,'0'), trainee_id:t.id, relation:i%3?'الأب':'الأم', status:'verified', created_at:new Date().toISOString()}); });
 }
