@@ -43,9 +43,13 @@ const attCount = () => S(n => { const { LocalStore } = window.__SAMA__; const D 
 const before = await attCount(); await ck(info.nid); ok(await attCount() === before, 'المسح المكرر في اليوم نفسه لا ينشئ حضورًا ثانيًا');
 const r3 = await ck(info.other); ok(!r3.includes(await S(n => window.__SAMA__.LocalStore.data.trainees.find(x => x.national_id === n).full_name, info.other)), 'رفض متدرب من برنامج آخر دون كشف اسمه');
 
-// ---------- «حضوري» ----------
-await go('me'); await p.fill('[name=nid]', info.nid); await p.click('#mGo'); await p.waitForTimeout(600);
-ok(await p.$('.mecard .me-rate') && !(await p.$('.me-grid')), 'حضوري يعرض النسبة والتنبيه فقط');
+// ---------- حضور البرنامج في بوابة المتدرب (بدل «حضوري») ----------
+await go('me'); ok(await p.evaluate(() => location.hash) === '#portals' && !(await p.$('nav a[href="#me"]')), '«حضوري» تحوّل إلى البوابات ولا رابط لها');
+const ph = await S(n => { const D = window.__SAMA__.LocalStore.data, t = D.trainees.find(x => x.national_id === n); if (D.trainees.some(x => x.id !== t.id && x.phone === '0558880001')) return null; t.phone = '0558880001'; window.__SAMA__.LocalStore.save(); return t.phone; }, info.nid);
+await p.goto(U + 'student/'); await p.waitForTimeout(700); await p.fill('#pl-phone', ph); await p.click('#plB'); await p.waitForTimeout(300); await p.fill('#pl-code', '1234'); await p.click('#plB'); await p.waitForTimeout(1500);
+const pt = p.locator('.tab[data-si]').filter({ has: p.locator('svg') }); if (!(await p.$('.prog-head')) && await pt.count()) for (let i = 0; i < await pt.count(); i++) { await pt.nth(i).click(); await p.waitForTimeout(300); if (await p.$('.prog-head')) break; }
+ok(await p.$('.prog-head') && /نسبة الإنجاز في البرنامج/.test(await p.innerText('#app')) && /نسبة الحضور/.test(await p.innerText('#app')), 'متدرب البرنامج يرى حضوره وإنجازه في البوابة');
+await p.click('#logoutBtn').catch(() => {}); await p.goto(U + '#home'); await p.waitForTimeout(800);
 
 // ---------- الإدارة (صفحة /admin/) ----------
 await go('admin', 1000); ok(p.url().startsWith(U + 'admin/'), 'الانتقال إلى صفحة الإدارة');
@@ -79,7 +83,7 @@ const arch = await S(c => { const { LocalStore } = window.__SAMA__; const D = Lo
 ok(arch.archived, 'أرشفة الدفعة');
 
 // باركود البرنامج يشير إلى الصفحة العامة لا إلى /admin/
-await go('qr-' + openCode, 1200);
+await go('qr-' + openCode, 1200); await p.waitForFunction(() => document.querySelector('[data-qr]') || [...document.querySelectorAll('#app *')].some(e => /^https?:\/\/\S+#p/.test(e.textContent.trim())), null, { timeout:10000 }).catch(() => {});
 const qrUrl = await S(() => document.querySelector('[data-qr]')?.dataset.qr || [...document.querySelectorAll('#app *')].map(e => e.textContent).find(t => /^https?:\/\/\S+#p/.test(t.trim()))?.trim() || '');
 ok(qrUrl.startsWith(U + '#p'), 'رابط الباركود يشير إلى الصفحة العامة: ' + qrUrl);
 

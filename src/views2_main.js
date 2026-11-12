@@ -2,7 +2,7 @@ import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
 import { PAGE, adminBase, publicBase, portalBase } from './config.js';
 import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
-import { liveSay, setBusy, showErrorSummary, toLatin, viewMe, viewVerify, wireFormA11y } from './features.js';
+import { liveSay, setBusy, showErrorSummary, toLatin, viewVerify, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
 import { closePrint } from './print.js';
 import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
@@ -63,7 +63,7 @@ export async function route(){
   window.scrollTo(0,0);
   if(/^v-[A-Za-z0-9-]+$/.test(h)) return viewVerify(h.slice(2));
   if(h==='verify') return viewVerify('');
-  if(h==='me') return viewMe();
+  if(h==='me'){ history.replaceState(null,'','#portals'); return viewPortals(); }   // «حضوري» انتقلت إلى بوابة المتدرب
   if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
   if(h.startsWith('policy-')) return viewPolicy(h.slice(7));
   if(/^p[a-z0-9]+$/i.test(h) && !ROUTES.includes(h)) return viewProgramPage(h);
@@ -233,7 +233,7 @@ export function attendanceBoxHtml(st){
       ${st.require_code?`<div class="field" style="margin-top:16px"><label style="text-align:center">رمز اليوم الظاهر على شاشة القاعة</label><div class="codebox">${[0,1,2,3].map(i=>`<input maxlength="1" inputmode="numeric" aria-label="الرقم ${i+1}">`).join('')}</div></div>`:''}
       <div class="errtxt" id="cErr" style="text-align:center;margin-top:10px"></div>
       <button class="btn pri lg" style="width:100%;margin-top:12px" id="cBtn">${ic('check')} تسجيل الحضور</button>
-    </form><div id="cRes" class="pad hidden" aria-live="polite"></div><div class="pad" style="padding-top:0;text-align:center"><a href="#me" class="hint" style="color:var(--brand);font-weight:500">${ic('activity')} اطّلع على نسبة حضورك</a></div></div>`;
+    </form><div id="cRes" class="pad hidden" aria-live="polite"></div><div class="pad" style="padding-top:0;text-align:center"><a href="#portals" class="hint" style="color:var(--brand);font-weight:500">${ic('activity')} تابع حضورك وتقدّمك من بوابة المتدرب</a></div></div>`;
 }
 export function bindAttendance(st, programCode, onBack){
   const tick=()=>{ const n=riyadhNow(); if(!$('#cClock')) return; $('#cClock').textContent=t12(n.hm).replace(' ص',' AM').replace(' م',' PM'); $('#cDate').textContent=fmtDate(n.date); };
@@ -342,7 +342,7 @@ export async function viewGeneralCheckin(){
    ===================================================================== */
 /* اختيار البوابة: المتدرب، وولي الأمر، والمدرب (لكل منها صفحة ودور) */
 export function viewPortals(){
-  const C=[['student','user','بوابة المتدرب','حضورك وواجباتك والمدة المتبقية من باقتك، وجلساتك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك والتنبيهات، بعد ربطك من المعهد.'],['teacher','book','بوابة المدرب','كشف حضور متدربيك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
+  const C=[['student','user','بوابة المتدرب','حضورك ونسبة إنجازك في باقتك أو برنامجك التدريبي، وواجباتك وشهادتك ومواعيدك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك والتنبيهات، بعد ربطك من المعهد.'],['teacher','book','بوابة المدرب','كشف حضور متدربيك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
   $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint" style="margin:8px 0 0">الدخول برقم جوالك المسجّل في المعهد ورمز تحقق.</p></div>
     <div class="grid g3">${C.map(([k,i,t,d],n)=>`<a class="card pad portal-card rv" style="--i:${n}" href="${portalBase(k)}"><span class="kic-lg t-info">${ic(i)}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div>${siteFooter()}`;
 }

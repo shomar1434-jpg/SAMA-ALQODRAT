@@ -64,9 +64,6 @@ ok(await p.$$eval('[data-ch]', x => x.length) === 2, 'عند التعدد يخت
 await p.click('[data-ch]'); await p.waitForTimeout(600);
 ok(/سُجّل حضورك/.test(await text('#cRes')), 'التحضير بعد الاختيار');
 
-// ---------- حضوري ----------
-await go('me'); await p.fill('[name=nid]', nid); await p.click('#mGo'); await p.waitForTimeout(600);
-ok(/قسم البنون/.test(await text('#mRes')) && await p.$('.mecard .me-rate'), 'حضوري يعرض اشتراك الباقة ونسبته');
 
 // ---------- الإدارة ----------
 await go('admin', 900); await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200);

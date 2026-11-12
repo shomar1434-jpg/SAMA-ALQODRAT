@@ -989,3 +989,8 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:500;color:var(--pt-ink,var(--pt));text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:start}
 .linkbtn:focus-visible{outline:2px solid var(--pt);outline-offset:2px;border-radius:4px}
 .modal:has(.mirror){width:min(980px,96vw);max-height:92vh;overflow:auto}
+/* لوحة البرنامج في بوابة المتدرب */
+.prog-head h2{font-size:clamp(20px,3vw,26px);font-weight:700;margin:8px 0 4px}
+.prog-head .hint{margin:0}
+.prog-next{margin:10px 0 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink-muted)}
+.prog-next b{color:var(--ink);font-weight:600}

@@ -4,7 +4,7 @@
    ===================================================================== */
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, DAYS } from './utils.js';
 import { ic, emptyBox, ringSvg, toast, statusPill, applyTheme, getTheme, setTheme } from './views2_head.js';
-import { Store, initStore } from './data2.js';
+import { Store, initStore, cohortItemsOf, LEVEL_TXT } from './data2.js';
 import { setPage, publicBase } from './config.js';
 import { LOGO } from './assets/logo.js';
 import { studentDashboard, teacherDashboard, guardianDashboard, ROLE_TXT, NOTIFY_TPL, normPhone, progressGauge, GAUGE_RED, mirrorData } from './portal_logic.js';
@@ -16,7 +16,7 @@ import { assignmentsFor } from './learning_logic.js';
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
 const T_TABS = [['today','calendar','كشف اليوم'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
 let sTab = 'dash', tTab = 'today';
-const tabBar = (tabs, cur, attr, badges = {}) => `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
+const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
 const TITLES = { student:'بوابة المتدرب', teacher:'بوابة المدرب', guardian:'بوابة ولي الأمر' };
 const KIND_TXT = { absence:'غياب', late:'تأخر', reminder:'تذكير بالحضور', homework:'واجب', general:'رسالة' };
@@ -55,7 +55,7 @@ function viewLogin(){
       <div class="field" id="otpF" hidden><label for="pl-code">رمز التحقق المرسل إلى جوالك</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
       <div class="errtxt" id="plE" role="alert"></div>
       <button class="btn pri" id="plB">${ic('lock')} إرسال رمز التحقق</button>
-      ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b>.'}</span></div>` : ''}
+      ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b> (باقات)، أو <b dir="ltr">0550000003</b> (برنامج تدريبي).'}</span></div>` : ''}
     </form></div></div>`;
   const ph = $('#pl-phone'), code = $('#pl-code');
   [ph, code].forEach(i => i.addEventListener('input', () => { i.value = toLatin(i.value).replace(/\D/g, ''); }));
@@ -137,26 +137,59 @@ function studentDetailHtml(it, notifications){
     ${notifications?.length ? `<div class="card pad rv" style="grid-column:1/-1"><h3 class="ctitle">${ic('alert')}الإشعارات</h3><ul class="ntf">${notifications.map(x => `<li class="${x.read_at ? '' : 'new'}"><span class="pill ${x.kind === 'absence' ? 'bad' : x.kind === 'late' ? 'warn' : 'info'}">${KIND_TXT[x.kind] || 'رسالة'}</span><p>${esc(x.text)}</p><span class="hint">${fmtShort(x.at.slice(0, 10))}</span></li>`).join('')}</ul></div>` : ''}
   </div>`;
 }
-function subTabs(items, cur){
-  return items.length > 1 ? `<div class="tabs" role="tablist" style="margin:14px 0">${items.map((x, i) => `<button class="tab" role="tab" data-si="${i}" aria-selected="${i === cur}">${ic('award')}${esc(x.plan)}</button>`).join('')}</div>` : '';
-}
 
 /* ---------- المتدرب ---------- */
 let sIdx = 0, pIdx = 0;
+/* بنود «لوحتي» الموحدة: اشتراكات الباقات ثم البرامج (الدفعات) */
+const STATE_TXT = { running:'جارية', upcoming:'قادمة', archived:'منتهية' };
+function unifiedItems(D, traineeId, subItems){
+  const t = D.trainees.find(x => x.id === traineeId);
+  const progs = t ? cohortItemsOf(D, t).sort((a, b) => ({ running:0, upcoming:1, archived:2 }[a.state] - { running:0, upcoming:1, archived:2 }[b.state])) : [];
+  return [...subItems.map(it => ({ kind:'sub', label:it.plan, it })), ...progs.map(x => ({ kind:'prog', label:x.program, x }))];
+}
+const itemTabs = (list, cur) => list.length > 1 ? `<div class="tabs" role="tablist" style="margin:14px 0">${list.map((u, i) => `<button class="tab" role="tab" data-si="${i}" aria-selected="${i === cur}">${ic(u.kind === 'prog' ? 'book' : 'award')}${esc(u.label)}</button>`).join('')}</div>` : '';
+/* لوحة برنامج (دفعة): الحضور ونسبة الإنجاز والشهادة ورسالة التنبيه */
+export function programPanelHtml(x, threshold = 75){
+  const ach = x.total ? Math.round(Math.min(1, x.attended / x.total) * 100) : null, rate = x.state === 'archived' ? x.finalRate : x.rate;
+  const tone = rate == null ? 'success' : rate < threshold ? 'warning' : 'success';
+  const zone = v => v == null ? '' : v < GAUGE_RED ? 'red' : v < threshold ? 'yellow' : 'green';
+  return `<div class="card pad rv prog-head"><div><span class="pill ${x.state === 'running' ? 'ok' : x.state === 'upcoming' ? 'info' : 'g'}">${STATE_TXT[x.state]}</span>
+      <h2>${esc(x.program)}</h2><p class="hint">الدفعة ${fmtNum(x.number)} · من ${fmtShort(x.start_date)} إلى ${fmtShort(x.end_date)}${x.hours ? ` · ${fmtNum(x.hours)} ساعة تدريبية` : ''}</p></div>
+      ${x.next ? `<p class="prog-next">${ic('calendar')} المحاضرة القادمة: <b>${DAYS[new Date(x.next + 'T12:00:00Z').getUTCDay()]} ${fmtShort(x.next)}</b> · <span class="num">${t12(String(x.start_time).slice(0, 5))}</span></p>` : ''}</div>
+    ${x.message ? `<div class="alert t-${{ ok:'success', done:'success', low:'warning', consec:'warning', last:'danger', lost:'danger' }[x.level] || 'info'} rv" role="status" style="margin-top:12px"><span class="aic">${ic('alert')}</span><div><b>${LEVEL_TXT[x.level] || ''}</b><div>${esc(x.message)}</div></div></div>` : ''}
+    <div class="card pad ach-card rv"><div class="ach-head"><div class="ind-h">${ic('award')}<b>نسبة الإنجاز في البرنامج</b></div><div class="ach-big num">${ach == null ? '—' : fmtNum(ach) + '٪'}</div></div>
+      <ul class="gauge-axes"><li data-zone="${zone(ach)}"><span class="ga-l">الحضور</span><span class="ga-bar" role="img" aria-label="الإنجاز: ${ach ?? 0}٪"><i style="width:${ach ?? 0}%"></i></span><b class="num">${ach == null ? '—' : fmtNum(ach) + '٪'}</b>
+        <span class="hint">${x.total ? `أيام الحضور: ${fmtNum(x.attended)} من أصل ${fmtNum(x.total)} مقررة في البرنامج` : 'لا محاضرات مقررة بعد'}</span></li></ul>
+      <p class="hint" style="margin:10px 0 0">الإنجاز = أيام الحضور ÷ كل أيام البرنامج المقررة. ولا واجبات في البرامج التدريبية.</p></div>
+    <div class="ind3">
+      <div class="card pad ind rv" style="--i:1"><div class="ind-h">${ic('check')}<b>نسبة الحضور</b></div>
+        ${x.held ? `<div class="ind-ring">${ringSvg(rate ?? 0, 92, 9, tone)}</div><div class="ind-nums"><span><b>${fmtNum(x.attended)}</b>حضور</span><span><b>${fmtNum(x.late)}</b>تأخر</span><span><b>${fmtNum(x.absent)}</b>غياب</span></div>
+          <p class="hint">من ${fmtNum(x.held)} محاضرة منعقدة، ويتبقى ${fmtNum(x.remaining)} محاضرة.</p>` : `<p class="ind-empty">${x.state === 'upcoming' ? 'تبدأ الدفعة ' + fmtShort(x.start_date) : 'لا توجد محاضرات منعقدة بعد'}</p>`}</div>
+      <div class="card pad ind rv" style="--i:2"><div class="ind-h">${ic('award')}<b>الشهادة</b></div>
+        ${x.cert ? `<div class="ind-big"><b>${ic('check')}</b> صدرت شهادتك</div><p class="hint">الرقم التسلسلي <b dir="ltr">${esc(x.cert)}</b></p><a class="btn sm" href="${publicBase()}#v-${encodeURIComponent(x.cert)}" target="_blank" rel="noopener">${ic('expand')} التحقق من الشهادة</a>`
+          : x.state === 'archived' ? `<p class="ind-empty">انتهت الدفعة دون بلوغ حد الشهادة ${fmtNum(threshold)}٪</p>`
+          : `<p class="ind-big"><b>${fmtNum(threshold)}٪</b> حد الشهادة</p><p class="hint">${x.needed ? `يلزمك حضور ${fmtNum(x.needed)} من ${fmtNum(x.remaining)} محاضرة متبقية.` : 'بلغت حد الشهادة، وتصدر عند انتهاء الدفعة.'}</p>`}</div>
+      <div class="card pad ind rv" style="--i:3"><div class="ind-h">${ic('hourglass')}<b>مدة البرنامج</b></div>
+        ${x.total ? `<div class="ind-big"><b>${fmtNum(x.remaining)}</b> محاضرة متبقية</div><div class="tbar big" role="img" aria-label="انعقد ${fmtNum(x.held)} من ${fmtNum(x.total)}"><i style="width:${Math.round(x.held / x.total * 100)}%"></i></div>
+          <p class="hint">انعقد ${fmtNum(x.held)} من ${fmtNum(x.total)} محاضرة.</p>` : '<p class="ind-empty">—</p>'}</div>
+    </div>`;
+}
+
 function viewStudent(D){
   const profiles = D.trainees.map(t => studentDashboard(D, t));
   const pr = profiles[Math.min(pIdx, profiles.length - 1)];
   if(!pr) return ($('#app').innerHTML = `<div class="wrap">${emptyBox('لا يوجد اشتراك مرتبط بهذا الرقم', 'راجع إدارة المعهد.')}</div>`);
-  const it = pr.items[Math.min(sIdx, pr.items.length - 1)];
+  const U = unifiedItems(D, pr.trainee.id, pr.items), u = U[Math.min(sIdx, U.length - 1)], it = u?.kind === 'sub' ? u.it : null, px = u?.kind === 'prog' ? u.x : null;
+  if(!pr.items.length && sTab !== 'dash') sTab = 'dash';
   $('#app').innerHTML = `<div class="wrap">
     ${profiles.length > 1 ? `<div class="tabs" style="margin-bottom:12px">${profiles.map((x, i) => `<button class="tab" data-pi="${i}" aria-selected="${i === pIdx}">${ic('user')}${esc(x.trainee.first_name)}</button>`).join('')}</div>` : ''}
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('user')}${TITLES.student}</span><h1>أهلًا ${esc(pr.trainee.first_name)}</h1>
-      ${it ? `<p>${esc(it.plan)} · قسم ${esc(it.section)}${it.subjects.length ? ' · ' + esc(it.subjects.join('، ')) : ''}</p>` : ''}</div>
+      ${it ? `<p>${esc(it.plan)} · قسم ${esc(it.section)}${it.subjects.length ? ' · ' + esc(it.subjects.join('، ')) : ''}</p>` : px ? `<p>${esc(px.program)} · الدفعة ${fmtNum(px.number)}</p>` : ''}</div>
       ${it?.upcoming[0] ? `<div class="next-ses"><span>جلستي القادمة</span><b>${DAYS[new Date(it.upcoming[0].date + 'T12:00:00Z').getUTCDay()]} ${fmtShort(it.upcoming[0].date)}</b><span class="num">${t12(it.upcoming[0].start)}</span></div>` : ''}</section>
-    ${tabBar(S_TABS, sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length })}
+    ${tabBar(pr.items.length ? S_TABS : S_TABS.slice(0, 1), sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length })}
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
-  if(sTab === 'dash') $('#sBody').innerHTML = it ? subTabs(pr.items, sIdx) + studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) : emptyBox('لا توجد اشتراكات');
+  if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75));
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
   $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
@@ -169,12 +202,12 @@ let gIdx = 0;
 function viewGuardian(D, s){
   const g = guardianDashboard(D, s.phone), ch = g.children[Math.min(gIdx, g.children.length - 1)];
   if(!ch) return ($('#app').innerHTML = `<div class="wrap">${emptyBox('لا يوجد أبناء مرتبطون بهذا الرقم', 'يربط المعهد ولي الأمر بأبنائه بعد التحقق. راجع إدارة المعهد.')}</div>`);
-  const it = ch.items[Math.min(sIdx, ch.items.length - 1)];
+  const U = unifiedItems(D, ch.trainee.id, ch.items), u = U[Math.min(sIdx, U.length - 1)], it = u?.kind === 'sub' ? u.it : null, px = u?.kind === 'prog' ? u.x : null;
   $('#app').innerHTML = `<div class="wrap">
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('users')}${TITLES.guardian}</span><h1>متابعة ${esc(ch.trainee.first_name)}</h1>
-      <p>${esc(ch.relation || '')}${it ? ' · ' + esc(it.plan) + ' · قسم ' + esc(it.section) : ''}</p></div></section>
+      <p>${esc(ch.relation || '')}${it ? ' · ' + esc(it.plan) + ' · قسم ' + esc(it.section) : px ? ' · ' + esc(px.program) : ''}</p></div></section>
     ${g.children.length > 1 ? `<div class="tabs" style="margin:14px 0">${g.children.map((c, i) => `<button class="tab" data-gi="${i}" aria-selected="${i === gIdx}">${ic('user')}${esc(c.trainee.first_name)}</button>`).join('')}</div>` : ''}
-    ${it ? subTabs(ch.items, sIdx) + studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : emptyBox('لا توجد اشتراكات')}</div>`;
+    ${!u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75))}</div>`;
   $$('[data-gi]').forEach(b => b.onclick = () => { gIdx = +b.dataset.gi; sIdx = 0; viewGuardian(D, s); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewGuardian(D, s); });
   if(ch.notifications.some(x => !x.read_at)) Store.markRead('guardian');
