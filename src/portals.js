@@ -55,7 +55,7 @@ function viewLogin(){
       <div class="field" id="otpF" hidden><label for="pl-code">رمز التحقق المرسل إلى جوالك</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
       <div class="errtxt" id="plE" role="alert"></div>
       <button class="btn pri" id="plB">${ic('lock')} إرسال رمز التحقق</button>
-      ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المعلم <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' استخدم رقم جوال طالب مشترك من لوحة الإدارة.'}</span></div>` : ''}
+      ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المعلم <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم الطالب <b dir="ltr">0550000001</b> أو الطالبة <b dir="ltr">0550000002</b>.'}</span></div>` : ''}
     </form></div></div>`;
   const ph = $('#pl-phone'), code = $('#pl-code');
   [ph, code].forEach(i => i.addEventListener('input', () => { i.value = toLatin(i.value).replace(/\D/g, ''); }));
