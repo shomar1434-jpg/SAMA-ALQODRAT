@@ -26,7 +26,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` و`registration` و`guardian_link` و`cohort_trainer` و`pwa` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` و`registration` و`guardian_link` و`cohort_trainer` و`pwa` و`compat` (التوافقية: `BROWSER=firefox|webkit` في CI) في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)
@@ -58,6 +58,7 @@ npm run check    # فحص ثابت + بناء + اختبارات (شغّله ق�
 - **الخصوصية:** رسائل رفض التحضير لا تكشف اسم المتدرب. بوابة المتدرب لا تُظهر إلا بياناته (لا أسماء زملاء الدفعة). التحقق من الشهادة باسم مقنّع.
 - **الوقت:** توقيت الرياض دائمًا (`riyadhNow` / `riyadh_now()`).
 - **الإدخال:** الاسم حروف فقط، والسجل والجوال أرقام فقط (تحويل الأرقام العربية)، والبريد بعلامة @.
+- **التوافقية:** لا تمرير أفقي في أي صفحة من 320px؛ أهداف اللمس 44px وخط الحقول 16px على اللمس؛ الحواف الآمنة `env(safe-area-inset-*)`؛ أي صفحة جديدة تُضاف إلى `tests/compat.mjs`.
 - **الوصول:** ملخص أخطاء النماذج، `aria-invalid`، `aria-busy`، احترام `prefers-reduced-motion`، خط 16px للمدخلات على الجوال.
 - **الطباعة:** A4 عبر `#printRoot`، والاعتماد بتوقيع مدير المركز والختم فقط.
 - **التصميم:** نظام «سِجِل»: Readex Pro، اللون الأساسي teal، والفاتح والداكن.
