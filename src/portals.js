@@ -13,6 +13,7 @@ import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
 import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
+import { initPwa } from './pwa.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
 const T_TABS = [['today','calendar','كشف اليوم'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
@@ -30,6 +31,7 @@ export function bootPortal(role){
   $('#homeLink').href = publicBase() + '#home';
   window.addEventListener('hashchange', render);
   render();
+  initPwa();
 }
 
 async function render(){

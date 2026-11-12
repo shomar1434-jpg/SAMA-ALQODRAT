@@ -1,0 +1,55 @@
+{
+  "id": "sama-public",
+  "name": "منصة مركز سما القدرات للتدريب",
+  "short_name": "سما القدرات",
+  "description": "التسجيل والحضور والمتابعة في مركز سما القدرات للتدريب",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#EEF3F2",
+  "theme_color": "#117A7E",
+  "categories": [
+    "education"
+  ],
+  "icons": [
+    {
+      "src": "pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "تسجيل الحضور",
+      "url": "./#checkin"
+    },
+    {
+      "name": "بوابة المتدرب",
+      "url": "./student/"
+    },
+    {
+      "name": "بوابة ولي الأمر",
+      "url": "./guardian/"
+    },
+    {
+      "name": "بوابة المدرب",
+      "url": "./teacher/"
+    }
+  ]
+}

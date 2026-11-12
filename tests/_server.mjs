@@ -7,7 +7,7 @@ import fs from 'node:fs';
 export function serveDist() {
   const dist = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'dist');
   if (!fs.existsSync(path.join(dist, 'index.html'))) { console.error('شغّل npm run build أولًا'); process.exit(1); }
-  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml' };
+  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json' };
   const server = http.createServer((req, res) => {
     let f = path.join(dist, decodeURIComponent(req.url.split('?')[0]));
     if (req.url.split('?')[0].endsWith('/')) f = path.join(f, 'index.html');
