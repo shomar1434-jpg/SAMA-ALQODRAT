@@ -26,7 +26,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)
@@ -46,6 +46,7 @@ npm run check    # فحص ثابت + بناء + اختبارات (شغّله ق�
 السياسات: مسودة ← نشر بإصدار (يلزم جهة اعتماد ونص مكتمل)، والمنشور ثابت. السياسات للاطلاع ولا تُلزم عند التسجيل (قرار المالك)؛ آلية القبول (`requires_acceptance`، `policy_acceptances`) باقية في الخادم معطّلة.
 نسبة الإنجاز: `achievementOf` في `src/portal_logic.js` = متوسط (أيام الحضور ÷ جلسات الباقة) و(الواجبات المحلولة ÷ المرسلة). يراها المتدرب وولي أمره، ويراها المدرب مرآةً في كشفه عبر `hw_assignments`/`hw_submissions` (`…_trainer_mirror.sql`).
 حماية الهوية: إعادة التسجيل بسجل مدني موجود تضيف التسجيل للملف نفسه ولا تغيّر الاسم أو الجوال المعتمد (الجوال مفتاح البوابة)؛ تُكمَّل الحقول الفارغة فقط، والفروق تصبح `profile_change_requests` تبت فيها الإدارة (`mergeOnRegister` ↔ `trainees_register_guard`).
+صندوق الوارد: `src/inbox_logic.js` ↔ `…_inbox.sql` (`sessionReminders` ↔ `run_session_reminders` كل دقيقة عبر pg_cron، `inboxOf` ↔ `portal_inbox`، `adminRecipients` ↔ `admin_notify`). كل إشعار تلقائي له `dedupe_key` فريد. الواجهة `src/inbox_ui.js`: جرس، لائحة، لافتة، صوت المعهد (Web Audio، يُفتح بعد أول لمسة)، إيقاف الصوت (`sama_sound`)، وما رُئي يُحفظ في الجهاز (`sama_seen_<role>_<phone>`) فلا يتكرر التنبيه.
 لا حذف لسجل تاريخي: الحذف يُرفض إن وُجد حضور أو شهادة (`on delete restrict`)، والبديل الإلغاء أو الأرشفة.
 
 ## قواعد لا تُكسر

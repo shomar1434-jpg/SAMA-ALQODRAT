@@ -12,6 +12,7 @@ import { modal, closeModal } from './views2_programs.js';
 import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
 import { assignmentsFor } from './learning_logic.js';
+import { mountInbox, unmountInbox } from './inbox_ui.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
 const T_TABS = [['today','calendar','كشف اليوم'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
@@ -35,8 +36,11 @@ async function render(){
   clearInterval(timer);
   const s = await Store.portalSession(ROLE);
   $('#logoutBtn').hidden = !s;
-  if(!s) return viewLogin();
-  $('#logoutBtn').onclick = async () => { await Store.portalLogout(ROLE); location.hash = ''; render(); };
+  if(!s){ unmountInbox(); return viewLogin(); }
+  $('#logoutBtn').onclick = async () => { unmountInbox(); await Store.portalLogout(ROLE); location.hash = ''; render(); };
+  mountInbox(ROLE, s.phone, {
+    onOpen: it => { if(it.action === 'msg'){ if(ROLE === 'student') sTab = 'msg'; if(ROLE === 'teacher') tTab = 'msg'; } else if(ROLE !== 'guardian'){ if(ROLE === 'student') sTab = 'dash'; } render(); },
+    onNew: () => { if($('.modal-bg') || document.activeElement?.matches('input,textarea,select')) return; render(); } });
   try {
     const D = await Store.portalData(ROLE);
     if(ROLE === 'student') return viewStudent(D);

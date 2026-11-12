@@ -21,6 +21,7 @@ export const IC = {
   check:'<path d="m5 12 5 5 9-10"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
   alert:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>',
   layers:'<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
   trend:'<path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/>',

@@ -1,3 +1,4 @@
+import { sessionReminders, inboxOf, adminRecipients } from './inbox_logic.js';
 import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './policy_logic.js';
 import { catalogPrograms, computeEnd } from './catalog.js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
@@ -214,7 +215,7 @@ export function scopeData(D, role, phone){
     return {...base, me:{...me, phone:undefined}, teachers:[{...me}], trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs,
       sub_attendance:(D.sub_attendance||[]).filter(a=>subs.some(s=>s.id===a.subscription_id)), guardian_links:(D.guardian_links||[]).filter(l=>l.status==='verified'&&ids.includes(l.trainee_id)).map(l=>({id:l.id, trainee_id:l.trainee_id, status:l.status, relation:l.relation})),
       assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&(D.assignments||[]).some(a=>a.id===x.assignment_id&&a.teacher_id===me.id)),
-      notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id),
+      notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id), notifications_in:(D.notifications||[]).filter(x=>x.to==='teacher'&&x.teacher_id===me.id),
       questions:(D.questions||[]).filter(q=>q.section===me.section&&(me.subjects||[]).includes(q.subject)&&q.status!=='deleted'),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.section===me.section&&(me.subjects||[]).includes(a.subject)&&a.submitted_at),
       rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
@@ -433,7 +434,17 @@ export const LocalStore = {
   },
   async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role); }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); }catch(e){} },
-  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); return JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); },
+  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); return JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); },
+  /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
+  runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
+    const add=sessionReminders(D, riyadhNow()).filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },
+  async inboxState(role){ const s=await this.portalSession(role); if(!s) return {items:[], unread:0}; this.load(); this.runReminders(); const sc=scopeData(this.data, role, s.phone); return sc ? inboxOf(sc, role) : {items:[], unread:0}; },
+  async adminNotify(f){ const D=this.data, text=String(f.text||'').trim(); if(text.length<3) throw new Error('اكتب نص الرسالة'); if(text.length>600) throw new Error('الرسالة أطول من 600 حرف');
+    if(!['student','guardian','teacher'].includes(f.audience)) throw new Error('اختر الفئة المستهدفة');
+    const R=adminRecipients(D, f, riyadhNow().date); if(!R.length) throw new Error('لا يوجد مستلمون في هذا النطاق');
+    const at=new Date().toISOString(), date=riyadhNow().date, batch=uid();
+    R.forEach(r=>D.notifications.push({id:uid(), at, date, sender:'admin', kind:'admin', text, read_at:null, batch, ...r}));
+    this.audit('notify.admin', batch, {audience:f.audience, scope:f.scope||'all', count:R.length}); this.save(); return {ok:true, count:R.length}; },
   /* إشعار من المدرب: يُرفض إن لم يكن المتدرب في نطاقه أو لم يكن لولي الأمر رابط موثّق */
   async teacherNotify({trainee_id, to, kind, note}){
     const s=await this.portalSession('teacher'); if(!s) throw new Error('انتهت الجلسة'); const D=this.data, sc=scopeData(D,'teacher',s.phone);
@@ -443,7 +454,7 @@ export const LocalStore = {
     if(D.notifications.some(x=>x.sender===sender&&x.trainee_id===trainee_id&&x.to===to&&x.kind===kind&&(x.date||x.at.slice(0,10))===today)) return {ok:true, duplicate:true};
     D.notifications.push(makeNotification(D,{sender, to, trainee_id, kind, note})); this.save(); return {ok:true};
   },
-  async markRead(role){ const s=await this.portalSession(role); if(!s) return; const sc=scopeData(this.data, role, s.phone); const ids=new Set(sc.notifications.map(x=>x.id)); this.data.notifications.forEach(x=>{ if(ids.has(x.id)&&!x.read_at) x.read_at=new Date().toISOString(); }); this.save(); },
+  async markRead(role){ const s=await this.portalSession(role); if(!s) return; const sc=scopeData(this.data, role, s.phone); if(!sc) return; const ids=new Set((role==='teacher'?sc.notifications_in:sc.notifications).map(x=>x.id)); const now=new Date().toISOString(); this.data.notifications.forEach(x=>{ if(ids.has(x.id)&&!x.read_at) x.read_at=now; }); this.save(); },
   /* إدارة المدربين وأولياء الأمور */
   async saveTeacher(t){ const a=this.data.teachers; if(!/^05\d{8}$/.test(normPhone(t.phone))) throw new Error('رقم الجوال غير صحيح');
     if(a.some(x=>x.id!==t.id && x.active!==false && normPhone(x.phone)===normPhone(t.phone))) throw new Error('رقم الجوال مستخدم لمدرب آخر');
@@ -568,6 +579,9 @@ export const CloudStore = {
   async portalLogout(){ await this.sb.auth.signOut(); },
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
   async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
+  runReminders(){ return 0; },   // في السحابة: run_session_reminders() عبر pg_cron كل دقيقة
+  async inboxState(role){ return this._e(await this.sb.rpc('portal_inbox',{p_role:role})) || {items:[], unread:0}; },
+  async adminNotify(f){ return this._e(await this.sb.rpc('admin_notify',{p:f})); },
   async resolveProfileChange(id, approve){ return this._e(await this.sb.rpc('resolve_profile_change',{p_id:id, p_approve:!!approve})); },
   async publicPolicies(){ return this._e(await this.sb.rpc('public_policies'))||[]; },
   async savePolicy(p){ validatePolicy(p, false); const row={slug:p.slug, title:p.title.trim(), body:String(p.body).trim(), effective_date:p.effective_date, approved_by:String(p.approved_by||'').trim(), requires_acceptance:!!p.requires_acceptance};
@@ -655,5 +669,5 @@ export let Store = LocalStore;
 /* يُستدعى مرة واحدة من boot() بعد تحميل كل الوحدات */
 export function initStore(){
   if(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase){ CloudStore.init(); Store = CloudStore; }
-  else LocalStore.load();
+  else { LocalStore.load(); window.addEventListener('storage', e => { if(e.key === LocalStore.key && e.newValue) LocalStore.load(); }); }   // الوضع التجريبي: تحديث من الألسنة الأخرى
 }
