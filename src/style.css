@@ -994,3 +994,27 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .prog-head .hint{margin:0}
 .prog-next{margin:10px 0 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--ink-muted)}
 .prog-next b{color:var(--ink);font-weight:600}
+/* صندوق الوارد: الجرس واللائحة واللافتة */
+.bell{position:relative;width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--surface-card);color:var(--ink);display:inline-grid;place-items:center;cursor:pointer;margin-inline-end:8px}
+.bell:hover{border-color:var(--pt)} .bell:focus-visible{outline:2px solid var(--pt);outline-offset:2px}
+.bell .ic{width:20px;height:20px}
+.bell .bdg{position:absolute;top:-6px;inset-inline-end:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:var(--danger);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid var(--surface-card)}
+#inboxPanel{position:fixed;top:64px;inset-inline-end:max(12px,env(safe-area-inset-right));width:min(400px,calc(100vw - 24px));max-height:min(70vh,560px);overflow:auto;z-index:60;background:var(--surface-card);border:1px solid var(--border);border-radius:18px;box-shadow:0 18px 48px rgba(0,0,0,.18)}
+.ibp-head{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:var(--surface-card);border-bottom:1px solid var(--border)}
+.ibp-head b{display:flex;align-items:center;gap:6px}
+.ibp-list{list-style:none;margin:0;padding:6px}
+.ibp-it{width:100%;display:flex;gap:10px;align-items:flex-start;text-align:start;background:none;border:0;padding:10px;border-radius:12px;font:inherit;color:inherit;cursor:pointer;min-height:44px}
+.ibp-it:hover,.ibp-it:focus-visible{background:var(--surface-sunken);outline:none}
+.ibp-it.new{background:color-mix(in srgb,var(--pt) 8%,transparent)}
+.ibp-it.new b::after{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-inline-start:6px;vertical-align:middle}
+.ibt-ic{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--surface-sunken)}
+.ibt-ic .ic{width:18px;height:18px}
+.ibt-ic.t-bad{background:var(--danger-tint);color:var(--danger-ink)} .ibt-ic.t-warn{background:var(--warning-tint);color:var(--warning-ink)} .ibt-ic.t-ok{background:var(--success-tint);color:var(--success-ink)} .ibt-ic.t-info{background:color-mix(in srgb,var(--pt) 14%,transparent);color:var(--pt)}
+.ibt-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ibt-body b{font-weight:600} .ibt-body span{color:var(--ink-muted);font-size:14px;line-height:1.6} .ibt-body small{color:var(--ink-subtle);font-size:12px}
+#inboxToast{position:fixed;top:calc(12px + env(safe-area-inset-top));inset-inline-start:50%;transform:translate(50%,-150%);z-index:70;width:min(420px,calc(100vw - 24px));transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+[dir=ltr] #inboxToast{transform:translate(-50%,-150%)}
+#inboxToast.on{transform:translate(50%,0)}
+#inboxToast .ibt-card{width:100%;display:flex;gap:10px;align-items:flex-start;text-align:start;padding:12px 14px;padding-inline-end:38px;border-radius:16px;border:1px solid var(--border);background:var(--surface-card);box-shadow:0 14px 40px rgba(0,0,0,.2);font:inherit;color:inherit;cursor:pointer}
+#inboxToast .ibt-x{position:absolute;top:8px;inset-inline-end:8px;width:28px;height:28px;border:0;border-radius:8px;background:none;color:var(--ink-subtle);font-size:20px;cursor:pointer}
+@media(prefers-reduced-motion:reduce){#inboxToast{transition:none}}
