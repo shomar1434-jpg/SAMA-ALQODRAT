@@ -1,0 +1,46 @@
+-- الخطوة A: إعادة التسجيل بسجل مدني موجود لا تستبدل الاسم ولا الجوال؛ الاختلاف طلب تحديث تراجعه الإدارة
+\set ON_ERROR_STOP on
+do $$
+declare v_t uuid; v_p uuid; r jsonb; ok boolean; v_req uuid; v_admin uuid; n int;
+  acc jsonb := (select coalesce(jsonb_agg(id), '[]') from current_policies(riyadh_now()::date) where requires_acceptance);   -- سياسة إلزامية من اختبار سابق
+begin
+  perform register_subscription(jsonb_build_object('national_id','1999999995','full_name','عبدالله محمد علي الشهري','phone','0551110000','gender','ذكر',
+     'plan_id',(select id from plans where tier='basic' and mode='in_person'),'accepted_policies',acc));
+  select id into v_t from trainees where national_id = '1999999995';
+  select program_id into v_p from cohorts where number = 99 and archived_at is null limit 1;
+
+  -- شخص آخر يعرف السجل المدني يسجّل بجواله واسم مختلف وبريد جديد
+  perform register_trainee(jsonb_build_object('national_id','1999999995','full_name','منتحل الشخصية','phone','0559990000','email','x@y.com','program_id',v_p,'accepted_policies',acc));
+  assert (select phone from trainees where id = v_t) = '0551110000', 'الجوال المعتمد لم يتغير';
+  assert (select full_name from trainees where id = v_t) = 'عبدالله محمد علي الشهري', 'الاسم المعتمد لم يتغير';
+  assert (select email from trainees where id = v_t) = 'x@y.com', 'الحقل الفارغ سابقًا يُكمَّل';
+  assert exists (select 1 from enrollments where trainee_id = v_t and program_id = v_p), 'التسجيل أُضيف إلى الملف نفسه';
+  assert (select count(*) from trainees where national_id = '1999999995') = 1, 'لا ملف مكرر';
+  select id into v_req from profile_change_requests where trainee_id = v_t and status = 'pending';
+  assert v_req is not null and (select changes ? 'phone' and changes ? 'full_name' and not (changes ? 'email') from profile_change_requests where id = v_req), 'طلب تحديث بالفروق فقط';
+
+  -- الجوال الجديد لا يفتح البوابة
+  perform set_config('app.phone', '0559990000', true);
+  assert not ('student' = any(portal_roles())), 'لا دور متدرب للجوال غير المعتمد';
+  perform set_config('app.phone', '', true);
+
+  -- الإدارة فقط تبت في الطلب
+  perform set_config('app.uid', '', true);
+  begin perform resolve_profile_change(v_req, true); ok := false; exception when others then ok := sqlerrm like '%غير مصرح%'; end;
+  assert ok, 'البت للإدارة فقط';
+  select user_id into v_admin from admins limit 1; perform set_config('app.uid', v_admin::text, true);
+  perform resolve_profile_change(v_req, false);
+  assert (select phone from trainees where id = v_t) = '0551110000' and (select status from profile_change_requests where id = v_req) = 'rejected', 'الرفض يُبقي الملف';
+
+  -- طلب صادق: قبوله يطبّق الجوال الجديد، وتعديل الإدارة المباشر لا يمر بالحارس
+  perform set_config('app.uid', '', true);
+  perform register_subscription(jsonb_build_object('national_id','1999999995','full_name','عبدالله محمد علي الشهري','phone','0552220000','gender','ذكر','plan_id',(select id from plans where tier='silver' and mode='in_person'),'accepted_policies',acc));
+  select count(*) into n from profile_change_requests where trainee_id = v_t and status = 'pending';
+  assert n = 1, 'طلب جديد واحد';
+  perform set_config('app.uid', v_admin::text, true);
+  perform resolve_profile_change((select id from profile_change_requests where trainee_id = v_t and status = 'pending'), true);
+  assert (select phone from trainees where id = v_t) = '0552220000', 'القبول يطبّق التغيير';
+  update trainees set city = 'صبيا' where id = v_t;
+  assert (select city from trainees where id = v_t) = 'صبيا', 'تعديل الإدارة المباشر يمر';
+  perform set_config('app.uid', '', true);
+end $$;

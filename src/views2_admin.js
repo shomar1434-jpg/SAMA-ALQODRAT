@@ -1,6 +1,6 @@
 import { LOGO } from './assets/logo.js';
 import { CATEGORIES, catPill, computeEnd } from './catalog.js';
-import { STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, enrollsOf, isSessionDay, progCode, sessionDays, takenOf } from './data2.js';
+import { PROFILE_FIELDS, STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, enrollsOf, isSessionDay, progCode, sessionDays, takenOf } from './data2.js';
 import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules, setBusy } from './features.js';
 import { pagePartners } from './partners.js';
 import { exportCSV, pageReports, printDayModal, printSheets, traineesRows } from './print.js';
@@ -335,13 +335,30 @@ export function cohortOpened(p){
 
 /* ---------- المتدربون ---------- */
 export let trQ='', trP='all';
+/* طلبات تحديث البيانات (الخطوة A): فروق أدخلها شخص أعاد التسجيل بسجل مدني موجود، ولا تُطبَّق إلا بقرار الإدارة */
+function changeReqHtml(){
+  const R=(AD.profile_change_requests||[]).filter(r=>r.status==='pending'); if(!R.length) return '';
+  return `<div class="card pad rv pcr" style="margin-bottom:14px"><h3 class="ctitle">${ic('alert')}طلبات تحديث البيانات <span class="pill warn">${fmtNum(R.length)}</span></h3>
+    <p class="hint" style="margin:-4px 0 10px">أُرسلت عند إعادة التسجيل بسجل مدني موجود. لا يتغير ملف المتدرب ولا جواله (مفتاح دخوله للبوابة) إلا إذا قبلتَ الطلب بعد التحقق من صاحبه.</p>
+    <div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>التغيير المطلوب</th><th>التاريخ</th><th></th></tr></thead><tbody>
+    ${R.map(r=>{ const t=AD.trainees.find(x=>x.id===r.trainee_id); return `<tr><td><b style="font-weight:500">${esc(t?.full_name||'—')}</b><div class="hint" dir="ltr" style="text-align:right">${esc(t?.national_id||'')}</div></td>
+      <td>${Object.entries(r.changes).map(([f,v])=>`<div><span class="hint">${PROFILE_FIELDS[f]||f}:</span> <s>${esc(v.old)}</s> ← <b>${esc(v.new)}</b></div>`).join('')}</td>
+      <td class="num">${fmtShort(r.created_at.slice(0,10))}</td>
+      <td style="white-space:nowrap"><button class="btn sm pri" data-pcr="${r.id}" data-ok="1">${ic('check')} قبول</button> <button class="btn sm" data-pcr="${r.id}" data-ok="0">رفض</button></td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
+}
+function bindChangeReq(){
+  $$('[data-pcr]').forEach(b=>b.onclick=()=>{ const ok=b.dataset.ok==='1';
+    confirmBox(ok?'قبول تحديث البيانات':'رفض الطلب', ok?'سيُطبَّق التغيير على ملف المتدرب. إن كان فيه رقم جوال جديد فسيصبح هو مفتاح دخوله للبوابة. تأكد من هوية صاحب الطلب أولًا.':'يبقى ملف المتدرب كما هو.', async()=>{
+      await Store.resolveProfileChange(b.dataset.pcr, ok); await reloadAD(); toast(ok?'طُبّق التحديث':'رُفض الطلب'); pageTrainees(); }, ok?'قبول':'رفض'); });
+}
 export function pageTrainees(){
-  const m=$('#main'); const {programs,trainees,enrollments,attendance}=AD;
+  const m=$('#main'); queueMicrotask(bindChangeReq); const {programs,trainees,enrollments,attendance}=AD;
   const ensOf = t => enrollments.filter(e=>e.trainee_id===t.id);
   const list = trainees.filter(t=>(!trQ||t.full_name.includes(trQ)||t.national_id.includes(trQ)||t.phone.includes(trQ)||ensOf(t).some(e=>(e.ref||'').includes(trQ))) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
     .sort((a,b)=>(ensOf(b).map(e=>e.created_at).sort().pop()||'').localeCompare(ensOf(a).map(e=>e.created_at).sort().pop()||''));
   m.innerHTML = titleBar(`${ic('id')}المتدربون`, `سجل المتدربين، <em>${fmtNum(list.length)} متدرب</em>`, 'كل متدرب بسجله المدني مرة واحدة، مع كل الدفعات التي سجّل فيها ونسبة حضوره في كل منها.', `<button class="btn sm" id="csvx">${ic('database')} تصدير Excel</button><button class="btn sm" id="csv">${ic('copy')} نسخ كجدول</button>`)+
-   `<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">
+   `${changeReqHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">
      <select class="inp" id="tp" style="max-width:280px"><option value="all">كل البرامج</option>${allCats().map(c=>{ const ps=programs.filter(p=>p.category===c&&enrollments.some(e=>e.program_id===p.id)); return ps.length?`<optgroup label="${esc(c)}">${ps.map(p=>`<option value="${p.id}" ${trP===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select></div>
    ${list.length?`<div class="tbw rv" style="--i:2"><table class="tb"><thead><tr><th>المتدرب</th><th>السجل المدني</th><th>الجوال</th><th>المدينة</th><th>الدفعات</th><th></th></tr></thead><tbody>
    ${list.slice(0,400).map(t=>`<tr><td><div class="who"><span class="avatar ${t.gender==='أنثى'?'f':''}">${esc(t.full_name[0])}</span><div><b style="font-weight:500">${esc(t.full_name)}</b><div class="hint">${esc(t.education||'')}${t.employer?` · ${esc(t.employer)}`:''}</div></div></div></td>
