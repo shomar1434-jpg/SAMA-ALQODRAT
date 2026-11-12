@@ -15,7 +15,7 @@ const ctx = await S(() => { const { LocalStore, cohortArchived, progCode, takenO
 // شخص آخر يعرف السجل المدني يسجّل بجواله واسمه
 await go(ctx.code, 800); await p.waitForSelector('.tab[data-t=reg]', { timeout:10000 }); await p.click('.tab[data-t=reg]'); await p.waitForSelector('[name=full_name]');
 await p.fill('[name=full_name]', 'منتحل الشخصية الكامل'); await p.fill('[name=national_id]', ctx.nid); await p.fill('[name=phone]', '0559990000');
-await p.selectOption('[name=gender]', 'ذكر'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
+await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
 await p.click('#rfGo'); await p.waitForTimeout(800);
 const st = await S(n => { const D = window.__SAMA__.LocalStore.data, t = D.trainees.find(x => x.national_id === n);
   return { phone:t.phone, name:t.full_name, count:D.trainees.filter(x => x.national_id === n).length, total:D.trainees.length, req:(D.profile_change_requests || []).filter(r => r.trainee_id === t.id && r.status === 'pending') }; }, ctx.nid);

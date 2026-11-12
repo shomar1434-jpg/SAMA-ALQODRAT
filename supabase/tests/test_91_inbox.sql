@@ -4,7 +4,7 @@ do $$
 declare d date := riyadh_now()::date; st time := (riyadh_now() + interval '5 minutes')::time; n1 int; n2 int; r jsonb; ok boolean; v_admin uuid; v_t uuid;
 begin
   if st < '00:10' then return; end if;   -- تجنب منتصف الليل
-  perform register_subscription(jsonb_build_object('national_id','1999999996','full_name','ياسر علي محمد الفيفي','phone','0557771234','gender','ذكر',
+  perform register_subscription(jsonb_build_object('birth_date','1995-01-01','national_id','1999999996','full_name','ياسر علي محمد الفيفي','phone','0557771234','gender','ذكر',
     'plan_id',(select id from plans where tier='basic' and mode='in_person'),
     'accepted_policies',(select coalesce(jsonb_agg(id), '[]') from current_policies(d) where requires_acceptance)));
   select id into v_t from trainees where national_id = '1999999996';

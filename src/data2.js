@@ -6,6 +6,7 @@ import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
+import { checkBirthGuardian } from './identity_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
@@ -259,11 +260,12 @@ function acceptPolicies(D, f, trainee_id, context){
 }
 /* حماية الهوية (الخطوة A) — مطابق لـ trainees_register_guard في SQL:
    إعادة التسجيل بسجل مدني موجود لا تغيّر البيانات المعتمدة؛ تُكمَّل الحقول الفارغة فقط، وأي اختلاف يصبح طلب تحديث تراجعه الإدارة */
-export const PROFILE_FIELDS = { full_name:'الاسم', phone:'الجوال', email:'البريد', gender:'الجنس', birth_date:'تاريخ الميلاد', city:'المدينة', education:'المؤهل', employer:'جهة العمل' };
+export const PROFILE_FIELDS = { full_name:'الاسم', phone:'الجوال', email:'البريد', gender:'الجنس', birth_date:'تاريخ الميلاد', city:'المدينة', education:'المؤهل', employer:'جهة العمل', guardian_phone:'جوال ولي الأمر' };
 export function mergeOnRegister(D, t, person, source='registration'){
   const ch={}, norm=v=>String(v??'').trim();
   for(const f of Object.keys(PROFILE_FIELDS)){
     const o=norm(t[f]), n=norm(person[f]);
+    if(f==='guardian_phone'){ if(n && n!==o) ch[f]={old:o, new:n}; continue; }   // لا يُكمَّل تلقائيًا: يفتح بوابة ولي الأمر
     if(!o){ if(n) t[f]=person[f]; continue; }
     if(n && n!==o) ch[f]={old:o, new:n};
   }
@@ -306,7 +308,7 @@ export const LocalStore = {
     checkAcceptance(D.policies, today, f.accepted_policies);
     let t = D.trainees.find(x=>x.national_id===f.national_id);
     for(const {p,c} of targets){ if(t && D.enrollments.some(e=>e.cohort_id===c.id && e.trainee_id===t.id && e.status!=='ملغى')) throw new Error(`هذا السجل المدني مسجّل مسبقًا في الدفعة ${c.number} من «${p.name}»`); }
-    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||''};
+    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date)};
     if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
     acceptPolicies(D, f, t.id, 'registration');
     const ref = newRef();
@@ -373,7 +375,7 @@ export const LocalStore = {
     const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا'); checkAcceptance(D.policies, riyadhNow().date, f.accepted_policies);
     let t=D.trainees.find(x=>x.national_id===f.national_id);
     if(t && D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`هذا السجل المدني مشترك مسبقًا في ${planName(plan)}`);
-    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||''};
+    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date)};
     if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
     acceptPolicies(D, f, t.id, 'subscription');
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:'pending', start_date:null, end_date:null, created_at:new Date().toISOString()};

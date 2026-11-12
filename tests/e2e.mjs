@@ -21,7 +21,7 @@ const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 const fillReg = async () => {
   await go(openCode, 800); await p.waitForSelector('.tab[data-t=reg]', { timeout:10000 }); await p.click('.tab[data-t=reg]'); await p.waitForSelector('[name=full_name]', { timeout:10000 });
   await p.fill('[name=full_name]', 'يحيى محمد علي الحكمي'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0551234567');
-  await p.selectOption('[name=gender]', 'ذكر'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 });
+  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 });
   await p.check('[name=agree]'); if (await p.$('#rf-pol')) await p.check('#rf-pol'); await p.click('#rfGo'); await p.waitForTimeout(700);
 };
 await fillReg(); ok(await p.$('.refbox'), 'تسجيل متدرب جديد في دفعة مفتوحة');

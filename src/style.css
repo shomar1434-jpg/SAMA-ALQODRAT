@@ -1029,3 +1029,12 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .bank-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
 .imp-steps{margin:0 0 10px;padding-inline-start:20px;line-height:1.9}.imp-err{margin:6px 0 0;padding-inline-start:18px;font-size:13.5px}
 .hw-quiz{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+
+/* ---------- نموذج التسجيل الموحّد ---------- */
+.en-kind{border:0;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.en-kind legend{font-weight:500;font-size:13.5px;margin-bottom:6px;padding:0}.en-kind legend i{color:var(--danger-ink);font-style:normal}
+.en-opt{position:relative;cursor:pointer}.en-opt input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.en-opt span{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;padding:12px 14px;min-height:56px;border:1.5px solid var(--border);border-radius:16px;background:var(--surface-card)}
+.en-opt span .ic{grid-row:span 2;width:24px;height:24px;color:var(--primary)}.en-opt small{color:var(--text-muted);font-size:13px}
+.en-opt input:checked+span{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--surface-card))}
+.en-opt input:focus-visible+span{outline:2px solid var(--primary);outline-offset:2px}
