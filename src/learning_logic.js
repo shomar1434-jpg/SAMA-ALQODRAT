@@ -1,6 +1,6 @@
 /* =====================================================================
    الجانب التعليمي (الخطوات 10–12): الواجبات، وبنوك الأسئلة واختبار قياس المستوى،
-   وتقييم المعلم بالنجوم، والمراسلة بين الطالب ومعلم المقرر.
+   وتقييم المدرب بالنجوم، والمراسلة بين المتدرب ومدرب المقرر.
    النطاق دائمًا: القسم (بنون/بنات) × المقرر، ويُتحقق منه هنا وفي SQL.
    ===================================================================== */
 import { riyadhNow, uid } from './utils.js';
@@ -12,7 +12,7 @@ export const RATE_ITEMS = { clarity:'وضوح الشرح', interaction:'التف
 export const MIN_ATTEND_TO_RATE = 3;            // شرط المشاركة قبل التقييم (قابل للتعديل)
 export const period = (n = riyadhNow()) => n.date.slice(0, 7);   // فترة التقييم: الشهر
 
-/* اشتراكات الطالب القائمة ونطاقها */
+/* اشتراكات المتدرب القائمة ونطاقها */
 export const liveSubsOf = (D, trainee_id) => (D.subscriptions || []).filter(s => s.trainee_id === trainee_id && ['pending', 'active'].includes(subStatus(s)));
 export const inScope = (sub, section, subject) => sub.section === section && (sub.subjects || []).includes(subject);
 export const teacherCovers = (t, section, subject) => t && t.active !== false && t.section === section && (t.subjects || []).includes(subject);
@@ -44,7 +44,7 @@ export function validateQuestion(q){
   if(!Array.isArray(q.options) || q.options.filter(x => String(x || '').trim()).length !== 4) throw new Error('اكتب الخيارات الأربعة');
   if(!(q.correct >= 0 && q.correct < 4)) throw new Error('حدد الإجابة الصحيحة');
 }
-/* يبني محاولة من أسئلة منشورة في نطاق الطالب، ويحفظ نسخة الأسئلة كما هي وقت المحاولة */
+/* يبني محاولة من أسئلة منشورة في نطاق المتدرب، ويحفظ نسخة الأسئلة كما هي وقت المحاولة */
 export function buildAttempt(D, trainee_id, section, subject, unit, count){
   const pool = bankFor(D, section, subject, unit).slice();
   if(!pool.length) throw new Error('لا توجد أسئلة منشورة في هذه الوحدة بعد');
@@ -53,7 +53,7 @@ export function buildAttempt(D, trainee_id, section, subject, unit, count){
   return { id:uid(), trainee_id, section, subject, unit:unit || null, started_at:new Date().toISOString(), submitted_at:null, minutes:Math.max(5, qs.length * 2),
     snapshot: qs.map(q => ({ id:q.id, text:q.text, options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1 })), answers:{}, score:null, total:qs.length };
 }
-/* ما يُرسل للطالب قبل الإنهاء: بلا الإجابات الصحيحة ولا التفسير */
+/* ما يُرسل للمتدرب قبل الإنهاء: بلا الإجابات الصحيحة ولا التفسير */
 export const attemptPublic = at => at.submitted_at ? at : { ...at, snapshot: at.snapshot.map(({ correct, explanation, ...q }) => q) };
 export function gradeAttempt(at, answers){
   const ans = {}; at.snapshot.forEach(q => { const v = answers?.[q.id]; ans[q.id] = Number.isInteger(+v) && +v >= 0 && +v < 4 ? +v : null; });
@@ -62,14 +62,14 @@ export function gradeAttempt(at, answers){
   return { ...at, answers:ans, score, submitted_at:new Date().toISOString(), skills };
 }
 
-/* ---------- تقييم المعلم ---------- */
+/* ---------- تقييم المدرب ---------- */
 export function canRate(D, trainee_id, teacher){
-  if(!teacherTeaches(D, teacher, trainee_id)) return { ok:false, why:'المعلم لا يدرّسك في اشتراك قائم' };
+  if(!teacherTeaches(D, teacher, trainee_id)) return { ok:false, why:'المدرب لا يدرّسك في اشتراك قائم' };
   const days = new Set((D.sub_attendance || []).filter(a => a.trainee_id === trainee_id).map(a => a.att_date)).size;
   if(days < MIN_ATTEND_TO_RATE) return { ok:false, why:`يُتاح التقييم بعد حضور ${MIN_ATTEND_TO_RATE} أيام على الأقل` };
   return { ok:true };
 }
-/* للمعلم: نتائج مجمّعة دون هوية المقيّمين */
+/* للمدرب: نتائج مجمّعة دون هوية المقيّمين */
 export function ratingSummary(D, teacher_id){
   const rs = (D.ratings || []).filter(r => r.teacher_id === teacher_id);
   const avg = k => rs.length ? Math.round(rs.reduce((s, r) => s + (k ? r.items?.[k] || 0 : r.stars), 0) / rs.length * 10) / 10 : null;

@@ -422,11 +422,11 @@ a.choice:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
 .star{position:absolute;width:110px;height:110px;top:-56px;inset-inline-end:-10px;animation:twinkle 5s ease-in-out infinite;z-index:-1}
 @keyframes twinkle{0%,100%{transform:scale(.9) rotate(0);opacity:.85}50%{transform:scale(1.08) rotate(20deg);opacity:1}}
 .cover-text h1{display:flex;flex-direction:column;gap:6px;margin:0}
-.cover-text .t1{font-size:clamp(46px,7.2vw,104px);line-height:1.15;font-weight:700;color:var(--pt-ink);letter-spacing:-.5px}
+.cover-text .t1{font-size:clamp(32px,4.6vw,66px);line-height:1.2;text-wrap:balance;font-weight:700;color:var(--pt-ink);letter-spacing:-.5px}
 .cover-text .rule{display:block;height:5px;width:min(520px,90%);border-radius:5px;background:var(--surface-track);position:relative;overflow:hidden}
 .cover-text .rule:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--po2),var(--po1),transparent);transform:translateX(100%);animation:sweep 3.6s 1s ease-in-out infinite}
 @keyframes sweep{0%{transform:translateX(100%)}60%,100%{transform:translateX(-100%)}}
-.cover-text .t2{font-size:clamp(34px,5vw,72px);line-height:1.2;font-weight:600;color:var(--pg)}
+.cover-text .t2{font-size:clamp(24px,3vw,44px);line-height:1.3;font-weight:600;color:var(--pg)}
 .cover-text p{font-size:17px;line-height:1.9;color:var(--ink-muted);max-width:56ch;margin:18px 0 0}
 .cover-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
 .btn.ghost-t{border-color:var(--pt2);color:var(--pt-ink)}
@@ -980,3 +980,12 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .gauge-axes li[data-zone=yellow] .ga-bar i{background:var(--gauge-y)}
 .gauge-axes li[data-zone=green] .ga-bar i{background:var(--success)}
 .gauge-dial .gauge-lbl{flex:none;align-self:center;height:auto;min-height:0;border-radius:999px;padding:5px 14px;line-height:1.5}
+/* نسبة الإنجاز ومرآة المدرب */
+.ach-card{margin-top:16px}
+.ach-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.ach-head .ind-h{margin:0}
+.ach-big{font-size:32px;font-weight:700;color:var(--pt)}
+.pill.ach{font-weight:600;min-width:52px;justify-content:center}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:500;color:var(--pt-ink,var(--pt));text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:start}
+.linkbtn:focus-visible{outline:2px solid var(--pt);outline-offset:2px;border-radius:4px}
+.modal:has(.mirror){width:min(980px,96vw);max-height:92vh;overflow:auto}

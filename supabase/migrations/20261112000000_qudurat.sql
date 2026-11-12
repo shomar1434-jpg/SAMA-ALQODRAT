@@ -62,7 +62,7 @@ create table if not exists subscriptions (
   created_at timestamptz not null default now(),
   check (end_date is null or start_date is not null)
 );
--- اشتراك قائم واحد للطالب في الباقة نفسها
+-- اشتراك قائم واحد للمتدرب في الباقة نفسها
 create unique index if not exists subscriptions_one_live on subscriptions(trainee_id, plan_id) where status in ('pending','active');
 create table if not exists sub_attendance (
   id uuid primary key default gen_random_uuid(),

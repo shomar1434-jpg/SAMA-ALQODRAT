@@ -67,7 +67,7 @@ export async function viewHome(){
           <div class="cover-art" data-reveal style="--i:2">${BULB_SVG}<i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i></div>
           <div class="cover-text">
             ${STAR_SVG('s1')}
-            <h1 data-reveal style="--i:1"><span class="t1">البرامج التدريبية</span><span class="rule"></span><span class="t2">لمركز سما القدرات</span></h1>
+            <h1 data-reveal style="--i:1"><span class="t1">منصة مركز سما القدرات للتدريب</span><span class="rule"></span><span class="t2">أهلًا بكم في المنصة الرقمية</span></h1>
             <p data-reveal style="--i:3">${fmtNum(P.length)} برنامجًا تدريبيًا معتمدًا في ${fmtNum(cats.length)} مجالات، بإشراف ${CENTER.accreditor}. سجّل في الدفعة المفتوحة، وتابع حضورك بباركود برنامجك.</p>
             <div class="cover-cta" data-reveal style="--i:4"><a class="btn pri lg" href="#register">${ic('book')} استعرض البرامج وسجّل</a><a class="btn lg ghost-t" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
           </div>

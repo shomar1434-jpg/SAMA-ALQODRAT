@@ -1,12 +1,12 @@
 /* =====================================================================
-   منطق البوابات (طالب، معلم، ولي أمر): دوال خالصة على كائن البيانات D.
+   منطق البوابات (متدرب، مدرب، ولي أمر): دوال خالصة على كائن البيانات D.
    في الوضع السحابي تقابلها دوال SQL بالأسماء نفسها تقريبًا (…_dashboard).
    مصدر بيانات واحد: كل البوابات تقرأ sub_attendance و subStats نفسها.
    ===================================================================== */
 import { riyadhNow, toMin, addDays, uid, fmtNum } from './utils.js';
 import { subStats, subStatus, sessionOn, sessionsBetween, planName, SECTIONS } from './qudurat.js';
 
-export const ROLE_TXT = { owner:'مالك النظام', admin:'مدير', registrar:'مسجّل', teacher:'معلم', student:'طالب', guardian:'ولي أمر' };
+export const ROLE_TXT = { owner:'مالك النظام', admin:'مدير', registrar:'مسجّل', teacher:'مدرب', student:'متدرب', guardian:'ولي أمر' };
 export const normPhone = p => { const d = String(p || '').replace(/\D/g, ''); return d.startsWith('966') ? '0' + d.slice(3) : d.startsWith('5') && d.length === 9 ? '0' + d : d; };
 
 /* الأدوار المرتبطة برقم الجوال (الوضع التجريبي). في السحابة: user_roles + روابط موثّقة */
@@ -32,7 +32,22 @@ export function homeworkIndicator(D, trainee, sub, n = riyadhNow()){
     success: due.length ? Math.round(quality.reduce((t, q) => t + q, 0) / due.length * 100) : null };
 }
 
-/* لوحة الطالب: لكل اشتراك ثلاث بطاقات مستقلة (حضور، واجبات، مؤقت زمني) + التقويم + سجل الأيام */
+/* نسبة الإنجاز (تظهر للمتدرب ولولي أمره وللمدرب بالحساب نفسه — مرآة واحدة):
+   الحضور = أيام الحضور ÷ كل جلسات الباقة المقررة × 100، والواجبات = ما حُلّ ÷ ما أُرسل × 100، والإنجاز = متوسطهما.
+   «أُرسل» = واجب منشور حتى اليوم في قسم المتدرب ومقرراته (ومنذ بداية اشتراكه)، و«حُلّ» = مسلَّم أو مصحَّح. */
+export function achievementOf(D, trainee, sub, st, n = riyadhNow()){
+  const sent = (D.assignments || []).filter(a => a.section === sub.section && (!a.subject || (sub.subjects || []).includes(a.subject)) && a.publish_date <= n.date && (!sub.start_date || a.due_date >= sub.start_date));
+  const solved = sent.filter(a => (D.submissions || []).some(x => x.trainee_id === trainee.id && x.assignment_id === a.id && ['submitted', 'graded'].includes(x.status)));
+  const att = st.total ? Math.round(Math.min(1, st.attended / st.total) * 100) : null;
+  const hw = sent.length ? Math.round(solved.length / sent.length * 100) : null;
+  const parts = [att, hw].filter(v => v != null);
+  return { attendance:att, attended:st.attended, total:st.total, homework:hw, solved:solved.length, sent:sent.length,
+    overall: parts.length ? Math.round(parts.reduce((t, v) => t + v, 0) / parts.length) : null };
+}
+/* بيانات المرآة للمدرب: واجبات كل مقررات المتدرب وحالات تسليمها (لا واجبات المدرب وحده) */
+export const mirrorData = D => (D.hw_assignments ? { ...D, assignments:D.hw_assignments, submissions:D.hw_submissions || [] } : D);
+
+/* لوحة المتدرب: لكل اشتراك ثلاث بطاقات مستقلة (حضور، واجبات، مؤقت زمني) + التقويم + سجل الأيام */
 export function studentDashboard(D, trainee, n = riyadhNow()){
   const subs = (D.subscriptions || []).filter(s => s.trainee_id === trainee.id && s.status !== 'cancelled');
   return { trainee:{ id:trainee.id, full_name:trainee.full_name, first_name:trainee.full_name.split(' ')[0], gender:trainee.gender },
@@ -45,6 +60,7 @@ export function studentDashboard(D, trainee, n = riyadhNow()){
       return { id:s.id, ref:s.ref, plan:planName(plan), tier:plan?.tier, section:SECTIONS[s.section], subjects:s.subjects || [], status:st.status, start_date:s.start_date, end_date:st.end || null,
         attendance:{ rate:st.rate, attended:st.attended, late:st.late, absent:st.absent, held:st.held, total:st.total, remaining:st.remaining },
         homework: homeworkIndicator(D, trainee, s, n),
+        achievement: achievementOf(D, trainee, s, st, n),
         time:{ pct: s.start_date ? st.timePct : null, daysLeft:st.daysLeft,
           reach: s.start_date && st.total ? Math.round(Math.min(1, (st.score + st.remaining) / st.total) * 100) : null },
         upcoming, log, teachers, last: st.lastAtt, threshold: D.settings?.cert_threshold ?? 75 };
@@ -52,15 +68,16 @@ export function studentDashboard(D, trainee, n = riyadhNow()){
     notifications: (D.notifications || []).filter(x => x.trainee_id === trainee.id && x.to === 'student').slice(-20).reverse() };
 }
 
-/* لوحة المعلم: طلاب قسمه ومقرراته فقط، وكشف اليوم، وتنبيه ما قبل النهاية */
+/* لوحة المدرب: متدربي قسمه ومقرراته فقط، وكشف اليوم، وتنبيه ما قبل النهاية */
 export function teacherDashboard(D, teacher, n = riyadhNow()){
   const remind = D.settings?.remind_minutes ?? 30;
   const subs = (D.subscriptions || []).filter(s => s.section === teacher.section && ['pending', 'active'].includes(subStatus(s, n.date)) && (s.subjects || []).some(x => (teacher.subjects || []).includes(x)));
   const ses = sessionOn(D, teacher.section, n.date);
   const phase = !ses ? 'none' : toMin(n.hm) < toMin(ses.start) ? 'before' : toMin(n.hm) <= toMin(ses.end) ? 'live' : 'after';
+  const M = mirrorData(D);
   const rows = subs.map(s => { const t = D.trainees.find(x => x.id === s.trainee_id), st = subStats(D, s, n), a = st.att.find(x => x.att_date === n.date);
     return { sub_id:s.id, trainee_id:t.id, name:t.full_name, plan:planName(st.plan), today: a ? a.status : phase === 'none' ? 'لا جلسة' : phase === 'after' ? 'غائب' : 'لم يسجل بعد', time:a?.time?.slice(0, 5) || null,
-      rate:st.rate, attended:st.attended, absent:st.absent, consec:st.consec, started:!!s.start_date, has_guardian:(D.guardian_links || []).some(l => l.status === 'verified' && l.trainee_id === t.id) };
+      rate:st.rate, attended:st.attended, absent:st.absent, consec:st.consec, started:!!s.start_date, achievement:achievementOf(M, t, s, st, n), has_guardian:(D.guardian_links || []).some(l => l.status === 'verified' && l.trainee_id === t.id) };
   }).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   const missing = rows.filter(r => r.today === 'لم يسجل بعد');
   const reminder = phase === 'live' && toMin(n.hm) >= toMin(ses.end) - remind && missing.length > 0;
@@ -76,11 +93,11 @@ export function guardianDashboard(D, phone, n = riyadhNow()){
     return { link_id:l.id, relation:l.relation, ...dash, notifications:(D.notifications || []).filter(x => x.trainee_id === t.id && x.to === 'guardian').slice(-20).reverse() }; }).filter(Boolean) };
 }
 
-/* قوالب رسائل المعلم إلى ولي الأمر (يختار المعلم القالب ويضيف ملاحظته) */
+/* قوالب رسائل المدرب إلى ولي الأمر (يختار المدرب القالب ويضيف ملاحظته) */
 export const NOTIFY_TPL = {
   absence:'نفيدكم بغياب {الاسم} عن جلسة اليوم ({التاريخ}). نأمل الحرص على الحضور.',
   late:'نفيدكم بتأخر {الاسم} عن جلسة اليوم ({التاريخ}).',
-  reminder:'تذكير: جلسة اليوم مستمرة حتى {النهاية}، ولم يُسجَّل حضورك بعد. إن كنت حاضرًا فامسح باركود الحضور، وإن تعذّر حضورك فأبلغ المعلم بعذرك.',
+  reminder:'تذكير: جلسة اليوم مستمرة حتى {النهاية}، ولم يُسجَّل حضورك بعد. إن كنت حاضرًا فامسح باركود الحضور، وإن تعذّر حضورك فأبلغ المدرب بعذرك.',
   homework:'نفيدكم بأن لدى {الاسم} واجبًا لم يُسلَّم بعد.',
   general:'',
 };

@@ -1,4 +1,4 @@
-// مركز السياسات: مسودة ← نشر بإصدار، وثبات المنشور، والإصدارات القادمة، وإلزام القبول في التسجيل وتوثيقه.
+// مركز السياسات: مسودة ← نشر بإصدار، وثبات المنشور، والإصدارات القادمة. السياسات للاطلاع ولا تُلزم عند التسجيل.
 import { chromium } from 'playwright';
 import { serveDist, reporter } from './_server.mjs';
 
@@ -44,26 +44,17 @@ await go('policy-privacy'); ok(await p.$('.pol-body h3') && /سجل الإصدا
 ok(!(await p.$('.pol-body script')), 'النص يُعرض آمنًا');
 await go('policy-privacy~2'); ok(/إصدار قادم/.test(await text('.pol-doc')) && /سنتين/.test(await text('.pol-body')), 'الإصدار القادم موسوم');
 
-// ---------- القبول في التسجيل ----------
+// ---------- التسجيل: السياسات للاطلاع لا للإلزام ----------
 const silver = await S(() => window.__SAMA__.LocalStore.data.plans.find(x => x.tier === 'silver' && x.mode === 'in_person').id);
 const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
-const fill = async () => {
-  await go('plan-' + silver);
-  await p.fill('[name=full_name]', 'ماجد سعيد علي القحطاني'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0554443322');
-  await p.selectOption('[name=gender]', 'ذكر'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
-};
-await fill();
-ok(await p.$('#rf-pol') && /النزاهة[\s\S]*الخصوصية[\s\S]*الحضور/.test(await text('#rfPol')), 'خانة قبول السياسات الثلاث في النموذج');
-await p.click('#rfGo'); await p.waitForTimeout(600);
-ok(!(await p.$('.refbox')) && /وافق/.test(await text('#rfSum')), 'رفض التسجيل دون القبول');
-threw = await S(n => window.__SAMA__.LocalStore.registerSubscription({ national_id:n, full_name:'أ ب ج', gender:'ذكر', plan_id:window.__SAMA__.LocalStore.data.plans[0].id }).then(() => false, e => /يلزم قبول/.test(e.message)), nid);
-ok(threw, 'المخزن يرفض دون القبول حتى لو تُجووزت الواجهة');
-await p.check('#rf-pol'); await p.click('#rfGo'); await p.waitForTimeout(800);
-ok(await p.$('.refbox'), 'التسجيل بعد القبول');
-const acc = await S(n => { const D = window.__SAMA__.LocalStore.data, t = D.trainees.find(x => x.national_id === n); return D.policy_acceptances.filter(a => a.trainee_id === t.id); }, nid);
-ok(acc.length === 3 && acc.some(a => a.policy_id === v1.id) && acc.every(a => a.context === 'subscription'), 'توثيق قبول الإصدارات السارية');
-await p.goto(U + 'admin/#admin-policies'); await p.waitForTimeout(900);
-ok(/^1$|^١$/.test((await text('tr[data-slug="privacy"] td.num'))), 'عدد القبولات في الإدارة');
+await go('plan-' + silver);
+await p.fill('[name=full_name]', 'ماجد سعيد علي القحطاني'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0554443322');
+await p.selectOption('[name=gender]', 'ذكر'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
+ok(!(await p.$('#rf-pol')) && await p.$('#rfPol .pol-note a[href="#policies"]'), 'رابط السياسات للاطلاع دون خانة إلزام');
+ok(!/يلزم قبولها/.test(await p.innerText('body')), 'لا عبارة «يلزم قبولها»');
+await p.click('#rfGo'); await p.waitForTimeout(800);
+ok(await p.$('.refbox'), 'التسجيل دون موافقة على السياسات');
+await go('policies'); ok(!/يلزم قبولها/.test(await text('#app')), 'صفحة السياسات بلا إلزام');
 
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close(); process.exit(failed() ? 1 : 0);

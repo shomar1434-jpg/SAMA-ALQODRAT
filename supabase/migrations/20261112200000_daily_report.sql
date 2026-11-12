@@ -56,7 +56,7 @@ begin
         'text', case result when 'already' then 'مسح مكرر في اليوم نفسه (لم يُحتسب مرتين)' when 'not_in_cohort' then 'محاولات تحضير مرفوضة: رقم غير مسجّل' when 'no_session' then 'محاولات تحضير مرفوضة: خارج وقت الجلسة'
                      when 'bad_code' then 'محاولات تحضير مرفوضة: رمز يوم خاطئ' else 'محاولات تحضير مرفوضة: ' || result end, 'count', cnt))
         from (select result, count(*) cnt from checkin_attempts where date = p_date and result <> 'ok' group by result) q), '[]')
-      || coalesce((select jsonb_agg(jsonb_build_object('type','device','text','تحضير أكثر من طالب من جهاز واحد','count',k))
+      || coalesce((select jsonb_agg(jsonb_build_object('type','device','text','تحضير أكثر من متدرب من جهاز واحد','count',k))
         from (select count(distinct trainee_hint) k from checkin_attempts where date = p_date and result in ('ok','already') and device <> '' and trainee_hint is not null group by device having count(distinct trainee_hint) > 1) q), '[]'),
     'teachers', coalesce((select jsonb_agg(jsonb_build_object('teacher', te.full_name, 'reminders', q.r, 'guardians', q.g))
         from (select sender, count(*) filter (where "to" = 'student') r, count(*) filter (where "to" = 'guardian') g from notifications where date = p_date and sender like 'teacher:%' group by sender) q

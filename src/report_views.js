@@ -33,7 +33,7 @@ export function pageDaily(){
   if($('#drGen')) $('#drGen').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ التوليد'); const r = await Store.generateReport(n.date, 'snapshot'); await reloadAD(); sel = r.report.id; toast('حُفظت لقطة اليوم'); pageDaily(); };
   if($('#drRev')) $('#drRev').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ الإصدار'); const r = await Store.generateReport(n.date, 'revision'); await reloadAD(); sel = r.report.id; toast(`صدرت المراجعة ${fmtNum(r.report.version - 1)}`); pageDaily(); };
   if($('#drPrint')) $('#drPrint').onclick = () => printDocs([reportDoc(cur)], 'تقرير اليوم');
-  if($('#drCsv')) $('#drCsv').onclick = () => exportCSV(`تقرير-اليوم-${cur.date}`, [['المجموعة', 'الطالب', 'الحالة', 'وقت الحضور'], ...cur.data.groups.flatMap(g => g.rows.map(r => [g.label, r.name, r.status, r.time || '']))]);
+  if($('#drCsv')) $('#drCsv').onclick = () => exportCSV(`تقرير-اليوم-${cur.date}`, [['المجموعة', 'المتدرب', 'الحالة', 'وقت الحضور'], ...cur.data.groups.flatMap(g => g.rows.map(r => [g.label, r.name, r.status, r.time || '']))]);
   if($('#drNoteS')) $('#drNoteS').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ الحفظ'); await Store.setReportNote(cur.id, $('#drNote').value); await reloadAD(); toast('حُفظت الملاحظة'); pageDaily(); };
 }
 
@@ -46,21 +46,21 @@ function reportHtml(r, n){
         <button class="btn sm" id="drPrint">${ic('form')} طباعة</button><button class="btn sm" id="drCsv">${ic('copy')} Excel</button></div></div>
     ${r.changes?.length ? `<div class="alert t-gold" style="margin-top:10px"><span class="aic">${ic('refresh')}</span><div><b style="font-weight:600">تغيّر عن الإصدار السابق</b><p style="margin:4px 0 0">${r.changes.map(esc).join(' · ')}</p></div></div>` : ''}
     <div class="kpis" style="grid-template-columns:repeat(5,1fr);margin-top:12px">
-      ${kpiCard(0, 'calendar', 'info', 'الجلسات', s.sessions_scheduled, '', `${fmtNum(s.expected)} طالب متوقع`)}
+      ${kpiCard(0, 'calendar', 'info', 'الجلسات', s.sessions_scheduled, '', `${fmtNum(s.expected)} متدرب متوقع`)}
       ${kpiCard(1, 'check', 'success', 'الحاضرون', s.present, '', '')}${kpiCard(2, 'timer', 'gold', 'المتأخرون', s.late, '', '')}
       ${kpiCard(3, 'x', 'danger', 'الغائبون', s.absent, '', '')}${kpiCard(4, 'clock', 'early', 'لم يسجلوا بعد', s.pending, '', r.data.closed ? '' : 'اليوم لم ينتهِ')}</div>
     <p class="hint" style="margin:8px 0 0">${esc(r.data.completeness)}. «لم يسجل بعد» أثناء الجلسة لا يُعد غيابًا حتى تنتهي.</p>
   </div>
   ${r.data.groups.length ? r.data.groups.map((g, i) => `<details class="card pad rv dr-group" style="--i:${i}" ${i < 2 ? 'open' : ''}><summary><b>${esc(g.label)}</b> <span class="hint">${g.session ? `${t12(g.session.start)} – ${t12(g.session.end)}` : ''} · ${fmtNum(g.rows.filter(x => ['حاضر', 'متأخر'].includes(x.status)).length)} من ${fmtNum(g.rows.length)}</span></summary>
-      <div class="tblwrap" style="margin-top:8px"><table class="tb"><thead><tr><th>الطالب</th>${g.rows[0]?.plan !== undefined ? '<th>الباقة</th>' : ''}<th>الحالة</th><th>وقت أول حضور</th></tr></thead><tbody>
+      <div class="tblwrap" style="margin-top:8px"><table class="tb"><thead><tr><th>المتدرب</th>${g.rows[0]?.plan !== undefined ? '<th>الباقة</th>' : ''}<th>الحالة</th><th>وقت أول حضور</th></tr></thead><tbody>
       ${g.rows.map(x => `<tr><td>${esc(x.name)}</td>${x.plan !== undefined ? `<td>${esc(x.plan)}</td>` : ''}<td><span class="pill dot ${x.status === 'لم يسجل بعد' ? 'g' : statusPill(x.status)}">${x.status}</span>${x.manual ? ' <span class="hint">تصحيح إداري</span>' : ''}</td><td class="num">${x.time ? t12(x.time) : '—'}</td></tr>`).join('')}</tbody></table></div></details>`).join('')
     : `<div class="card pad rv">${emptyBox('لا توجد جلسات في هذا اليوم')}</div>`}
   <div class="grid g2" style="align-items:start">
     <div class="card pad rv"><h3 class="ctitle">${ic('alert')}الحوادث التشغيلية المسجّلة</h3>
       ${r.data.incidents.length ? `<ul class="ses-list">${r.data.incidents.map(x => `<li><span class="pill ${x.type === 'device' ? 'bad' : x.type === 'manual' ? 'o' : 'warn'}">${fmtNum(x.count)}</span><span>${esc(x.text)}</span></li>`).join('')}</ul>` : '<p class="hint">لم تُسجَّل حوادث.</p>'}
       <p class="hint" style="margin:8px 0 0">تُعرض الحوادث المسجّلة فعلًا فقط.</p></div>
-    <div class="card pad rv"><h3 class="ctitle">${ic('users')}متابعات المعلمين</h3>
-      ${r.data.teachers.length ? `<ul class="ses-list">${r.data.teachers.map(x => `<li><b>${esc(x.teacher)}</b><span>${fmtNum(x.reminders)} تذكير للطلاب</span><span>${fmtNum(x.guardians)} إشعار لأولياء الأمور</span></li>`).join('')}</ul>` : '<p class="hint">لا توجد متابعات اليوم.</p>'}
+    <div class="card pad rv"><h3 class="ctitle">${ic('users')}متابعات المدربين</h3>
+      ${r.data.teachers.length ? `<ul class="ses-list">${r.data.teachers.map(x => `<li><b>${esc(x.teacher)}</b><span>${fmtNum(x.reminders)} تذكير للمتدربين</span><span>${fmtNum(x.guardians)} إشعار لأولياء الأمور</span></li>`).join('')}</ul>` : '<p class="hint">لا توجد متابعات اليوم.</p>'}
       ${r.data.homework.length ? `<h3 class="ctitle" style="margin-top:12px">${ic('form')}واجبات استحقت اليوم</h3><ul class="ses-list">${r.data.homework.map(h => `<li><b>${esc(h.title)}</b><span>${esc(h.section)}</span><span>${fmtNum(h.submitted)} تسليم</span></li>`).join('')}</ul>` : ''}</div></div>
   ${live ? '' : `<div class="card pad rv"><h3 class="ctitle">${ic('edit')}ملاحظات الإدارة والإجراءات المفتوحة</h3>
     <textarea class="inp" id="drNote" rows="3" maxlength="1000" style="padding:10px 14px;line-height:1.8">${esc(r.note || '')}</textarea>
@@ -70,7 +70,7 @@ function reportHtml(r, n){
 function reportDoc(r){
   const s = r.data.summary;
   const body = r.data.groups.map(g => `<h3 class="psec">${esc(g.label)}${g.session ? ` · ${t12(g.session.start)} – ${t12(g.session.end)}` : ''}</h3>
-    <table class="ptab"><thead><tr><th style="width:30px">م</th><th>الطالب</th><th style="width:110px">الحالة</th><th style="width:90px">الوقت</th></tr></thead>
+    <table class="ptab"><thead><tr><th style="width:30px">م</th><th>المتدرب</th><th style="width:110px">الحالة</th><th style="width:90px">الوقت</th></tr></thead>
     <tbody>${g.rows.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td>${x.status}${x.manual ? ' (تصحيح)' : ''}</td><td>${x.time ? t12(x.time) : '—'}</td></tr>`).join('')}</tbody></table>`).join('')
     + (r.data.incidents.length ? `<h3 class="psec">الحوادث التشغيلية</h3><ul>${r.data.incidents.map(x => `<li>${esc(x.text)}: ${x.count}</li>`).join('')}</ul>` : '')
     + (r.note ? `<h3 class="psec">ملاحظات الإدارة</h3><p>${esc(r.note)}</p>` : '');
