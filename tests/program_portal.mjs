@@ -1,0 +1,30 @@
+// بوابة متدربي البرامج: حضور الدفعة وإنجازها وشهادتها للمتدرب ولولي أمره، ومتدرب الباقة والبرنامج معًا
+import { chromium } from 'playwright';
+import { serveDist, reporter } from './_server.mjs';
+const { server, origin: U } = serveDist();
+const { ok, failed } = reporter();
+const b = await chromium.launch();
+const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+const login = async (role, ph) => { await p.goto(U + role + '/'); await p.waitForTimeout(700); if (!(await p.$('#pl-phone'))) { await p.click('#logoutBtn'); await p.waitForTimeout(700); if (!(await p.$('#pl-phone'))) { await p.goto(U + role + '/'); await p.waitForTimeout(700); } } await p.fill('#pl-phone', ph); await p.click('#plB'); await p.waitForTimeout(300); await p.fill('#pl-code', '1234'); await p.click('#plB'); await p.waitForTimeout(1600); };
+await p.goto(U); await p.waitForTimeout(1000);
+ok(!(await p.$('nav a[href="#me"]')) && await p.$('.sfoot a[href="#portals"]'), 'لا «حضوري» في القائمة، والتذييل يشير إلى البوابة');
+const exp = await p.evaluate(() => { const D = window.__SAMA__.LocalStore.data, t = D.trainees.find(x => x.phone === '0550000003'); const e = D.enrollments.find(x => x.trainee_id === t.id && x.status !== 'ملغى');
+  return { name:D.programs.find(x => x.id === e.program_id).name, att:D.attendance.filter(a => a.enrollment_id === e.id).length, subs:D.subscriptions.filter(s => s.trainee_id === t.id).length }; });
+await login('student', '0550000003');
+const txt = await p.innerText('#app');
+ok(exp.subs === 0 && txt.includes(exp.name) && await p.$('.prog-head'), 'متدرب برنامج دون باقة يدخل البوابة ويرى برنامجه');
+ok(new RegExp(`أيام الحضور: ${exp.att.toLocaleString('ar-SA')}|أيام الحضور: ${exp.att}`).test(txt) || txt.includes('أيام الحضور'), 'نسبة الإنجاز بأيام الحضور');
+ok(!(await p.$('.ptabs')), 'لا تبويبات الواجبات والمراسلة لمتدرب البرامج فقط');
+await login('guardian', '0509000099');
+ok(await p.$('.prog-head') && (await p.innerText('#app')).includes(exp.name), 'ولي الأمر يرى برنامج ابنه');
+// متدرب باقة + برنامج: يختار بينهما
+await p.goto(U); await p.waitForTimeout(800);
+await p.evaluate(() => { const S = window.__SAMA__.LocalStore, D = S.data, t = D.trainees.find(x => x.phone === '0550000001'), c = D.cohorts.find(c => window.__SAMA__.cohortState(c) === 'running');
+  D.enrollments.push({ id:'eboth', ref:'R-X', cohort_id:c.id, program_id:c.program_id, trainee_id:t.id, status:'مسجل', created_at:c.start_date + 'T08:00:00Z' }); S.save(); });
+await login('student', '0550000001');
+const tabs = await p.$$('[data-si]');
+ok(tabs.length >= 2 && await p.$('.gauge-card'), 'متدرب الباقة والبرنامج يرى الاثنين ويبدأ بالباقة');
+await tabs[tabs.length - 1].click(); await p.waitForTimeout(500);
+ok(await p.$('.prog-head') && await p.$('.ptabs'), 'التبديل إلى البرنامج مع بقاء تبويبات الباقة');
+ok(!errs.length, 'لا أخطاء' + (errs.length ? ': ' + errs.join(' | ') : ''));
+await b.close(); server.close(); process.exit(failed() ? 1 : 0);

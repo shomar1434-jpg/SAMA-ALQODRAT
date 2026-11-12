@@ -45,7 +45,7 @@ export function siteFooter(){
         <a class="sf-item" href="${MAP_URL}" target="_blank" rel="noopener">${ic('pin')}<span>${CENTER.address}</span></a>
         <span class="sf-item">${ic('database')}<span>صندوق البريد ${CENTER.pobox}</span></span>
         <h4 style="margin-top:14px">روابط سريعة</h4>
-        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#me">حضوري</a><a href="#verify">التحقق من شهادة</a><a href="#policies">السياسات</a></div></div>
+        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من شهادة</a><a href="#policies">السياسات</a></div></div>
       <div class="sf-col"><h4>معتمد من</h4>
         <div class="sf-acc"><span><img src="${LOGOS.tvtc}" alt="المؤسسة العامة للتدريب التقني والمهني"></span><span><img src="${LOGOS.nelc}" alt="المركز الوطني للتعليم الإلكتروني"></span></div></div>
     </div>

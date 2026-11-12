@@ -87,14 +87,18 @@ export function certPublic(D, cert){
   if(!cert) return null; const p=D.programs.find(x=>x.id===cert.program_id), c=D.cohorts.find(x=>x.id===cert.cohort_id), t=D.trainees.find(x=>x.id===cert.trainee_id);
   return {serial:cert.serial, revoked:cert.revoked, issued_at:cert.issued_at, rate:cert.rate, name_masked:maskName(t?.full_name), gender:t?.gender, program:p?.name, category:p?.category, accreditation_no:p?.accreditation_no, hours:p?.hours, number:c?.number, start_date:c?.start_date, end_date:c?.end_date};
 }
-export function traineeAttendanceLogic(D, nid){
-  const t=D.trainees.find(x=>x.national_id===nid);
-  if(!t) return {ok:false, reason:'no_match'};
-  const list = D.enrollments.filter(e=>e.trainee_id===t.id && e.status!=='ملغى').map(e=>{ const c=D.cohorts.find(x=>x.id===e.cohort_id), p=D.programs.find(x=>x.id===e.program_id); if(!c||!p) return null;
+/* بنود برامج (دفعات) المتدرب: الحضور والحالة والرسالة والشهادة — تستخدمها «حضوري» وبوابة المتدرب وولي الأمر */
+export function cohortItemsOf(D, t){
+  return (D.enrollments||[]).filter(e=>e.trainee_id===t.id && e.status!=='ملغى').map(e=>{ const c=D.cohorts.find(x=>x.id===e.cohort_id), p=D.programs.find(x=>x.id===e.program_id); if(!c||!p) return null;
     const s=enrollmentStats(D,e,c), n=riyadhNow(), state=cohortState(c); const next=sessionDays(c).find(d=>d>n.date||(d===n.date&&toMin(n.hm)<toMin(c.end_time)));
     const cert=(D.certificates||[]).find(x=>x.enrollment_id===e.id&&!x.revoked), level=attendanceLevel(s,state,D.settings);
     return {program:p.name, code:progCode(p), number:c.number, state, start_date:c.start_date, end_date:c.end_date, start_time:c.start_time, ...s, next: cohortArchived(c)?null:(next||null), cert: cert?cert.serial:null,
-      level, message: levelMessage(level,s,D.settings,{'البرنامج':p.name,'الاسم':t.full_name.split(' ')[0],'البداية':fmtDate(c.start_date)})}; }).filter(Boolean)
+      enrollment_id:e.id, hours:p.hours||null, level, message: levelMessage(level,s,D.settings,{'البرنامج':p.name,'الاسم':t.full_name.split(' ')[0],'البداية':fmtDate(c.start_date)})}; }).filter(Boolean);
+}
+export function traineeAttendanceLogic(D, nid){
+  const t=D.trainees.find(x=>x.national_id===nid);
+  if(!t) return {ok:false, reason:'no_match'};
+  const list = cohortItemsOf(D, t)
     .concat(subAttendanceItems(D,t))
     .sort((a,b)=>({running:0,upcoming:1,archived:2}[a.state]-{running:0,upcoming:1,archived:2}[b.state]) || String(b.start_date||'9').localeCompare(String(a.start_date||'9')));
   return {ok:true, trainee:t, first_name:t.full_name.split(' ')[0], threshold:calcSet(D.settings).cert_threshold, items:list};
@@ -187,7 +191,7 @@ export function sectionDaysTxt(D, section){
 export function scopeData(D, role, phone){
   const ph=normPhone(phone), pick=(o,k)=>Object.fromEntries(k.map(x=>[x,o[x]]));
   const base={ plans:D.plans||[], schedule_templates:D.schedule_templates||[], schedule_exceptions:D.schedule_exceptions||[],
-    settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes']) };
+    settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes',...Object.keys(CALC_DEFAULTS).filter(k=>k.startsWith('msg_'))]) };
   const tSafe=t=>({id:t.id, full_name:t.full_name, gender:t.gender});
   const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true}));
   const forTrainees=ids=>{ const subs=(D.subscriptions||[]).filter(s=>ids.includes(s.trainee_id)), sid=subs.map(s=>s.id);
@@ -196,6 +200,10 @@ export function scopeData(D, role, phone){
     return { trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs, sub_attendance:(D.sub_attendance||[]).filter(a=>sid.includes(a.subscription_id)),
       assignments:(D.assignments||[]).filter(a=>scopes.includes(a.section+':'+a.subject)), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), teachers:teachersPub,
       bank_units:Object.entries(units).map(([k,count])=>{ const [section,subject,unit]=k.split('|'); return {section,subject,unit,count}; }),
+      // البرامج: دفعات المتدرب وحضورها وشهاداتها (للبوابة بدل «حضوري»)
+      ...(()=>{ const en=(D.enrollments||[]).filter(e=>ids.includes(e.trainee_id)), cids=en.map(e=>e.cohort_id), pids=en.map(e=>e.program_id), eids=en.map(e=>e.id);
+        return { enrollments:en, cohorts:(D.cohorts||[]).filter(c=>cids.includes(c.id)), programs:(D.programs||[]).filter(p=>pids.includes(p.id)).map(p=>({id:p.id, code:p.code, name:p.name, category:p.category, accreditation_no:p.accreditation_no, hours:p.hours})),
+          attendance:(D.attendance||[]).filter(a=>eids.includes(a.enrollment_id)), certificates:(D.certificates||[]).filter(x=>eids.includes(x.enrollment_id)).map(x=>({id:x.id, serial:x.serial, enrollment_id:x.enrollment_id, rate:x.rate, issued_at:x.issued_at, revoked:x.revoked})) }; })(),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)).map(attemptPublic), ratings:(D.ratings||[]).filter(r=>ids.includes(r.trainee_id)), messages:(D.messages||[]).filter(m=>ids.includes(m.trainee_id)) }; };
   if(role==='student'){ const ids=D.trainees.filter(t=>normPhone(t.phone)===ph).map(t=>t.id);
     return {...base, ...forTrainees(ids), notifications:(D.notifications||[]).filter(x=>x.to==='student'&&ids.includes(x.trainee_id)), guardian_links:[]}; }
@@ -216,6 +224,13 @@ export function scopeData(D, role, phone){
           hw_submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&hw.some(a=>a.id===x.assignment_id)).map(x=>({assignment_id:x.assignment_id, trainee_id:x.trainee_id, status:x.status, score:x.score})) }; })()}; }
   return null;
 }
+/* متدرب برنامج تدريبي (دفعة جارية) بجوال 0550000003 وولي أمره 0509000099 — لعرض بوابة متدربي البرامج */
+export function demoProgramTrainee(D){
+  { const S=D.subscriptions||[]; const subT=new Set(S.map(x=>x.trainee_id)), ok=new Set((D.cohorts||[]).filter(c=>cohortState(c)==='running').map(c=>c.id));
+    const e=(D.enrollments||[]).filter(x=>x.status!=='ملغى'&&ok.has(x.cohort_id)&&!subT.has(x.trainee_id)).sort((a,b)=>(D.attendance||[]).filter(t=>t.enrollment_id===b.id).length-(D.attendance||[]).filter(t=>t.enrollment_id===a.id).length)[0];
+    const t=e&&D.trainees.find(y=>y.id===e.trainee_id);
+    if(t){ t.phone='0550000003'; D.guardian_links.push({id:uid(), guardian_phone:'0509000099', guardian_name:'ولي أمر تجريبي', trainee_id:t.id, relation:'الأب', status:'verified', verified_at:new Date().toISOString(), created_at:new Date().toISOString()}); } }
+}
 /* بيانات تجريبية: مدربو المقررات وأولياء أمور لعدد من المتدربين */
 export function demoPeople(D){
   const T=[['girls','كمي','هدى محمد علي النعمي','0501000001'],['girls','لفظي','منى أحمد حسن الصميلي','0501000002'],['boys','كمي','خالد يحيى محمد الحكمي','0501000003'],['boys','لفظي','فيصل علي أحمد المدخلي','0501000004'],['girls','تحصيلي','أمل حسن علي معافا','0501000005'],['boys','تحصيلي','ماجد موسى علي عريشي','0501000006']];
@@ -225,6 +240,7 @@ export function demoPeople(D){
   const pickSub=sec=>S.filter(x=>x.section===sec&&x.start_date&&x.status!=='cancelled').sort((a,b)=>days(b.trainee_id)-days(a.trainee_id)).find(x=>sec==='girls'||x.subjects.includes('كمي'));
   [['boys','0550000001'],['girls','0550000002']].forEach(([sec,ph])=>{ const x=pickSub(sec); if(!x) return; const t=D.trainees.find(y=>y.id===x.trainee_id); if(t) t.phone=ph; S.splice(S.indexOf(x),1); S.unshift(x); });
   if(S[1]?.section==='boys') S.unshift(S.splice(1,1)[0]);
+  demoProgramTrainee(D);
   (D.subscriptions||[]).slice(0,12).forEach((s,i)=>{ const t=D.trainees.find(x=>x.id===s.trainee_id); if(!t) return;
     D.guardian_links.push({id:uid(), guardian_name:'ولي أمر '+t.full_name.split(' ').slice(1,2).join(''), guardian_phone:'05090000'+String(10+i).padStart(2,'0'), trainee_id:t.id, relation:i%3?'الأب':'الأم', status:'verified', created_at:new Date().toISOString()}); });
 }
@@ -250,7 +266,7 @@ export const LocalStore = {
     if(!this.data.partners || (this.data.partners.length<=2 && this.data.partners.every(x=>x.type==='جهة اعتماد'))) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
-    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; });
+    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
