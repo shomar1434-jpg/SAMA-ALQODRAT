@@ -1,4 +1,4 @@
-# يدوي: ينزّل شعارات شركاء النجاح من روابطها الأصلية ويرفعها ملفًا مضغوطًا لتُضاف إلى src/assets/partners/
+# يدوي: ينزّل شعارات شركاء النجاح من روابطها الأصلية ويدفعها إلى الفرع partner-logos (مجلد partners/) لتُنسخ إلى src/assets/partners/
 name: fetch-partner-logos
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
         description: 'روابط الشعارات (رابط في كل سطر)'
         required: false
 permissions:
-  contents: read
+  contents: write
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -37,5 +37,9 @@ jobs:
           fi
           while read -r u; do u=$(echo "$u" | xargs); [ -z "$u" ] && continue; curl -fsSL "$u" -o "out/$(basename "$u")"; done < list.txt
           ls -la out
-      - uses: actions/upload-artifact@v4
-        with: { name: partner-logos, path: out }
+      - name: Push to branch partner-logos
+        run: |
+          mkdir -p pub && cd pub && git init -q -b partner-logos && mkdir partners && cp ../out/* partners/
+          git config user.name "github-actions[bot]" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "شعارات شركاء النجاح من روابطها الأصلية"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" partner-logos
