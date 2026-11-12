@@ -158,7 +158,7 @@ export function regFormHtml(title, sub){
       ${fld('birth_date','تاريخ الميلاد',false,`<input class="inp" name="birth_date" type="date">`)}
       ${fld('city','المدينة أو المحافظة',true,`<select class="inp" name="city"><option value="">اختر</option>${CITIES.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
-      ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','طالب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
+      ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
       <div id="rfPol" style="grid-column:1/-1" hidden></div>
       <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود البرنامج والتحقق برقم سجلي المدني.</span></label>
     </form>
@@ -257,9 +257,9 @@ export function bindAttendance(st, programCode, onBack){
     await send();
   };
 }
-/* معرّف عشوائي لهذا المتصفح، لكشف تحضير أكثر من طالب من جهاز واحد (لا يحوي بيانات شخصية) */
+/* معرّف عشوائي لهذا المتصفح، لكشف تحضير أكثر من متدرب من جهاز واحد (لا يحوي بيانات شخصية) */
 export function deviceId(){ try{ let d=localStorage.getItem('sama_device'); if(!d){ d=uid(); localStorage.setItem('sama_device',d); } return d; }catch(e){ return ''; } }
-/* عند وجود أكثر من تسجيل له جلسة الآن: يختار الطالب برنامجه */
+/* عند وجود أكثر من تسجيل له جلسة الآن: يختار المتدرب برنامجه */
 export function showChoice(r, send, onBack){
   const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
   box.innerHTML = `<div style="text-align:center" class="rv"><h2 style="font-size:21px;font-weight:700">أهلًا ${esc(r.name.split(' ')[0])}، اختر برنامج جلستك الآن</h2>
@@ -340,9 +340,9 @@ export async function viewGeneralCheckin(){
 /* =====================================================================
    3) شاشة باركود البرنامج (ثابت لكل برنامج، يخدم كل دفعاته)
    ===================================================================== */
-/* اختيار البوابة: الطالب، وولي الأمر، والمعلم (لكل منها صفحة ودور) */
+/* اختيار البوابة: المتدرب، وولي الأمر، والمدرب (لكل منها صفحة ودور) */
 export function viewPortals(){
-  const C=[['student','user','بوابة الطالب','حضورك وواجباتك والمدة المتبقية من باقتك، وجلساتك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك والتنبيهات، بعد ربطك من المعهد.'],['teacher','book','بوابة المعلم','كشف حضور طلابك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
+  const C=[['student','user','بوابة المتدرب','حضورك وواجباتك والمدة المتبقية من باقتك، وجلساتك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك والتنبيهات، بعد ربطك من المعهد.'],['teacher','book','بوابة المدرب','كشف حضور متدربيك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
   $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint" style="margin:8px 0 0">الدخول برقم جوالك المسجّل في المعهد ورمز تحقق.</p></div>
     <div class="grid g3">${C.map(([k,i,t,d],n)=>`<a class="card pad portal-card rv" style="--i:${n}" href="${portalBase(k)}"><span class="kic-lg t-info">${ic(i)}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div>${siteFooter()}`;
 }

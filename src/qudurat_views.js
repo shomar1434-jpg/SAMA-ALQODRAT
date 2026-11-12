@@ -137,7 +137,7 @@ export function pageQudurat(){
   const todayAtt = (D.sub_attendance || []).filter(a => a.att_date === n.date);
   const ending = live.filter(s => s.end_date && s.end_date <= addDays(n.date, 7));
   const tabs = [['subs', 'users', 'المشتركون'], ['today', 'calendar', 'حضور اليوم'], ['plans', 'award', 'الباقات'], ['schedule', 'clock', 'الجدول والاستثناءات'], ['requests', 'form', 'طلبات مخصصة']];
-  m.innerHTML = titleBar(`${ic('award')}القدرات والتحصيلي`, 'باقات <em>القدرات والتحصيلي</em>', 'الاشتراكات تبدأ من أول حضور بالباركود. أضف الطلاب الحاليين بتاريخ بدايتهم الفعلي.',
+  m.innerHTML = titleBar(`${ic('award')}القدرات والتحصيلي`, 'باقات <em>القدرات والتحصيلي</em>', 'الاشتراكات تبدأ من أول حضور بالباركود. أضف المتدربين الحاليين بتاريخ بدايتهم الفعلي.',
     `<button class="btn pri sm" id="qAdd">${ic('plus')} مشترك</button><button class="btn sm" id="qImp">${ic('copy')} استيراد قائمة</button><a class="btn sm" href="#qr-checkin">${ic('qr')} الباركود الموحد</a>`) +
     `<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       ${kpiCard(0, 'users', 'info', 'اشتراكات قائمة', live.length, '', `${fmtNum(live.filter(s => !s.start_date).length)} بانتظار أول حضور`)}
@@ -154,7 +154,7 @@ export function pageQudurat(){
   ({ subs:tabSubs, today:tabToday, plans:tabPlans, schedule:tabSchedule, requests:tabRequests })[qTab]();
 }
 
-/* تنبيه التحضير بالنيابة: أكثر من طالب من الجهاز نفسه اليوم */
+/* تنبيه التحضير بالنيابة: أكثر من متدرب من الجهاز نفسه اليوم */
 function deviceAlerts(D, n){
   const ok = (D.checkin_attempts || []).filter(a => a.date === n.date && ['ok', 'already'].includes(a.result) && a.device && a.trainee_hint);
   const by = {}; ok.forEach(a => { (by[a.device] = by[a.device] || new Set()).add(a.trainee_hint); });
@@ -163,7 +163,7 @@ function deviceAlerts(D, n){
   const names = id => D.trainees.find(t => t.id === id)?.full_name || '—';
   return `<div class="alert t-warning rv" style="margin-top:14px"><span class="aic">${ic('alert')}</span><div><b style="font-weight:600">تحضير متعدد من جهاز واحد اليوم</b>
     <p style="margin:4px 0 0">${sus.map(([d, s]) => `جهاز …${esc(d.slice(-4))}: ${[...s].map(id => esc(names(id))).join('، ')}`).join('<br>')}</p>
-    <p class="hint" style="margin:4px 0 0">قد يكون طالب حضّر عن زملائه. راجع الحضور الفعلي في القاعة.</p></div></div>`;
+    <p class="hint" style="margin:4px 0 0">قد يكون متدرب حضّر عن زملائه. راجع الحضور الفعلي في القاعة.</p></div></div>`;
 }
 
 function filteredSubs(D, n){
@@ -188,7 +188,7 @@ function tabSubs(){
       <select class="inp" id="qs" aria-label="القسم" style="width:auto"><option value="all">البنون والبنات</option>${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${qf.section === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <select class="inp" id="qst" aria-label="الحالة" style="width:auto">${[['live', 'القائمة'], ['all', 'الكل'], ...Object.entries(SUB_STATUS)].map(([k, v]) => `<option value="${k}" ${qf.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <button class="btn sm" id="qx">${ic('copy')} Excel</button></div>
-    ${rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>الطالب</th><th>الباقة</th><th>القسم</th><th>الحالة</th><th>البداية – النهاية</th><th>الحضور</th><th>المدة</th><th></th></tr></thead><tbody>
+    ${rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>القسم</th><th>الحالة</th><th>البداية – النهاية</th><th>الحضور</th><th>المدة</th><th></th></tr></thead><tbody>
       ${rows.map(({ s, t, st }) => `<tr><td><b style="font-weight:500">${esc(t?.full_name || '—')}</b><div class="hint" dir="ltr" style="text-align:right">${esc(t?.national_id || '')}</div></td>
         <td>${esc(planName(st.plan))}</td><td>${SECTIONS[s.section]}</td><td><span class="pill dot ${SUB_TONE[st.status]}">${SUB_STATUS[st.status]}</span>${s.start_manual ? '<div class="hint">بداية يدوية</div>' : ''}</td>
         <td class="num">${s.start_date ? `${fmtShort(s.start_date)} – ${fmtShort(st.end)}` : '—'}</td>
@@ -216,7 +216,7 @@ function tabToday(){
     const done = ses && n.hm >= ses.end;
     return `<div class="card pad rv" style="--i:${i};margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       <h3 class="ctitle">${ic('users')}${SECTIONS[sec]}</h3><span class="pill ${ses ? 'info' : 'g'}">${ses ? `جلسة اليوم ${t12(ses.start)} – ${t12(ses.end)}` : 'لا توجد جلسة اليوم'}</span></div>
-      ${!ses ? '' : list.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>الطالب</th><th>الباقة</th><th>الحالة</th><th>وقت الحضور</th><th>تعديل</th></tr></thead><tbody>
+      ${!ses ? '' : list.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>الحالة</th><th>وقت الحضور</th><th>تعديل</th></tr></thead><tbody>
         ${list.sort((a, b) => (a.t?.full_name || '').localeCompare(b.t?.full_name || '', 'ar')).map(({ s, t, a }) => `<tr><td>${esc(t?.full_name || '—')}</td><td>${esc(planName(D.plans.find(p => p.id === s.plan_id)))}</td>
           <td>${a ? `<span class="pill dot ${a.status === 'متأخر' ? 'warn' : 'ok'}">${a.status}</span>${a.manual ? ' <span class="hint">يدوي</span>' : ''}` : `<span class="pill dot ${done ? 'bad' : 'g'}">${done ? 'غائب' : 'لم يسجل بعد'}</span>`}</td>
           <td class="num">${a ? t12(a.time.slice(0, 5)) : '—'}</td>
@@ -253,12 +253,12 @@ function subDetail(id){
     await Store.setSubAttendance(s.id, b.dataset.dd, next); await reloadAD(); subDetail(s.id); });
 }
 
-/* إضافة أو تعديل مشترك، ومنهم الطلاب الحاليون بتاريخ بداية فعلي (D-10) */
+/* إضافة أو تعديل مشترك، ومنهم المتدربون الحاليون بتاريخ بداية فعلي (D-10) */
 function subModal(s){
   const D = AD, t = s ? D.trainees.find(x => x.id === s.trainee_id) : null, plans = (D.plans || []).filter(p => p.active !== false);
   modal(`<h3>${s ? 'تعديل الاشتراك' : 'إضافة مشترك'}</h3>
     <form id="smF" class="grid g2" novalidate>
-      ${s ? `<div class="field" style="grid-column:1/-1"><label>الطالب</label><div class="inp" style="display:flex;align-items:center;background:var(--surface-sunken)">${esc(t?.full_name || '')} · <span dir="ltr">${esc(t?.national_id || '')}</span></div></div>`
+      ${s ? `<div class="field" style="grid-column:1/-1"><label>المتدرب</label><div class="inp" style="display:flex;align-items:center;background:var(--surface-sunken)">${esc(t?.full_name || '')} · <span dir="ltr">${esc(t?.national_id || '')}</span></div></div>`
         : `<div class="field"><label for="sm-nid">السجل المدني <i>*</i></label><input class="inp num" id="sm-nid" name="national_id" inputmode="numeric" maxlength="10" dir="ltr"><span class="hint" id="smFound"></span></div>
            <div class="field"><label for="sm-name">الاسم الرباعي <i>*</i></label><input class="inp" id="sm-name" name="full_name" maxlength="80"></div>
            <div class="field"><label for="sm-phone">الجوال</label><input class="inp num" id="sm-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr"></div>
@@ -266,13 +266,13 @@ function subModal(s){
       <div class="field"><label for="sm-plan">الباقة <i>*</i></label><select class="inp" id="sm-plan" name="plan_id">${plans.map(p => `<option value="${p.id}" ${s?.plan_id === p.id ? 'selected' : ''}>${esc(planName(p))}${p.mode === 'remote' ? ' (قريبًا)' : ''}</option>`).join('')}</select></div>
       <div class="field"><label for="sm-sec">القسم</label><select class="inp" id="sm-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${(s?.section || 'boys') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="field" style="grid-column:1/-1"><label for="sm-start">تاريخ البداية الفعلي</label><input class="inp" type="date" id="sm-start" name="start_date" value="${s?.start_date || ''}" max="${riyadhNow().date}">
-        <span class="hint">اتركه فارغًا ليبدأ الاشتراك تلقائيًا من أول حضور بالباركود. للطلاب الذين بدؤوا قبل المنصة اكتب تاريخ أول يوم حضروه.</span></div>
+        <span class="hint">اتركه فارغًا ليبدأ الاشتراك تلقائيًا من أول حضور بالباركود. للمتدربين الذين بدؤوا قبل المنصة اكتب تاريخ أول يوم حضروه.</span></div>
       <div class="errtxt" id="smE" style="grid-column:1/-1"></div>
       <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="smC">إلغاء</button><button class="btn pri" id="smS">${ic('check')} حفظ</button></div></form>`);
   $('#smC').onclick = closeModal;
   const nid = $('#sm-nid');
   if(nid){ nid.addEventListener('input', () => { nid.value = toLatin(nid.value).replace(/\D/g, ''); const x = nid.value.length === 10 && D.trainees.find(y => y.national_id === nid.value);
-      $('#smFound').textContent = x ? `طالب مسجّل: ${x.full_name}` : ''; if(x){ $('#sm-name').value = x.full_name; $('#sm-phone').value = x.phone || ''; $('#sm-gender').value = x.gender; $('#sm-sec').value = sectionOfGender(x.gender); } });
+      $('#smFound').textContent = x ? `متدرب مسجّل: ${x.full_name}` : ''; if(x){ $('#sm-name').value = x.full_name; $('#sm-phone').value = x.phone || ''; $('#sm-gender').value = x.gender; $('#sm-sec').value = sectionOfGender(x.gender); } });
     $('#sm-gender').onchange = e => { $('#sm-sec').value = sectionOfGender(e.target.value); };
     $('#sm-phone').addEventListener('input', e => e.target.value = toLatin(e.target.value).replace(/\D/g, '')); }
   $('#smF').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#smE').textContent = '';
@@ -282,10 +282,10 @@ function subModal(s){
     catch(x){ setBusy(b, false); $('#smE').textContent = x.message; } };
 }
 
-/* استيراد قائمة الطلاب الحاليين بلصقها من Excel */
+/* استيراد قائمة المتدربين الحاليين بلصقها من Excel */
 function importModal(){
   const D = AD, tiers = Object.entries(TIERS).filter(([k]) => k !== 'custom');
-  modal(`<h3>استيراد الطلاب الحاليين</h3>
+  modal(`<h3>استيراد المتدربين الحاليين</h3>
     <p class="hint" style="margin:-4px 0 10px">انسخ الأعمدة من Excel بهذا الترتيب والصقها: <b>السجل المدني، الاسم، الجوال، الجنس (ذكر/أنثى)، الباقة (${tiers.map(([, v]) => v).join(' / ')})، تاريخ البداية (اختياري، مثل 2026-10-20)</b>. الباقات حضورية.</p>
     <textarea class="inp" id="imT" rows="8" dir="auto" style="padding:10px 14px;line-height:1.8;font-family:monospace" placeholder="1012345678	محمد علي أحمد الحكمي	0551234567	ذكر	الفضية	2026-10-20"></textarea>
     <div id="imP" style="margin-top:10px"></div>

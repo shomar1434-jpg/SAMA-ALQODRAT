@@ -1,5 +1,5 @@
 -- =====================================================================
--- الخطوات 3 و6 و7 و8: الأدوار والدخول بالجوال، وبوابات الطالب والمعلم وولي الأمر.
+-- الخطوات 3 و6 و7 و8: الأدوار والدخول بالجوال، وبوابات المتدرب والمدرب وولي الأمر.
 -- الهوية من Supabase Auth (رقم الجوال الموثّق برمز تحقق). الصلاحية تُحسم هنا على الخادم.
 -- البيانات تُعاد محصورة بالدور (portal_data) والحساب في الواجهة من portal_logic.js.
 -- =====================================================================
@@ -83,22 +83,22 @@ begin
     'notifications', coalesce((select jsonb_agg(to_jsonb(n) order by n.at) from notifications n where n.trainee_id = any(ids) and n."to" = p_role and n.date >= riyadh_now()::date - 60), '[]'));
 end $$;
 
--- إشعار من المعلم: الطالب في نطاقه، وولي الأمر موثّق، ولا تكرار لنفس الحدث في اليوم
+-- إشعار من المدرب: المتدرب في نطاقه، وولي الأمر موثّق، ولا تكرار لنفس الحدث في اليوم
 create or replace function teacher_notify(p jsonb) returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare me teachers%rowtype; t trainees%rowtype; d date := riyadh_now()::date; v_kind text := p->>'kind'; v_to text := p->>'to'; v_text text; v_end text;
 begin
   select * into me from teachers where active and phone = my_phone();
   if me.id is null then raise exception 'غير مصرح'; end if;
   select * into t from trainees where id = (p->>'trainee_id')::uuid;
-  if not exists (select 1 from subscriptions s where s.trainee_id = t.id and s.section = me.section and s.subjects && me.subjects) then raise exception 'الطالب ليس ضمن طلابك'; end if;
-  if v_to = 'guardian' and not exists (select 1 from guardian_links where status = 'verified' and trainee_id = t.id) then raise exception 'لا يوجد ولي أمر موثّق لهذا الطالب'; end if;
+  if not exists (select 1 from subscriptions s where s.trainee_id = t.id and s.section = me.section and s.subjects && me.subjects) then raise exception 'المتدرب ليس ضمن متدربيك'; end if;
+  if v_to = 'guardian' and not exists (select 1 from guardian_links where status = 'verified' and trainee_id = t.id) then raise exception 'لا يوجد ولي أمر موثّق لهذا المتدرب'; end if;
   if v_to not in ('student','guardian') or v_kind not in ('absence','late','reminder','homework','general') then raise exception 'طلب غير صالح'; end if;
   if exists (select 1 from notifications where sender = 'teacher:' || me.id and trainee_id = t.id and "to" = v_to and kind = v_kind and date = d) then return jsonb_build_object('ok',true,'duplicate',true); end if;
   select to_char(end_time,'HH24:MI') into v_end from session_on(me.section, d);
   v_text := case v_kind
     when 'absence' then 'نفيدكم بغياب ' || split_part(t.full_name,' ',1) || ' عن جلسة اليوم (' || d || '). نأمل الحرص على الحضور.'
     when 'late' then 'نفيدكم بتأخر ' || split_part(t.full_name,' ',1) || ' عن جلسة اليوم (' || d || ').'
-    when 'reminder' then 'تذكير: جلسة اليوم مستمرة حتى ' || coalesce(v_end,'') || '، ولم يُسجَّل حضورك بعد. إن كنت حاضرًا فامسح باركود الحضور، وإن تعذّر حضورك فأبلغ المعلم بعذرك.'
+    when 'reminder' then 'تذكير: جلسة اليوم مستمرة حتى ' || coalesce(v_end,'') || '، ولم يُسجَّل حضورك بعد. إن كنت حاضرًا فامسح باركود الحضور، وإن تعذّر حضورك فأبلغ المدرب بعذرك.'
     when 'homework' then 'نفيدكم بأن لدى ' || split_part(t.full_name,' ',1) || ' واجبًا لم يُسلَّم بعد.'
     else '' end;
   v_text := trim(v_text || ' ' || left(coalesce(p->>'note',''), 300));

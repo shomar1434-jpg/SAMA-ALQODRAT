@@ -24,7 +24,7 @@ export const progName = id => progOf(id)?.name || '—';
 export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
 export async function viewAdmin(r){
   const app=$('#app');
-  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المعلمون وأولياء الأمور'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
+  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المدربون وأولياء الأمور'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
   app.innerHTML = `<div class="admin"><aside class="side">
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة</span></b></div>
       <div class="sec">الصفحات</div>

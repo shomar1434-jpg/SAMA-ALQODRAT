@@ -52,7 +52,7 @@ const r2 = await checkin(nid);
 const cnt = await S(id => window.__SAMA__.LocalStore.data.sub_attendance.filter(a => a.subscription_id === id).length, s1.id);
 ok(/مسبقًا/.test(r2) && cnt === 1, 'المسح المكرر = يوم حضور واحد');
 
-// طالب له اشتراك وتسجيل دفعة في الوقت نفسه ← يختار
+// متدرب له اشتراك وتسجيل دفعة في الوقت نفسه ← يختار
 const both = await S(() => { const { LocalStore, cohortArchived, enrollsOf, riyadhNow } = window.__SAMA__; const D = LocalStore.data, n = riyadhNow();
   const c = D.cohorts.find(c => !cohortArchived(c) && c.start_date <= n.date && enrollsOf(D, c.id).some(e => !D.attendance.some(a => a.enrollment_id === e.id && a.att_date === n.date)));
   c.days = [0, 1, 2, 3, 4, 5, 6]; const h = +n.hm.slice(0, 2); c.start_time = String(h).padStart(2, '0') + ':00'; c.end_time = String(Math.min(h + 2, 23)).padStart(2, '0') + ':59';
@@ -60,7 +60,7 @@ const both = await S(() => { const { LocalStore, cohortArchived, enrollsOf, riya
   D.subscriptions.push({ id: 'sboth', ref: 'SQ-1', trainee_id: t.id, plan_id: D.plans.find(x => x.tier === 'basic' && x.mode === 'in_person').id, section: 'boys', subjects: [], status: 'pending', start_date: null, end_date: null });
   LocalStore.save(); return t.national_id; });
 await checkin(both);
-ok(await p.$$eval('[data-ch]', x => x.length) === 2, 'عند التعدد يختار الطالب بين برنامجين');
+ok(await p.$$eval('[data-ch]', x => x.length) === 2, 'عند التعدد يختار المتدرب بين برنامجين');
 await p.click('[data-ch]'); await p.waitForTimeout(600);
 ok(/سُجّل حضورك/.test(await text('#cRes')), 'التحضير بعد الاختيار');
 
@@ -71,10 +71,10 @@ ok(/قسم البنون/.test(await text('#mRes')) && await p.$('.mecard .me-rat
 // ---------- الإدارة ----------
 await go('admin', 900); await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200);
 await go('admin-qudurat', 1200);
-ok(/تحضير متعدد من جهاز واحد/.test(await text('#main')), 'تنبيه التحضير من جهاز واحد لأكثر من طالب');
+ok(/تحضير متعدد من جهاز واحد/.test(await text('#main')), 'تنبيه التحضير من جهاز واحد لأكثر من متدرب');
 ok(await p.$$eval('#qBody tbody tr', x => x.length) > 10, 'قائمة المشتركين');
 
-// إضافة طالب حالي بتاريخ بداية فعلي
+// إضافة متدرب حالي بتاريخ بداية فعلي
 const nid2 = await S(() => window.__SAMA__.makeSaudiId('1'));
 const past = await S(() => { const d = new Date(); d.setDate(d.getDate() - 20); return d.toISOString().slice(0, 10); });
 await p.click('#qAdd'); await p.waitForTimeout(300);

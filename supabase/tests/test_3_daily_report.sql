@@ -7,7 +7,7 @@ begin
   assert ok, 'التوليد اليدوي للمسؤول فقط';
   r := generate_daily_report(d, 'snapshot', '', true);                                   -- كما تشغّله المهمة المجدولة
   assert not (r->>'existing')::boolean and (r->'report'->>'version')::int = 1, 'اللقطة الأولى';
-  assert (r->'report'->'data'->'summary'->>'expected')::int >= 1, 'التقرير يحوي طلاب جلسة اليوم: ' || (r->'report'->'data'->'summary')::text;
+  assert (r->'report'->'data'->'summary'->>'expected')::int >= 1, 'التقرير يحوي متدربي جلسة اليوم: ' || (r->'report'->'data'->'summary')::text;
   r := generate_daily_report(d, 'snapshot', '', true);
   assert (r->>'existing')::boolean and (select count(*) from daily_reports where date = d) = 1, 'إعادة التشغيل لا تكرر اللقطة';
   perform run_daily_report_job('snapshot');

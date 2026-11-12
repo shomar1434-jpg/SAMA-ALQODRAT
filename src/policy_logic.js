@@ -4,9 +4,9 @@ import { esc } from './utils.js';
 import { POLICY_TEXTS, POLICY_APPROVER, POLICY_EFFECTIVE } from './policy_texts.js';
 
 export const POLICY_KINDS = [   // بترتيب صفحة السياسات في الموقع الرسمي
-  { slug:'integrity',     title:'سياسة النزاهة الأكاديمية',                 acceptance:true,  src:'academic-policy' },
-  { slug:'privacy',       title:'سياسة الخصوصية وحماية البيانات',           acceptance:true,  src:'policies' },
-  { slug:'attendance',    title:'سياسات الحضور والانضباط في الدورات التدريبية', acceptance:true,  src:'course-policy' },
+  { slug:'integrity',     title:'سياسة النزاهة الأكاديمية',                 acceptance:false,  src:'academic-policy' },
+  { slug:'privacy',       title:'سياسة الخصوصية وحماية البيانات',           acceptance:false,  src:'policies' },
+  { slug:'attendance',    title:'سياسات الحضور والانضباط في الدورات التدريبية', acceptance:false,  src:'course-policy' },
   { slug:'copyright',     title:'سياسة حقوق الملكية الفكرية وحقوق النشر',    acceptance:false, src:'copyright-policy' },
   { slug:'support',       title:'سياسة الدعم الفني',                        acceptance:false, src:'support-policy' },
   { slug:'communication', title:'سياسات التواصل وآدابه',                    acceptance:false, src:'communication' }

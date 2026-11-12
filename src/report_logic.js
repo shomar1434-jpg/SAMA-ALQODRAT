@@ -37,12 +37,12 @@ export function buildDailyReport(D, date, n = riyadhNow()){
   const incidents = [
     ...Object.entries(fails).map(([k, v]) => ({ type:'checkin_fail', text:`محاولات تحضير مرفوضة: ${FAIL_TXT[k] || k}`, count:v })),
     ...(att.filter(a => a.result === 'already').length ? [{ type:'duplicate', text:'مسح مكرر في اليوم نفسه (لم يُحتسب مرتين)', count:att.filter(a => a.result === 'already').length }] : []),
-    ...Object.values(byDev).filter(s => s.size > 1).map(s => ({ type:'device', text:'تحضير أكثر من طالب من جهاز واحد', count:s.size })),
+    ...Object.values(byDev).filter(s => s.size > 1).map(s => ({ type:'device', text:'تحضير أكثر من متدرب من جهاز واحد', count:s.size })),
     ...(D.audit_logs || []).filter(l => l.action === 'attendance.manual' && l.at && l.detail?.date === date).map(() => ({ type:'manual', text:'تصحيح حضور يدوي من الإدارة', count:1 })),
   ];
   const merged = {}; incidents.forEach(i => { const k = i.type + i.text; merged[k] = merged[k] ? { ...merged[k], count:merged[k].count + i.count } : { ...i }; });
   const tSent = {}; (D.notifications || []).filter(x => (x.date || x.at.slice(0, 10)) === date && String(x.sender).startsWith('teacher:')).forEach(x => {
-    const t = (D.teachers || []).find(y => 'teacher:' + y.id === x.sender), k = t?.full_name || 'معلم';
+    const t = (D.teachers || []).find(y => 'teacher:' + y.id === x.sender), k = t?.full_name || 'مدرب';
     tSent[k] = tSent[k] || { teacher:k, reminders:0, guardians:0 }; if(x.to === 'guardian') tSent[k].guardians++; else tSent[k].reminders++; });
   const homework = (D.assignments || []).filter(a => a.due_date === date).map(a => ({ title:a.title, section:SECTIONS[a.section], submitted:(D.submissions || []).filter(s => s.assignment_id === a.id && ['submitted', 'graded'].includes(s.status)).length }));
   return {

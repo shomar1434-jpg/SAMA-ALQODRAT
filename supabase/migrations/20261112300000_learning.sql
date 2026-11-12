@@ -1,5 +1,5 @@
 -- =====================================================================
--- الخطوات 10–12: الواجبات، وبنوك الأسئلة واختبار قياس المستوى، وتقييم المعلم، والمراسلة.
+-- الخطوات 10–12: الواجبات، وبنوك الأسئلة واختبار قياس المستوى، وتقييم المدرب، والمراسلة.
 -- النطاق: القسم × المقرر، ويُتحقق منه في كل دالة (مطابق لـ src/learning_logic.js).
 -- =====================================================================
 create table if not exists assignments (
@@ -57,7 +57,7 @@ create or replace function teacher_teaches(p_teacher teachers, p_trainee uuid) r
   select p_teacher.id is not null and exists (select 1 from subscriptions s where s.trainee_id = p_trainee and sub_live(s, riyadh_now()::date) and s.section = p_teacher.section and s.subjects && p_teacher.subjects);
 $$;
 
--- ---------- المعلم ----------
+-- ---------- المدرب ----------
 create or replace function teacher_save_assignment(p jsonb) returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare me teachers := me_teacher();
 begin
@@ -114,7 +114,7 @@ begin
   if not found then raise exception 'غير مصرح'; end if;
 end $$;
 
--- ---------- الطالب ----------
+-- ---------- المتدرب ----------
 create or replace function student_submit(p jsonb) returns jsonb language plpgsql volatile security definer set search_path = public as $$
 declare a assignments%rowtype; v_tr uuid := (p->>'trainee_id')::uuid; v_draft boolean := coalesce((p->>'draft')::boolean, false); v_ans text := trim(coalesce(p->>'answer','')); s submissions%rowtype;
 begin
@@ -168,7 +168,7 @@ declare v_tr uuid := (p->>'trainee_id')::uuid; t teachers%rowtype; v_days int; v
 begin
   if not student_owns(v_tr) then raise exception 'غير مصرح'; end if;
   select * into t from teachers where id = (p->>'teacher_id')::uuid and active;
-  if not teacher_teaches(t, v_tr) then raise exception 'المعلم لا يدرّسك في اشتراك قائم'; end if;
+  if not teacher_teaches(t, v_tr) then raise exception 'المدرب لا يدرّسك في اشتراك قائم'; end if;
   select count(distinct att_date) into v_days from sub_attendance where trainee_id = v_tr;
   if v_days < 3 then raise exception 'يُتاح التقييم بعد حضور 3 أيام على الأقل'; end if;
   if v_st is null or v_st not between 1 and 5 then raise exception 'اختر من نجمة إلى خمس نجوم'; end if;
@@ -183,9 +183,9 @@ create or replace function send_message(p jsonb, p_role text) returns jsonb lang
 declare v_tr uuid := (p->>'trainee_id')::uuid; t teachers%rowtype; v_text text := trim(coalesce(p->>'text',''));
 begin
   if v_text = '' or length(v_text) > 1000 then raise exception 'الرسالة فارغة أو أطول من 1000 حرف'; end if;
-  if p_role = 'teacher' then t := me_teacher(); if t.id is null or t.id <> (p->>'teacher_id')::uuid or not teacher_teaches(t, v_tr) then raise exception 'الطالب ليس ضمن طلابك'; end if;
+  if p_role = 'teacher' then t := me_teacher(); if t.id is null or t.id <> (p->>'teacher_id')::uuid or not teacher_teaches(t, v_tr) then raise exception 'المتدرب ليس ضمن متدربيك'; end if;
   else if not student_owns(v_tr) then raise exception 'غير مصرح'; end if; select * into t from teachers where id = (p->>'teacher_id')::uuid and active;
-       if not teacher_teaches(t, v_tr) then raise exception 'المعلم لا يدرّسك'; end if; end if;
+       if not teacher_teaches(t, v_tr) then raise exception 'المدرب لا يدرّسك'; end if; end if;
   insert into messages(trainee_id, teacher_id, "from", text) values (v_tr, t.id, case when p_role = 'teacher' then 'teacher' else 'student' end, v_text);
   return jsonb_build_object('ok', true);
 end $$;

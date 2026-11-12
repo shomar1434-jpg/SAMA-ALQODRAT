@@ -1,6 +1,6 @@
 /* =====================================================================
    واجهات الجانب التعليمي داخل البوابات: الواجبات، وقياس المستوى وبنك الأسئلة،
-   والمراسلة، وتقييم المعلم بالنجوم.
+   والمراسلة، وتقييم المدرب بالنجوم.
    ===================================================================== */
 import { $, $$, esc, fmtNum, fmtShort, riyadhNow, addDays } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
@@ -14,7 +14,7 @@ const STATE_TXT = { new:'جديد', draft:'قيد الحل', submitted:'مُرس
 const STATE_TONE = { new:'info', draft:'o', submitted:'ok', needs_revision:'warn', graded:'ok', late:'bad' };
 const secOf = t => Object.keys(SECTIONS).find(k => k === t?.section) || t?.section;
 
-/* ======================= الطالب ======================= */
+/* ======================= المتدرب ======================= */
 export function studentHomework(D, tr, reload){
   const list = assignmentsFor(D, tr.id), counts = {};
   list.forEach(a => counts[a.state] = (counts[a.state] || 0) + 1);
@@ -22,7 +22,7 @@ export function studentHomework(D, tr, reload){
     ${list.length ? `<div class="hw-list">${list.map(a => `<article class="hw"><div class="hw-h"><b>${esc(a.title)}</b><span class="pill dot ${STATE_TONE[a.state]}">${STATE_TXT[a.state]}</span></div>
       <div class="hint">${esc(a.subject)} · نُشر ${fmtShort(a.publish_date)} · يُستحق ${fmtShort(a.due_date)}${a.submission?.late ? ' · سُلّم متأخرًا' : ''}</div>
       ${a.body ? `<p>${esc(a.body)}</p>` : ''}
-      ${a.submission?.status === 'graded' || a.submission?.status === 'needs_revision' ? `<div class="hw-fb"><b>${a.submission.score != null ? `الدرجة ${fmtNum(a.submission.score)} من ${fmtNum(a.max_score)}` : 'ملاحظات المعلم'}</b>${a.submission.feedback ? `<p>${esc(a.submission.feedback)}</p>` : ''}</div>` : ''}
+      ${a.submission?.status === 'graded' || a.submission?.status === 'needs_revision' ? `<div class="hw-fb"><b>${a.submission.score != null ? `الدرجة ${fmtNum(a.submission.score)} من ${fmtNum(a.max_score)}` : 'ملاحظات المدرب'}</b>${a.submission.feedback ? `<p>${esc(a.submission.feedback)}</p>` : ''}</div>` : ''}
       ${a.submission?.status !== 'graded' ? `<form class="hw-f" data-hw="${a.id}"><label class="sr-only" for="hw-${a.id}">إجابتك</label><textarea class="inp" id="hw-${a.id}" rows="3" maxlength="6000" placeholder="اكتب إجابتك هنا" style="padding:10px 14px;line-height:1.8">${esc(a.submission?.answer || '')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn sm" data-draft>حفظ مسودة</button><button class="btn pri sm">${ic('check')} إرسال</button></div></form>` : ''}
     </article>`).join('')}</div>` : emptyBox('لا توجد واجبات منشورة لك بعد')}</div>`,
@@ -69,7 +69,7 @@ export function studentMessages(D, tr, reload, role = 'student'){
 export function threadUi(D, threads, role, reload){
   return { html:`<div class="card pad rv">${threads.length ? `<div class="msg-wrap"><div class="msg-list">${threads.map((th, i) => { const unread = threadFor(D, th.trainee_id, th.teacher_id).filter(m => m.from !== role && !m.read_at).length;
       return `<button class="msg-th ${i === 0 ? 'on' : ''}" data-th="${i}">${esc(th.title)}${unread ? ` <span class="badge-n">${fmtNum(unread)}</span>` : ''}</button>`; }).join('')}</div><div class="msg-pane" id="msgPane"></div></div>`
-      : emptyBox(role === 'teacher' ? 'لا يوجد طلاب لمراسلتهم' : 'لا يوجد معلم مسند لاشتراكك')}</div>`,
+      : emptyBox(role === 'teacher' ? 'لا يوجد متدربون لمراسلتهم' : 'لا يوجد مدرب مسند لاشتراكك')}</div>`,
   bind(){ if(!threads.length) return; const open = i => { const th = threads[i]; $$('.msg-th').forEach((b, j) => b.classList.toggle('on', j === i));
       const ms = threadFor(D, th.trainee_id, th.teacher_id);
       $('#msgPane').innerHTML = `<div class="msgs" id="msgs" aria-live="polite">${ms.length ? ms.map(m => `<div class="msg ${m.from === role ? 'me' : ''}"><p>${esc(m.text)}</p><span>${fmtShort(m.at.slice(0, 10))} ${new Date(m.at).toLocaleTimeString('ar-SA', { timeZone:'Asia/Riyadh', hour:'numeric', minute:'2-digit' })}${m.from === role && m.read_at ? ' · قُرئت' : ''}</span></div>`).join('') : '<p class="hint">ابدأ المحادثة.</p>'}</div>
@@ -90,21 +90,21 @@ export function studentRating(D, tr, reload){
           <div class="grid" style="gap:6px;margin-top:8px">${Object.entries(RATE_ITEMS).map(([k, l]) => `<label class="rate-it"><span>${l}</span><select class="inp" name="${k}">${[5, 4, 3, 2, 1].map(v => `<option value="${v}" ${(r?.items?.[k] ?? 5) === v ? 'selected' : ''}>${'★'.repeat(v)}</option>`).join('')}</select></label>`).join('')}</div>
           <label class="sr-only" for="rc-${t.id}">تعليق</label><textarea class="inp" id="rc-${t.id}" name="comment" rows="2" maxlength="500" placeholder="تعليق اختياري" style="margin-top:8px;padding:10px 14px">${esc(r?.comment || '')}</textarea>
           <button class="btn pri sm" style="margin-top:8px">${ic('check')} ${r ? 'تحديث التقييم' : 'إرسال التقييم'}</button>
-          <p class="hint" style="margin:6px 0 0">يرى المعلم نتائج مجمّعة دون اسمك.</p>` : `<p class="hint">${esc(c.why)}</p>`}</form>`; }).join('') : `<div class="card pad">${emptyBox('لا يوجد معلم لتقييمه')}</div>`}</div>`,
+          <p class="hint" style="margin:6px 0 0">يرى المدرب نتائج مجمّعة دون اسمك.</p>` : `<p class="hint">${esc(c.why)}</p>`}</form>`; }).join('') : `<div class="card pad">${emptyBox('لا يوجد مدرب لتقييمه')}</div>`}</div>`,
   bind(){ $$('[data-rt]').forEach(f => f.onsubmit = async e => { e.preventDefault(); const fd = new FormData(f); if(!fd.get('stars')) return toast('اختر عدد النجوم');
       const b = $('button', f); setBusy(b, true, 'جارٍ الإرسال');
       try { const r = await Store.rateTeacher({ trainee_id:tr.id, teacher_id:f.dataset.rt, stars:+fd.get('stars'), items:Object.fromEntries(Object.keys(RATE_ITEMS).map(k => [k, +fd.get(k)])), comment:fd.get('comment') });
         toast(r.updated ? 'حُدّث تقييمك' : 'شكرًا لتقييمك'); reload(); } catch(x){ setBusy(b, false); toast(x.message); } }); } };
 }
 
-/* ======================= المعلم ======================= */
+/* ======================= المدرب ======================= */
 export function teacherHomework(D, reload){
   const me = D.me, list = (D.assignments || []).slice().sort((a, b) => b.publish_date.localeCompare(a.publish_date));
   const students = (D.trainees || []).length;
   return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('form')}واجباتي</h3><button class="btn pri sm" id="hwAdd">${ic('plus')} واجب</button></div>
     ${list.length ? list.map(a => { const subs = (D.submissions || []).filter(s => s.assignment_id === a.id), done = subs.filter(s => ['submitted', 'graded', 'needs_revision'].includes(s.status));
       return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> <span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(students)}</span></summary>
-        ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>الطالب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
+        ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
           <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${esc(s.answer || '')}</td>
           <td>${['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
   bind(){ $('#hwAdd').onclick = () => { const n = riyadhNow();
@@ -115,7 +115,7 @@ export function teacherHomework(D, reload){
         <div class="field"><label for="hf-p">تاريخ النشر</label><input class="inp" type="date" id="hf-p" name="publish_date" value="${n.date}"></div>
         <div class="field"><label for="hf-d">تاريخ الاستحقاق</label><input class="inp" type="date" id="hf-d" name="due_date" value="${addDays(n.date, 3)}"></div>
         <div class="field" style="grid-column:1/-1"><label for="hf-b">التعليمات</label><textarea class="inp" id="hf-b" name="body" rows="4" style="padding:10px 14px;line-height:1.8"></textarea></div>
-        <p class="hint" style="grid-column:1/-1;margin:0">يصل الواجب إلى طلاب قسم ${SECTIONS[secOf(me)]} المشتركين في المقرر فقط.</p>
+        <p class="hint" style="grid-column:1/-1;margin:0">يصل الواجب إلى متدربي قسم ${SECTIONS[secOf(me)]} المشتركين في المقرر فقط.</p>
         <div class="errtxt" id="hfE" style="grid-column:1/-1"></div>
         <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="hfC">إلغاء</button><button class="btn pri" id="hfS">${ic('check')} نشر</button></div></form>`);
       $('#hfC').onclick = closeModal;
@@ -125,7 +125,7 @@ export function teacherHomework(D, reload){
       modal(`<h3>تصحيح: ${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</h3><p class="hw-ans">${esc(s.answer || '')}</p><form id="gf2" class="grid g2" novalidate>
         <div class="field"><label for="g-s">الدرجة من ${fmtNum(a.max_score)}</label><input class="inp num" id="g-s" name="score" type="number" min="0" max="${a.max_score}" value="${s.score ?? ''}"></div>
         <div class="field"><label for="g-st">النتيجة</label><select class="inp" id="g-st" name="status"><option value="graded">مكتمل ومصحح</option><option value="needs_revision" ${s.status === 'needs_revision' ? 'selected' : ''}>يحتاج تعديلًا</option></select></div>
-        <div class="field" style="grid-column:1/-1"><label for="g-f">ملاحظات للطالب</label><textarea class="inp" id="g-f" name="feedback" rows="3" style="padding:10px 14px">${esc(s.feedback || '')}</textarea></div>
+        <div class="field" style="grid-column:1/-1"><label for="g-f">ملاحظات للمتدرب</label><textarea class="inp" id="g-f" name="feedback" rows="3" style="padding:10px 14px">${esc(s.feedback || '')}</textarea></div>
         <div class="errtxt" id="gE" style="grid-column:1/-1"></div><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="gC">إلغاء</button><button class="btn pri" id="gS">${ic('check')} حفظ</button></div></form>`);
       $('#gC').onclick = closeModal; $('#gf2').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), bb = $('#gS'); setBusy(bb, true, 'جارٍ الحفظ');
         try { await Store.gradeSubmission(s.id, f); closeModal(); toast('حُفظ التصحيح'); reload(); } catch(x){ setBusy(bb, false); $('#gE').textContent = x.message; } }; }); } };
@@ -137,7 +137,7 @@ export function teacherBank(D, reload){
   return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('database')}بنك أسئلة ${SECTIONS[secOf(me)]} · ${esc(me.subjects.join('، '))}</h3><button class="btn pri sm" id="qAdd2">${ic('plus')} سؤال</button></div>
       ${qs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المقرر</th><th>الوحدة</th><th>السؤال</th><th>الحالة</th><th></th></tr></thead><tbody>${qs.map(q => `<tr><td>${esc(q.subject)}</td><td>${esc(q.unit)}</td><td style="max-width:380px">${esc(q.text)}</td>
         <td><span class="pill dot ${q.status === 'published' ? 'ok' : 'g'}">${q.status === 'published' ? 'منشور' : 'مسودة'}</span></td><td style="white-space:nowrap"><button class="btn sm" data-qe="${q.id}" aria-label="تعديل">${ic('edit')}</button> <button class="btn sm" data-qp="${q.id}">${q.status === 'published' ? 'إيقاف' : 'نشر'}</button></td></tr>`).join('')}</tbody></table></div>` : emptyBox('البنك فارغ')}</div>
-    <div class="card pad rv" style="margin-top:16px"><h3 class="ctitle">${ic('chart')}نتائج قياس المستوى لطلابي</h3>${att.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>الطالب</th><th>المقرر</th><th>الوحدة</th><th>الدرجة</th><th>التاريخ</th></tr></thead><tbody>${att.map(a => `<tr><td>${esc(D.trainees.find(t => t.id === a.trainee_id)?.full_name || '')}</td><td>${esc(a.subject)}</td><td>${esc(a.unit || '')}</td><td class="num">${fmtNum(a.score)} / ${fmtNum(a.total)}</td><td>${fmtShort(a.submitted_at.slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div>`,
+    <div class="card pad rv" style="margin-top:16px"><h3 class="ctitle">${ic('chart')}نتائج قياس المستوى لمتدربيّ</h3>${att.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>المقرر</th><th>الوحدة</th><th>الدرجة</th><th>التاريخ</th></tr></thead><tbody>${att.map(a => `<tr><td>${esc(D.trainees.find(t => t.id === a.trainee_id)?.full_name || '')}</td><td>${esc(a.subject)}</td><td>${esc(a.unit || '')}</td><td class="num">${fmtNum(a.score)} / ${fmtNum(a.total)}</td><td>${fmtShort(a.submitted_at.slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div>`,
   bind(){ const edit = q => { modal(`<h3>${q ? 'تعديل سؤال' : 'سؤال جديد'}</h3><form id="qf" class="grid g2" novalidate>
         <div class="field"><label for="qf-s">المقرر</label><select class="inp" id="qf-s" name="subject">${me.subjects.map(s => `<option ${q?.subject === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
         <div class="field"><label for="qf-u">الوحدة</label><input class="inp" id="qf-u" name="unit" value="${esc(q?.unit || '')}"></div>
@@ -163,8 +163,8 @@ export function teacherMessages(D, reload){
 }
 export function teacherRatings(D){
   const r = D.rating_summary || { count:0, items:{}, comments:[] };
-  return { html:`<div class="card pad rv"><h3 class="ctitle">${ic('award')}تقييمات الطلاب (مجمّعة دون أسماء)</h3>
+  return { html:`<div class="card pad rv"><h3 class="ctitle">${ic('award')}تقييمات المتدربين (مجمّعة دون أسماء)</h3>
     ${r.count ? `<div class="rate-sum"><div><b class="num">${fmtNum(r.stars)}</b><span>من 5 · ${fmtNum(r.count)} تقييم</span></div>${Object.entries(RATE_ITEMS).map(([k, l]) => `<div><span>${l}</span><div class="tbar"><i style="width:${(r.items[k] || 0) * 20}%"></i></div><b class="num">${fmtNum(r.items[k] || 0)}</b></div>`).join('')}</div>
       ${r.comments.length ? `<ul class="ntf" style="margin-top:12px">${r.comments.map(c => `<li><span class="pill g">${esc(c.period)}</span><p>${esc(c.text)}</p><span></span></li>`).join('')}</ul>` : ''}`
-      : `<p class="hint">لا توجد تقييمات بعد. يُتاح التقييم للطالب بعد حضور ${MIN_ATTEND_TO_RATE} أيام.</p>`}</div>`, bind(){} };
+      : `<p class="hint">لا توجد تقييمات بعد. يُتاح التقييم للمتدرب بعد حضور ${MIN_ATTEND_TO_RATE} أيام.</p>`}</div>`, bind(){} };
 }
