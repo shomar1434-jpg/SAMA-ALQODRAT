@@ -20,3 +20,19 @@ export function checkBirthGuardian(f, today){
   if(!/^05\d{8}$/.test(g)) throw new Error('جوال ولي الأمر مطلوب لمن هم دون 19 سنة (10 أرقام تبدأ بـ 05)');
   return g;
 }
+
+/* ربط ولي الأمر الذاتي: ثلاثة شروط معًا — المتدرب صرّح بجوال ولي الأمر عند التسجيل، وولي الأمر أثبت ملكية الجوال
+   برمز التحقق (الجلسة)، وكتب السجل المدني الصحيح. الرفض برسالة واحدة لا تكشف السبب، وحد المحاولات في الساعة. */
+export const LINK_FAIL = 'تعذّر الربط. تأكد من رقم السجل المدني، أو راجع إدارة المعهد.';
+export const LINK_LOCKED = 'تجاوزت عدد المحاولات. حاول بعد ساعة، أو راجع إدارة المعهد.';
+export function selfLinkLogic(D, phone, nid, nowIso){
+  const since = new Date(new Date(nowIso).getTime() - 3600e3).toISOString();
+  const fails = (D.guardian_link_attempts || []).filter(a => a.phone === phone && !a.ok && a.at >= since).length;
+  if(fails >= LINK_MAX_TRIES) return { ok:false, reason:'locked' };
+  const t = (D.trainees || []).find(x => x.national_id === nid && x.guardian_phone === phone);
+  if(!t) return { ok:false, reason:'no_match' };
+  const links = (D.guardian_links || []).filter(l => l.trainee_id === t.id && l.guardian_phone === phone);
+  if(links.some(l => l.status === 'verified')) return { ok:true, already:true, trainee_id:t.id };
+  if(links.some(l => l.status === 'revoked')) return { ok:false, reason:'revoked' };          // ما ألغته الإدارة لا يُعاد ذاتيًا
+  return { ok:true, trainee_id:t.id };
+}

@@ -205,16 +205,38 @@ function viewStudent(D){
 let gIdx = 0;
 function viewGuardian(D, s){
   const g = guardianDashboard(D, s.phone), ch = g.children[Math.min(gIdx, g.children.length - 1)];
-  if(!ch) return ($('#app').innerHTML = `<div class="wrap">${emptyBox('لا يوجد أبناء مرتبطون بهذا الرقم', 'يربط المعهد ولي الأمر بأبنائه بعد التحقق. راجع إدارة المعهد.')}</div>`);
+  if(!ch){ $('#app').innerHTML = `<div class="wrap"><div class="card pad rv" style="max-width:520px;margin:0 auto">${linkFormHtml(true)}</div></div>`; return bindLinkForm(); }
   const U = unifiedItems(D, ch.trainee.id, ch.items), u = U[Math.min(sIdx, U.length - 1)], it = u?.kind === 'sub' ? u.it : null, px = u?.kind === 'prog' ? u.x : null;
   $('#app').innerHTML = `<div class="wrap">
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('users')}${TITLES.guardian}</span><h1>متابعة ${esc(ch.trainee.first_name)}</h1>
-      <p>${esc(ch.relation || '')}${it ? ' · ' + esc(it.plan) + ' · قسم ' + esc(it.section) : px ? ' · ' + esc(px.program) : ''}</p></div></section>
+      <p>${esc(ch.relation || '')}${it ? ' · ' + esc(it.plan) + ' · قسم ' + esc(it.section) : px ? ' · ' + esc(px.program) : ''}</p></div>
+      <div><button class="btn sm ghost-t" id="gLink">${ic('plus')} ربط ابن أو ابنة</button></div></section>
     ${g.children.length > 1 ? `<div class="tabs" style="margin:14px 0">${g.children.map((c, i) => `<button class="tab" data-gi="${i}" aria-selected="${i === gIdx}">${ic('user')}${esc(c.trainee.first_name)}</button>`).join('')}</div>` : ''}
     ${!u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75))}</div>`;
+  $('#gLink').onclick = () => { modal(linkFormHtml(false)); bindLinkForm(); };
   $$('[data-gi]').forEach(b => b.onclick = () => { gIdx = +b.dataset.gi; sIdx = 0; viewGuardian(D, s); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewGuardian(D, s); });
   if(ch.notifications.some(x => !x.read_at)) Store.markRead('guardian');
+}
+
+/* ربط ولي الأمر بابنه: يكتب السجل المدني للمتدرب الذي صرّح بجوال ولي الأمر عند التسجيل */
+function linkFormHtml(first){
+  return `<h3 class="ctitle">${ic('users')}${first ? 'اربط حسابك بابنك أو ابنتك' : 'ربط ابن أو ابنة'}</h3>
+    <p class="hint" style="margin:-4px 0 12px">اكتب رقم السجل المدني للمتدرب. يتم الربط إذا كان جوالك هذا هو جوال ولي الأمر المسجَّل في بياناته.</p>
+    <form id="glF" class="grid" novalidate><div class="field"><label for="gl-nid">رقم السجل المدني أو الإقامة للمتدرب</label>
+      <input class="inp num" id="gl-nid" inputmode="numeric" maxlength="10" dir="ltr" placeholder="1XXXXXXXXX" autocomplete="off" aria-describedby="glE"></div>
+      <div class="errtxt" id="glE" role="alert"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">${first ? '' : '<button type="button" class="btn" id="glC">إلغاء</button>'}<button class="btn pri" id="glB">${ic('check')} ربط</button></div>
+      <p class="hint" style="margin:0">لم ينجح الربط؟ راجع إدارة المعهد لتحديث جوال ولي الأمر في بيانات المتدرب.</p></form>`;
+}
+function bindLinkForm(){
+  const nid = $('#gl-nid'); nid.addEventListener('input', () => { nid.value = toLatin(nid.value).replace(/\D/g, ''); });
+  if($('#glC')) $('#glC').onclick = closeModal;
+  $('#glF').onsubmit = async e => { e.preventDefault(); const b = $('#glB'); $('#glE').textContent = '';
+    if(!/^[12]\d{9}$/.test(nid.value)){ $('#glE').textContent = 'رقم السجل المدني 10 أرقام يبدأ بـ 1 أو 2.'; nid.setAttribute('aria-invalid', 'true'); return; }
+    setBusy(b, true, 'جارٍ التحقق');
+    try { const r = await Store.guardianSelfLink(nid.value); closeModal(); toast(r.already ? 'هذا المتدرب مرتبط بحسابك مسبقًا' : 'تم الربط'); gIdx = 0; render(); }
+    catch(x){ setBusy(b, false); $('#glE').textContent = x.message; } };
 }
 
 /* ---------- المدرب ---------- */

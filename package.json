@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "lint": "eslint src tests",
-    "test": "node tests/smoke.mjs && node tests/e2e.mjs && node tests/qudurat.mjs && node tests/portals.mjs && node tests/daily.mjs && node tests/learning.mjs && node tests/policies.mjs && node tests/gauge.mjs && node tests/program_portal.mjs && node tests/identity.mjs && node tests/inbox.mjs && node tests/question_banks.mjs && node tests/registration.mjs",
+    "test": "node tests/smoke.mjs && node tests/e2e.mjs && node tests/qudurat.mjs && node tests/portals.mjs && node tests/daily.mjs && node tests/learning.mjs && node tests/policies.mjs && node tests/gauge.mjs && node tests/program_portal.mjs && node tests/identity.mjs && node tests/inbox.mjs && node tests/question_banks.mjs && node tests/registration.mjs && node tests/guardian_link.mjs",
     "check": "npm run lint && npm run build && npm test",
     "test:sql": "bash supabase/tests/run.sh",
     "seed:site": "node scripts/seed_site.mjs"
