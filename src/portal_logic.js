@@ -15,7 +15,8 @@ export function rolesOfPhone(D, phone){
   if((D.teachers || []).some(t => t.active !== false && normPhone(t.phone) === ph)) roles.push('teacher');
   // المتدرب: مشترك في باقة أو مسجّل في برنامج (دفعة)
   if(D.trainees.some(t => normPhone(t.phone) === ph && ((D.subscriptions || []).some(s => s.trainee_id === t.id) || (D.enrollments || []).some(e => e.trainee_id === t.id && e.status !== 'ملغى')))) roles.push('student');
-  if((D.guardian_links || []).some(l => l.status === 'verified' && normPhone(l.guardian_phone) === ph)) roles.push('guardian');
+  // ولي الأمر: له رابط موثّق، أو صرّح متدرب بجواله عند التسجيل (يدخل ثم يربط بالسجل المدني)
+  if((D.guardian_links || []).some(l => l.status === 'verified' && normPhone(l.guardian_phone) === ph) || D.trainees.some(t => t.guardian_phone && normPhone(t.guardian_phone) === ph)) roles.push('guardian');
   return roles;
 }
 

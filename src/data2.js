@@ -6,7 +6,7 @@ import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
-import { checkBirthGuardian } from './identity_logic.js';
+import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
@@ -460,6 +460,14 @@ export const LocalStore = {
   async saveTeacher(t){ const a=this.data.teachers; if(!/^05\d{8}$/.test(normPhone(t.phone))) throw new Error('رقم الجوال غير صحيح');
     if(a.some(x=>x.id!==t.id && x.active!==false && normPhone(x.phone)===normPhone(t.phone))) throw new Error('رقم الجوال مستخدم لمدرب آخر');
     const i=a.findIndex(x=>x.id===t.id); if(i>=0) a[i]={...a[i],...t, phone:normPhone(t.phone)}; else a.push({...t, id:uid(), phone:normPhone(t.phone), active:true, created_at:new Date().toISOString()}); this.audit('teacher.save', t.id||'new'); this.save(); },
+  /* ربط ولي الأمر الذاتي بالسجل المدني للابن (بعد دخوله برمز التحقق) */
+  async guardianSelfLink(national_id){ const s=await this.portalSession('guardian'); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا');
+    const D=this.data, now=new Date().toISOString(), nid=String(national_id||'').trim(), r=selfLinkLogic(D, s.phone, nid, now);
+    if(r.reason==='locked') throw new Error(LINK_LOCKED);
+    (D.guardian_link_attempts=D.guardian_link_attempts||[]).push({id:uid(), phone:s.phone, nid_hash:'h'+nid.slice(-2), ok:r.ok, reason:r.reason||null, at:now}); if(D.guardian_link_attempts.length>2000) D.guardian_link_attempts.splice(0,500);
+    if(!r.ok){ this.save(); throw new Error(LINK_FAIL); }
+    if(!r.already){ D.guardian_links.push({id:uid(), guardian_name:'', guardian_phone:s.phone, trainee_id:r.trainee_id, relation:'ولي الأمر', status:'verified', verified_by:'self', source:'self', created_at:now}); this.audit('guardian_link.self', r.trainee_id); }
+    this.save(); return {ok:true, already:!!r.already}; },
   async saveGuardianLink(l){ const D=this.data; if(!/^05\d{8}$/.test(normPhone(l.guardian_phone))) throw new Error('رقم جوال ولي الأمر غير صحيح');
     const t=D.trainees.find(x=>x.national_id===l.national_id||x.id===l.trainee_id); if(!t) throw new Error('لا يوجد متدرب بهذا السجل المدني');
     if(D.guardian_links.some(x=>x.status==='verified'&&x.trainee_id===t.id&&normPhone(x.guardian_phone)===normPhone(l.guardian_phone))) throw new Error('هذا الرابط موجود مسبقًا');
@@ -625,6 +633,7 @@ export const CloudStore = {
   async sendMessage(p, role){ return this._e(await this.sb.rpc('send_message',{p, p_role:role})); },
   async markThreadRead({trainee_id, teacher_id}, role){ await this.sb.rpc('mark_thread_read',{p_trainee:trainee_id, p_teacher:teacher_id, p_role:role}); },
   async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
+  async guardianSelfLink(national_id){ const r=this._e(await this.sb.rpc('guardian_self_link',{p_nid:String(national_id||'').trim()})); if(!r?.ok) throw new Error(LINK_FAIL); return r; },
   async saveGuardianLink(l){ const t=this._e(await this.sb.from('trainees').select('id').eq('national_id',l.national_id).maybeSingle()); if(!t) throw new Error('لا يوجد متدرب بهذا السجل المدني');
     const {data:{session}}=await this.sb.auth.getSession(); this._e(await this.sb.from('guardian_links').insert({guardian_name:l.guardian_name, guardian_phone:normPhone(l.guardian_phone), trainee_id:t.id, relation:l.relation, verified_by:session?.user?.id||null})); },
   async revokeGuardianLink(id){ this._e(await this.sb.from('guardian_links').update({status:'revoked', revoked_at:new Date().toISOString()}).eq('id',id)); },

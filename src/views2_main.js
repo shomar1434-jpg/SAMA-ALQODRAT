@@ -385,7 +385,7 @@ export async function viewGeneralCheckin(){
    ===================================================================== */
 /* اختيار البوابة: المتدرب، وولي الأمر، والمدرب (لكل منها صفحة ودور) */
 export function viewPortals(){
-  const C=[['student','user','بوابة المتدرب','حضورك ونسبة إنجازك في باقتك أو برنامجك التدريبي، وواجباتك وشهادتك ومواعيدك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك والتنبيهات، بعد ربطك من المعهد.'],['teacher','book','بوابة المدرب','كشف حضور متدربيك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
+  const C=[['student','user','بوابة المتدرب','حضورك ونسبة إنجازك في باقتك أو برنامجك التدريبي، وواجباتك وشهادتك ومواعيدك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك وتقدّمه والتنبيهات. تدخل بجوالك المسجَّل ولي أمرٍ في بياناته، ثم تكتب سجله المدني مرة واحدة.'],['teacher','book','بوابة المدرب','كشف حضور متدربيك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
   $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint" style="margin:8px 0 0">الدخول برقم جوالك المسجّل في المعهد ورمز تحقق.</p></div>
     <div class="grid g3">${C.map(([k,i,t,d],n)=>`<a class="card pad portal-card rv" style="--i:${n}" href="${portalBase(k)}"><span class="kic-lg t-info">${ic(i)}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div>${siteFooter()}`;
 }
