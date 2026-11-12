@@ -945,3 +945,38 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .pol-hist{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
 .pol-hist li{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px dashed var(--border);padding:6px 0}
 #rfPol a{color:var(--pt);text-decoration:underline}
+/* عداد الأداء العام */
+:root{--gauge-y:#E2B000}
+[data-theme="dark"]{--gauge-y:#F2C94C}
+.pill.gy{background:color-mix(in srgb,var(--gauge-y) 18%,transparent);color:color-mix(in srgb,var(--gauge-y) 70%,var(--ink))}
+.gauge-card{margin-top:16px}
+.gauge-body{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:24px;align-items:center}
+@media(max-width:700px){.gauge-body{grid-template-columns:1fr}}
+.gauge-dial{position:relative;display:flex;flex-direction:column;align-items:center}
+.gg{width:100%;max-width:300px;height:auto;overflow:visible}
+.gg path.gg-r,.gg path.gg-y,.gg path.gg-g{fill:none;stroke-width:20}
+.gg .gg-r{stroke:var(--danger)} .gg .gg-y{stroke:var(--gauge-y)} .gg .gg-g{stroke:var(--success)}
+.gg-tick{stroke:var(--ink-subtle);stroke-width:1.5}
+.gg-num{font-size:10px;fill:var(--ink-subtle);text-anchor:middle;font-family:inherit}
+.gg-needle{transform-box:view-box;transform-origin:120px 120px;transform:rotate(var(--to));animation:gg-sweep 1.1s cubic-bezier(.2,.8,.2,1) both}
+.gg-needle path{fill:var(--ink)}
+.gg-hub{fill:var(--ink);stroke:var(--surface-card);stroke-width:3}
+@keyframes gg-sweep{from{transform:rotate(-90deg)}to{transform:rotate(var(--to))}}
+@media(prefers-reduced-motion:reduce){.gg-needle{animation:none}}
+.gauge-val{display:flex;align-items:baseline;gap:6px;margin-top:-4px}
+.gauge-val b{font-size:34px;font-weight:700;line-height:1}
+.gauge-val span{color:var(--ink-subtle);font-size:13px}
+.gauge-lbl{margin-top:8px}
+.gauge-card[data-zone=red] .gauge-val b{color:var(--danger)}
+.gauge-card[data-zone=yellow] .gauge-val b{color:color-mix(in srgb,var(--gauge-y) 75%,var(--ink))}
+.gauge-card[data-zone=green] .gauge-val b{color:var(--success)}
+.gauge-axes{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.gauge-axes li{display:grid;grid-template-columns:110px 1fr 52px;grid-template-rows:auto auto;gap:4px 10px;align-items:center}
+.gauge-axes .ga-l{font-weight:600}
+.gauge-axes .hint{grid-column:1/-1;font-size:13px}
+.ga-bar{height:10px;border-radius:99px;background:var(--surface-track);overflow:hidden}
+.ga-bar i{display:block;height:100%;border-radius:inherit;background:var(--ink-subtle)}
+.gauge-axes li[data-zone=red] .ga-bar i{background:var(--danger)}
+.gauge-axes li[data-zone=yellow] .ga-bar i{background:var(--gauge-y)}
+.gauge-axes li[data-zone=green] .ga-bar i{background:var(--success)}
+.gauge-dial .gauge-lbl{flex:none;align-self:center;height:auto;min-height:0;border-radius:999px;padding:5px 14px;line-height:1.5}

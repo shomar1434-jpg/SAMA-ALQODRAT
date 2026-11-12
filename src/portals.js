@@ -7,7 +7,7 @@ import { ic, emptyBox, ringSvg, toast, statusPill, applyTheme, getTheme, setThem
 import { Store, initStore } from './data2.js';
 import { setPage, publicBase } from './config.js';
 import { LOGO } from './assets/logo.js';
-import { studentDashboard, teacherDashboard, guardianDashboard, ROLE_TXT, NOTIFY_TPL, normPhone } from './portal_logic.js';
+import { studentDashboard, teacherDashboard, guardianDashboard, ROLE_TXT, NOTIFY_TPL, normPhone, progressGauge, GAUGE_RED } from './portal_logic.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
@@ -71,15 +71,40 @@ function viewLogin(){
 }
 
 /* ---------- بطاقات الطالب الثلاث (تُستخدم لولي الأمر أيضًا) ---------- */
+/* عداد الأداء العام: نصف دائرة أحمر ← أصفر ← أخضر، وإبرة على المتوسط */
+function gaugeSvg(g){
+  const W = 240, cx = 120, cy = 120, r = 92, sw = 20;
+  const pt = (v, rr = r) => { const t = Math.PI * (1 - v / 100); return [cx + rr * Math.cos(t), cy - rr * Math.sin(t)]; };
+  const arc = (v1, v2, cls) => { const [x1, y1] = pt(v1), [x2, y2] = pt(v2); return `<path class="${cls}" d="M${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}"/>`; };
+  const tick = v => { const [x1, y1] = pt(v, r + sw / 2 + 2), [x2, y2] = pt(v, r + sw / 2 + 8), [tx, ty] = pt(v, r + sw / 2 + 18);
+    return `<line class="gg-tick" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/><text class="gg-num" x="${tx.toFixed(1)}" y="${(ty + 4).toFixed(1)}">${fmtNum(v)}</text>`; };
+  const v = g.score ?? 0, deg = -90 + 180 * v / 100;
+  return `<svg class="gg" viewBox="-18 -8 ${W + 36} 150" role="img" aria-label="${g.score == null ? 'مؤشر الأداء العام: يبدأ القياس من أول يوم حضور' : `مؤشر الأداء العام ${g.score} من 100: ${g.label}`}">
+    ${arc(0, GAUGE_RED, 'gg-r')}${arc(GAUGE_RED, g.thr, 'gg-y')}${arc(g.thr, 100, 'gg-g')}
+    ${[0, GAUGE_RED, g.thr, 100].map(tick).join('')}
+    ${g.score == null ? '' : `<g class="gg-needle" style="--to:${deg.toFixed(1)}deg"><path d="M${cx - 5} ${cy} L${cx} ${cy - r + 6} L${cx + 5} ${cy} Z"/></g>`}
+    <circle class="gg-hub" cx="${cx}" cy="${cy}" r="9"/>
+  </svg>`;
+}
+export function gaugeHtml(it){
+  const g = progressGauge(it), zt = { red:'danger', yellow:'gy', green:'success' };
+  return `<div class="card pad gauge-card rv" data-zone="${g.zone || 'none'}"><div class="ind-h">${ic('activity')}<b>مؤشر الأداء العام</b></div>
+    <div class="gauge-body"><div class="gauge-dial">${gaugeSvg(g)}<div class="gauge-val">${g.score == null ? '<span class="hint">—</span>' : `<b class="num">${fmtNum(g.score)}</b><span>من ١٠٠</span>`}</div>
+      <span class="pill gauge-lbl ${g.zone ? zt[g.zone] : ''}">${g.label}</span></div>
+      <ul class="gauge-axes">${g.axes.map(x => { const z = x.value == null ? '' : x.value < GAUGE_RED ? 'red' : x.value < g.thr ? 'yellow' : 'green';
+        return `<li data-zone="${z}"><span class="ga-l">${x.label}</span><span class="ga-bar" role="img" aria-label="${x.label}: ${x.value == null ? 'غير متاح بعد' : x.value + '٪'}"><i style="width:${x.value ?? 0}%"></i></span><b class="num">${x.value == null ? '—' : fmtNum(x.value) + '٪'}</b><span class="hint">${esc(x.detail)}</span></li>`; }).join('')}</ul></div>
+    <p class="hint" style="margin:10px 0 0">متوسط المحاور الثلاثة: الحضور، ونجاح أداء الواجبات، والمؤقت الزمني (أعلى نسبة حضور نهائية ما زالت ممكنة في المدة المتبقية). الأخضر يبدأ من ${fmtNum(g.thr)}٪ وهو حد استحقاق الشهادة.</p>
+  </div>`;
+}
 export function studentPanelHtml(it){
   const a = it.attendance, hw = it.homework, tm = it.time;
   const tone = a.rate == null ? 'success' : a.rate < 75 ? 'warning' : 'success';
-  return `<div class="ind3">
+  return `${gaugeHtml(it)}<div class="ind3">
     <div class="card pad ind rv" style="--i:1"><div class="ind-h">${ic('check')}<b>الحضور</b></div>
       ${a.held ? `<div class="ind-ring">${ringSvg(a.rate ?? 0, 92, 9, tone)}</div><div class="ind-nums"><span><b>${fmtNum(a.attended)}</b>حضور</span><span><b>${fmtNum(a.late)}</b>تأخر</span><span><b>${fmtNum(a.absent)}</b>غياب</span></div>
         <p class="hint">من ${fmtNum(a.held)} جلسة منعقدة، ويتبقى ${fmtNum(a.remaining)} جلسة.</p>` : `<p class="ind-empty">${it.start_date ? 'لا توجد جلسات منعقدة بعد' : 'يبدأ الاشتراك من أول يوم تحضر فيه'}</p>`}</div>
     <div class="card pad ind rv" style="--i:2"><div class="ind-h">${ic('form')}<b>أداء الواجبات</b></div>
-      ${hw.due ? `<div class="ind-ring">${ringSvg(hw.pct, 92, 9, hw.pct < 75 ? 'warning' : 'success')}</div><p class="hint">سلّمت ${fmtNum(hw.done)} من ${fmtNum(hw.due)} واجبًا مستحقًا.</p>`
+      ${hw.due ? `<div class="ind-ring">${ringSvg(hw.pct, 92, 9, hw.pct < 75 ? 'warning' : 'success')}</div><p class="hint">سلّمت ${fmtNum(hw.done)} من ${fmtNum(hw.due)} واجبًا مستحقًا، ونسبة النجاح فيها ${fmtNum(hw.success)}٪.</p>`
         : `<p class="ind-empty">لا توجد واجبات مستحقة بعد</p>`}${hw.pending ? `<span class="pill o">${fmtNum(hw.pending)} واجب ينتظر التسليم</span>` : ''}</div>
     <div class="card pad ind rv" style="--i:3"><div class="ind-h">${ic('hourglass')}<b>المؤقت الزمني للباقة</b></div>
       ${tm.pct == null ? `<p class="ind-empty">يبدأ العدّ من أول يوم حضور</p>` : `<div class="ind-big"><b>${fmtNum(tm.daysLeft)}</b> يومًا متبقية</div>
