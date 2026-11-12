@@ -33,7 +33,7 @@ begin
   perform set_config('app.uid', '', true);
 
   -- التسجيل يلزمه قبول الإصدار الساري
-  person := jsonb_build_object('national_id', v_nid, 'full_name', 'فهد سعد علي الزهراني', 'phone', '0559998877', 'gender', 'ذكر', 'city', 'جازان', 'education', 'ثانوي',
+  person := jsonb_build_object('birth_date','1995-01-01','national_id', v_nid, 'full_name', 'فهد سعد علي الزهراني', 'phone', '0559998877', 'gender', 'ذكر', 'city', 'جازان', 'education', 'ثانوي',
      'plan_id', (select id from plans where tier = 'basic' and mode = 'in_person'));
   begin perform register_subscription(person); ok := false; exception when others then ok := sqlerrm like '%يلزم قبول%'; end;
   assert ok, 'رفض التسجيل دون قبول';

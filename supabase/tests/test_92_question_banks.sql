@@ -7,7 +7,7 @@ begin
   -- مدربان في قسم البنين لمقرر كمي، ومتدرب مشترك
   insert into teachers(full_name, phone, section, subjects) values ('مدرب البنك الأول', '0501008881', 'boys', '{كمي,لفظي}') returning id into t1;
   insert into teachers(full_name, phone, section, subjects) values ('مدرب البنك الثاني', '0501008882', 'boys', '{كمي}') returning id into t2;
-  perform register_subscription(jsonb_build_object('national_id','1999999988','full_name','سامي فهد علي الحربي','phone','0557778881','gender','ذكر',
+  perform register_subscription(jsonb_build_object('birth_date','1995-01-01','national_id','1999999988','full_name','سامي فهد علي الحربي','phone','0557778881','gender','ذكر',
     'plan_id',(select id from plans where tier='basic' and mode='in_person'),
     'accepted_policies',(select coalesce(jsonb_agg(id), '[]') from current_policies(d) where requires_acceptance)));
   select id into v_tr from trainees where national_id = '1999999988';

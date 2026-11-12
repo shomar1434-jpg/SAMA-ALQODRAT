@@ -4,13 +4,13 @@ do $$
 declare v_t uuid; v_p uuid; r jsonb; ok boolean; v_req uuid; v_admin uuid; n int;
   acc jsonb := (select coalesce(jsonb_agg(id), '[]') from current_policies(riyadh_now()::date) where requires_acceptance);   -- سياسة إلزامية من اختبار سابق
 begin
-  perform register_subscription(jsonb_build_object('national_id','1999999995','full_name','عبدالله محمد علي الشهري','phone','0551110000','gender','ذكر',
+  perform register_subscription(jsonb_build_object('birth_date','1995-01-01','national_id','1999999995','full_name','عبدالله محمد علي الشهري','phone','0551110000','gender','ذكر',
      'plan_id',(select id from plans where tier='basic' and mode='in_person'),'accepted_policies',acc));
   select id into v_t from trainees where national_id = '1999999995';
   select program_id into v_p from cohorts where number = 99 and archived_at is null limit 1;
 
   -- شخص آخر يعرف السجل المدني يسجّل بجواله واسم مختلف وبريد جديد
-  perform register_trainee(jsonb_build_object('national_id','1999999995','full_name','منتحل الشخصية','phone','0559990000','email','x@y.com','program_id',v_p,'accepted_policies',acc));
+  perform register_trainee(jsonb_build_object('birth_date','1995-01-01','national_id','1999999995','full_name','منتحل الشخصية','phone','0559990000','email','x@y.com','program_id',v_p,'accepted_policies',acc));
   assert (select phone from trainees where id = v_t) = '0551110000', 'الجوال المعتمد لم يتغير';
   assert (select full_name from trainees where id = v_t) = 'عبدالله محمد علي الشهري', 'الاسم المعتمد لم يتغير';
   assert (select email from trainees where id = v_t) = 'x@y.com', 'الحقل الفارغ سابقًا يُكمَّل';
@@ -34,7 +34,7 @@ begin
 
   -- طلب صادق: قبوله يطبّق الجوال الجديد، وتعديل الإدارة المباشر لا يمر بالحارس
   perform set_config('app.uid', '', true);
-  perform register_subscription(jsonb_build_object('national_id','1999999995','full_name','عبدالله محمد علي الشهري','phone','0552220000','gender','ذكر','plan_id',(select id from plans where tier='silver' and mode='in_person'),'accepted_policies',acc));
+  perform register_subscription(jsonb_build_object('birth_date','1995-01-01','national_id','1999999995','full_name','عبدالله محمد علي الشهري','phone','0552220000','gender','ذكر','plan_id',(select id from plans where tier='silver' and mode='in_person'),'accepted_policies',acc));
   select count(*) into n from profile_change_requests where trainee_id = v_t and status = 'pending';
   assert n = 1, 'طلب جديد واحد';
   perform set_config('app.uid', v_admin::text, true);
@@ -43,4 +43,28 @@ begin
   update trainees set city = 'صبيا' where id = v_t;
   assert (select city from trainees where id = v_t) = 'صبيا', 'تعديل الإدارة المباشر يمر';
   perform set_config('app.uid', '', true);
+end $$;
+
+-- الخطوة B: تاريخ الميلاد إلزامي، وجوال ولي الأمر لمن هم دون 19، ولا يُستبدل في إعادة التسجيل
+do $$
+declare d date := riyadh_now()::date; ok boolean; v_t uuid; minor date := (riyadh_now()::date - interval '16 years')::date;
+        base jsonb := jsonb_build_object('national_id','1999999970','full_name','ريان سعد علي القرني','phone','0553330001','gender','ذكر',
+          'plan_id',(select id from plans where tier='basic' and mode='in_person'),
+          'accepted_policies',(select coalesce(jsonb_agg(id), '[]') from current_policies(riyadh_now()::date) where requires_acceptance));
+begin
+  begin perform register_subscription(base); ok := false; exception when others then ok := sqlerrm like '%تاريخ الميلاد مطلوب%'; end;
+  assert ok, 'تاريخ الميلاد إلزامي';
+  begin perform register_subscription(base || jsonb_build_object('birth_date', minor)); ok := false; exception when others then ok := sqlerrm like '%جوال ولي الأمر مطلوب%'; end;
+  assert ok, 'جوال ولي الأمر إلزامي دون 19';
+  assert age_on((d - interval '19 years')::date, d) = 19 and age_on((d - interval '19 years' + interval '1 day')::date, d) = 18, 'حد العمر 19';
+  perform register_subscription(base || jsonb_build_object('birth_date', minor, 'guardian_phone', '0509990001'));
+  select id into v_t from trainees where national_id = '1999999970';
+  assert (select guardian_phone from trainees where id = v_t) = '0509990001', 'حفظ جوال ولي الأمر عند أول تسجيل';
+  -- إعادة تسجيل بجوال ولي أمر آخر: لا يُستبدل، بل طلب تحديث
+  perform register_trainee(base - 'plan_id' || jsonb_build_object('birth_date', minor, 'guardian_phone', '0509996666',
+    'program_id', (select c.program_id from cohorts c where c.reg_open and c.archived_at is null and c.end_date >= d limit 1)));
+  assert (select guardian_phone from trainees where id = v_t) = '0509990001', 'جوال ولي الأمر المعتمد لا يُستبدل';
+  assert exists (select 1 from profile_change_requests where trainee_id = v_t and status = 'pending' and changes->'guardian_phone'->>'new' = '0509996666'), 'طلب تحديث لجوال ولي الأمر';
+  -- بالغ بلا ولي أمر مسجّل سابقًا: لا يُكمَّل الحقل الفارغ تلقائيًا
+  assert (select guardian_phone from trainees where national_id = '1999999995') is null, 'البالغ بلا جوال ولي أمر';
 end $$;
