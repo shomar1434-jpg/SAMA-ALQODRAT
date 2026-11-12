@@ -36,8 +36,17 @@ export function validateAssignment(a){
 
 /* ---------- بنوك الأسئلة واختبار قياس المستوى ---------- */
 export const bankKey = (section, subject) => `${section}:${subject}`;
-export function bankFor(D, section, subject, unit, published = true){
-  return (D.questions || []).filter(q => q.section === section && q.subject === subject && (!unit || q.unit === unit) && (!published || q.status === 'published'));
+/* بنك كل مدرب مستقل: teacher_id يحدد صاحب البنك (إن مُرّر) */
+export function bankFor(D, section, subject, unit, published = true, teacher_id = null){
+  return (D.questions || []).filter(q => q.section === section && q.subject === subject && (!unit || q.unit === unit) && (!published || q.status === 'published') && (!teacher_id || q.teacher_id === teacher_id));
+}
+/* وحدات البنوك المتاحة لمتدرب: لكل مدرب يدرّسه (القسم × المقرر) وحداته المنشورة وعددها */
+export function bankUnitsOf(D, subs, teachers){
+  const scopes = new Set(subs.flatMap(s => (s.subjects || []).map(x => s.section + ':' + x))), units = {};
+  (D.questions || []).filter(q => q.status === 'published' && q.teacher_id && scopes.has(q.section + ':' + q.subject)).forEach(q => {
+    const t = (teachers || []).find(x => x.id === q.teacher_id && teacherCovers(x, q.section, q.subject)); if(!t) return;
+    const k = [q.section, q.subject, q.unit || 'عام', q.teacher_id].join('|'); units[k] = units[k] || { section:q.section, subject:q.subject, unit:q.unit || 'عام', teacher_id:q.teacher_id, teacher_name:t.full_name, count:0 }; units[k].count++; });
+  return Object.values(units).sort((a, b) => (a.subject + a.teacher_name + a.unit).localeCompare(b.subject + b.teacher_name + b.unit, 'ar'));
 }
 export function validateQuestion(q){
   if(!q.text || q.text.trim().length < 5) throw new Error('اكتب نص السؤال');
@@ -45,14 +54,67 @@ export function validateQuestion(q){
   if(!(q.correct >= 0 && q.correct < 4)) throw new Error('حدد الإجابة الصحيحة');
 }
 /* يبني محاولة من أسئلة منشورة في نطاق المتدرب، ويحفظ نسخة الأسئلة كما هي وقت المحاولة */
-export function buildAttempt(D, trainee_id, section, subject, unit, count){
-  const pool = bankFor(D, section, subject, unit).slice();
+export function buildAttempt(D, trainee_id, section, subject, unit, count, teacher_id = null){
+  const pool = bankFor(D, section, subject, unit, true, teacher_id).slice();
   if(!pool.length) throw new Error('لا توجد أسئلة منشورة في هذه الوحدة بعد');
   for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const qs = pool.slice(0, Math.max(1, Math.min(count || 10, pool.length)));
-  return { id:uid(), trainee_id, section, subject, unit:unit || null, started_at:new Date().toISOString(), submitted_at:null, minutes:Math.max(5, qs.length * 2),
+  return { id:uid(), trainee_id, teacher_id:teacher_id || null, section, subject, unit:unit || null, started_at:new Date().toISOString(), submitted_at:null, minutes:Math.max(5, qs.length * 2),
     snapshot: qs.map(q => ({ id:q.id, text:q.text, options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1 })), answers:{}, score:null, total:qs.length };
 }
+export const snapOf = q => ({ id:q.id, text:q.text, options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1 });
+export const shuffle = a => { for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ---------- واجب اختبار من بنك المدرب ----------
+   تُحفظ نسخة الأسئلة في الواجب وقت النشر (quiz)، ولا يرى المتدرب الإجابات الصحيحة إلا في مراجعة تسليمه. */
+export function buildQuiz(D, teacher, subject, unit, count){
+  const pool = shuffle(bankFor(D, teacher.section, subject, unit, true, teacher.id).slice());
+  if(!pool.length) throw new Error('لا توجد أسئلة منشورة في بنكك لهذا المقرر' + (unit ? ' وهذه الوحدة' : ''));
+  return pool.slice(0, Math.max(1, Math.min(+count || 10, 50, pool.length))).map(snapOf);
+}
+export const quizPublic = a => a.kind === 'quiz' && Array.isArray(a.quiz) ? { ...a, quiz:a.quiz.map(({ correct, explanation, ...q }) => q) } : a;
+export function gradeQuiz(a, answers){
+  const ans = {}, review = a.quiz.map(q => { const v = answers?.[q.id]; ans[q.id] = Number.isInteger(+v) && v !== null && v !== '' && +v >= 0 && +v < 4 ? +v : null;
+    return { id:q.id, correct:q.correct, explanation:q.explanation || '' }; });
+  const right = a.quiz.filter(q => ans[q.id] === q.correct).length;
+  return { answers:ans, review, right, total:a.quiz.length, score:Math.round(right / a.quiz.length * (a.max_score || 10) * 10) / 10 };
+}
+
+/* ---------- استيراد بنك أسئلة (لصق من Excel أو ملف CSV) ----------
+   الأعمدة: المقرر | الوحدة | المهارة | السؤال | أ | ب | ج | د | الصحيحة | التفسير | الصعوبة (اختياري) */
+export const BANK_COLUMNS = ['المقرر', 'الوحدة', 'المهارة', 'السؤال', 'أ', 'ب', 'ج', 'د', 'الصحيحة', 'التفسير', 'الصعوبة'];
+export const BANK_SAMPLE = 'كمي\tالجبر\tالمعادلات\tإذا كان 2س = 10 فإن س =\t2\t5\t8\t10\tب\tنقسم الطرفين على 2\tسهل';
+const AR_DIG = s => String(s ?? '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+export function correctIndex(v){
+  const x = AR_DIG(v).trim().toLowerCase().replace(/[()\.]/g, '');
+  const map = { 'أ':0, 'ا':0, 'إ':0, 'a':0, '1':0, 'ب':1, 'b':1, '2':1, 'ج':2, 'c':2, '3':2, 'د':3, 'd':3, '4':3 };
+  return x in map ? map[x] : -1;
+}
+function splitLine(line, sep){
+  if(sep === '\t') return line.split('\t');
+  const out = []; let cur = '', q = false;
+  for(let i = 0; i < line.length; i++){ const c = line[i];
+    if(q){ if(c === '"' && line[i + 1] === '"'){ cur += '"'; i++; } else if(c === '"') q = false; else cur += c; }
+    else if(c === '"') q = true; else if(c === sep){ out.push(cur); cur = ''; } else cur += c; }
+  out.push(cur); return out;
+}
+export function parseBank(text, subjects){
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
+  if(!lines.length) return { rows:[], errors:[{ line:0, msg:'لا توجد بيانات. الصق الأسئلة من الجدول أو اختر ملفًا.' }] };
+  const sep = lines[0].includes('\t') ? '\t' : (lines[0].split(';').length > lines[0].split(',').length ? ';' : ',');
+  const rows = [], errors = [];
+  lines.forEach((l, i) => {
+    const c = splitLine(l, sep).map(x => String(x || '').trim());
+    if(i === 0 && /المقرر|السؤال/.test(c.join(' '))) return;                 // سطر العناوين
+    const subject = c[0], q = { subject, unit:c[1] || 'عام', skill:c[2] || '', text:c[3] || '', options:[c[4], c[5], c[6], c[7]].map(x => x || ''),
+      correct:correctIndex(c[8]), explanation:c[9] || '', difficulty:['سهل', 'متوسط', 'صعب'].includes(c[10]) ? c[10] : 'متوسط' };
+    const why = !subjects.includes(subject) ? `المقرر «${subject || 'فارغ'}» ليس من مقررات المدرب (${subjects.join('، ')})`
+      : q.text.length < 5 ? 'نص السؤال قصير أو فارغ' : q.options.some(o => !o) ? 'يلزم أربعة خيارات' : q.correct < 0 ? 'الإجابة الصحيحة: أ أو ب أو ج أو د' : '';
+    if(why) errors.push({ line:i + 1, msg:why }); else rows.push(q);
+  });
+  return { rows, errors };
+}
+
 /* ما يُرسل للمتدرب قبل الإنهاء: بلا الإجابات الصحيحة ولا التفسير */
 export const attemptPublic = at => at.submitted_at ? at : { ...at, snapshot: at.snapshot.map(({ correct, explanation, ...q }) => q) };
 export function gradeAttempt(at, answers){

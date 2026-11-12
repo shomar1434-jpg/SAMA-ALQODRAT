@@ -22,13 +22,32 @@ export function studentHomework(D, tr, reload){
     ${list.length ? `<div class="hw-list">${list.map(a => `<article class="hw"><div class="hw-h"><b>${esc(a.title)}</b><span class="pill dot ${STATE_TONE[a.state]}">${STATE_TXT[a.state]}</span></div>
       <div class="hint">${esc(a.subject)} · نُشر ${fmtShort(a.publish_date)} · يُستحق ${fmtShort(a.due_date)}${a.submission?.late ? ' · سُلّم متأخرًا' : ''}</div>
       ${a.body ? `<p>${esc(a.body)}</p>` : ''}
+      ${a.kind === 'quiz' ? quizHtml(a) : ''}
       ${a.submission?.status === 'graded' || a.submission?.status === 'needs_revision' ? `<div class="hw-fb"><b>${a.submission.score != null ? `الدرجة ${fmtNum(a.submission.score)} من ${fmtNum(a.max_score)}` : 'ملاحظات المدرب'}</b>${a.submission.feedback ? `<p>${esc(a.submission.feedback)}</p>` : ''}</div>` : ''}
-      ${a.submission?.status !== 'graded' ? `<form class="hw-f" data-hw="${a.id}"><label class="sr-only" for="hw-${a.id}">إجابتك</label><textarea class="inp" id="hw-${a.id}" rows="3" maxlength="6000" placeholder="اكتب إجابتك هنا" style="padding:10px 14px;line-height:1.8">${esc(a.submission?.answer || '')}</textarea>
+      ${a.kind !== 'quiz' && a.submission?.status !== 'graded' ? `<form class="hw-f" data-hw="${a.id}"><label class="sr-only" for="hw-${a.id}">إجابتك</label><textarea class="inp" id="hw-${a.id}" rows="3" maxlength="6000" placeholder="اكتب إجابتك هنا" style="padding:10px 14px;line-height:1.8">${esc(a.submission?.answer || '')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn sm" data-draft>حفظ مسودة</button><button class="btn pri sm">${ic('check')} إرسال</button></div></form>` : ''}
     </article>`).join('')}</div>` : emptyBox('لا توجد واجبات منشورة لك بعد')}</div>`,
-  bind(){ $$('[data-hw]').forEach(f => { const send = async draft => { const b = draft ? $('[data-draft]', f) : $('button.pri', f); setBusy(b, true, draft ? 'جارٍ الحفظ' : 'جارٍ الإرسال');
+  bind(){ $$('[data-qz]').forEach(f => f.onsubmit = async e => { e.preventDefault(); const a = list.find(x => x.id === f.dataset.qz), ans = {};
+      $$('input[type=radio]:checked', f).forEach(r => ans[r.dataset.q] = +r.value);
+      const miss = a.quiz.length - Object.keys(ans).length, b = $('button.pri', f);
+      const go = async () => { setBusy(b, true, 'جارٍ التصحيح'); try { const r = await Store.submitAssignment({ trainee_id:tr.id, assignment_id:a.id, answers:ans });
+          toast(`النتيجة ${fmtNum(r.right)} من ${fmtNum(r.total)}`); reload(); } catch(x){ setBusy(b, false); toast(x.message); } };
+      if(miss > 0 && !f.dataset.warned){ f.dataset.warned = '1'; $('.qz-w', f).textContent = `لم تُجب عن ${fmtNum(miss)} من الأسئلة. التسليم نهائي ويُصحَّح فورًا؛ اضغط مرة أخرى للتسليم.`; b.lastChild.textContent = ' تسليم رغم ذلك'; return; }
+      go(); });
+    $$('[data-hw]').forEach(f => { const send = async draft => { const b = draft ? $('[data-draft]', f) : $('button.pri', f); setBusy(b, true, draft ? 'جارٍ الحفظ' : 'جارٍ الإرسال');
       try { await Store.submitAssignment({ trainee_id:tr.id, assignment_id:f.dataset.hw, answer:$('textarea', f).value, draft }); toast(draft ? 'حُفظت المسودة' : 'أُرسلت إجابتك'); reload(); } catch(x){ setBusy(b, false); toast(x.message); } };
     f.onsubmit = e => { e.preventDefault(); send(false); }; $('[data-draft]', f).onclick = () => send(true); }); } };
+}
+
+/* واجب اختبار من بنك المدرب: قبل التسليم أسئلة بلا إجابات، وبعده مراجعة بالإجابة الصحيحة والتفسير */
+function quizHtml(a){
+  const sb = a.submission, done = sb?.status === 'graded' && sb.review;
+  if(done){ const rv = Object.fromEntries((sb.review || []).map(x => [x.id, x]));
+    return `<ol class="qres">${a.quiz.map(q => { const c = rv[q.id]?.correct, mine = sb.answers?.[q.id];
+      return `<li class="${mine === c ? 'ok' : 'bad'}"><p>${esc(q.text)}</p><p><b>الصحيح:</b> ${esc(q.options[c] ?? '')}${mine != null && mine !== c ? ` · <b>إجابتك:</b> ${esc(q.options[mine])}` : mine == null ? ' · <b>لم تُجب</b>' : ''}</p>${rv[q.id]?.explanation ? `<p class="hint">${esc(rv[q.id].explanation)}</p>` : ''}</li>`; }).join('')}</ol>`; }
+  return `<form class="hw-quiz" data-qz="${a.id}"><p class="hint" style="margin:0 0 6px">${fmtNum(a.quiz.length)} أسئلة من بنك المدرب · يُصحَّح فورًا عند التسليم</p>
+    ${a.quiz.map((q, i) => `<fieldset class="q"><legend><b>${fmtNum(i + 1)}.</b> ${esc(q.text)}</legend>${q.options.map((o, j) => `<label class="opt"><input type="radio" name="${a.id}-${i}" value="${j}" data-q="${q.id}"> ${esc(o)}</label>`).join('')}</fieldset>`).join('')}
+    <div class="errtxt qz-w" aria-live="polite"></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn pri sm">${ic('check')} تسليم الاختبار</button></div></form>`;
 }
 
 export function studentLevel(D, tr, it, reload){
@@ -37,13 +56,13 @@ export function studentLevel(D, tr, it, reload){
   const past = (D.attempts || []).filter(a => a.trainee_id === tr.id && a.submitted_at).sort((a, b) => b.submitted_at.localeCompare(a.submitted_at));
   return { html:`<div class="grid g2" style="align-items:start"><div class="card pad rv"><h3 class="ctitle">${ic('spark')}قياس مستواي</h3>
       ${units.length ? `<form id="lvF" class="grid" novalidate>
-        <div class="field"><label for="lv-u">المقرر والوحدة</label><select class="inp" id="lv-u">${units.map((u, i) => `<option value="${i}">${esc(u.subject)} · ${esc(u.unit)} (${fmtNum(u.count)} سؤالًا)</option>`).join('')}</select></div>
+        <div class="field"><label for="lv-u">المقرر والوحدة وبنك المدرب</label><select class="inp" id="lv-u">${units.map((u, i) => `<option value="${i}">${esc(u.subject)} · ${esc(u.unit)}${u.teacher_name ? ` · ${esc(u.teacher_name)}` : ''} (${fmtNum(u.count)} سؤالًا)</option>`).join('')}</select></div>
         <div class="field"><label for="lv-n">عدد الأسئلة</label><select class="inp" id="lv-n">${[5, 10, 20].map(n => `<option>${n}</option>`).join('')}</select></div>
         <button class="btn pri" id="lvGo">${ic('timer')} ابدأ الاختبار</button>
-        <p class="hint" style="margin:0">أسئلة من بنك قسمك ومقررك فقط. لا تظهر الإجابات الصحيحة قبل التسليم.</p></form>` : emptyBox('لا توجد أسئلة منشورة لمقرراتك بعد')}</div>
+        <p class="hint" style="margin:0">أسئلة من بنك مدرب مقررك. لا تظهر الإجابات الصحيحة قبل التسليم.</p></form>` : emptyBox('لا توجد أسئلة منشورة لمقرراتك بعد')}</div>
     <div class="card pad rv"><h3 class="ctitle">${ic('chart')}محاولاتي</h3>${past.length ? `<ul class="ses-list">${past.map(a => `<li><b>${esc(a.subject)}</b><span>${esc(a.unit || '')}</span><span class="pill ${a.score / a.total >= .7 ? 'ok' : 'warn'}">${fmtNum(a.score)} / ${fmtNum(a.total)}</span><span class="hint">${fmtShort(a.submitted_at.slice(0, 10))}</span></li>`).join('')}</ul>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div></div>`,
   bind(){ if(!$('#lvF')) return; $('#lvF').onsubmit = async e => { e.preventDefault(); const u = units[+$('#lv-u').value], b = $('#lvGo'); setBusy(b, true, 'جارٍ تجهيز الأسئلة');
-      try { const at = await Store.startAttempt({ trainee_id:tr.id, section:u.section, subject:u.subject, unit:u.unit, count:+$('#lv-n').value }); runAttempt(at, reload); } catch(x){ setBusy(b, false); toast(x.message); } }; } };
+      try { const at = await Store.startAttempt({ trainee_id:tr.id, section:u.section, subject:u.subject, unit:u.unit, teacher_id:u.teacher_id || null, count:+$('#lv-n').value }); runAttempt(at, reload); } catch(x){ setBusy(b, false); toast(x.message); } }; } };
 }
 function runAttempt(at, reload){
   const ans = {}, end = Date.now() + at.minutes * 60000;
@@ -103,13 +122,17 @@ export function teacherHomework(D, reload){
   const students = (D.trainees || []).length;
   return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('form')}واجباتي</h3><button class="btn pri sm" id="hwAdd">${ic('plus')} واجب</button></div>
     ${list.length ? list.map(a => { const subs = (D.submissions || []).filter(s => s.assignment_id === a.id), done = subs.filter(s => ['submitted', 'graded', 'needs_revision'].includes(s.status));
-      return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> <span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(students)}</span></summary>
+      return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> ${a.kind === 'quiz' ? `<span class="pill info">اختبار · ${fmtNum(a.quiz?.length || 0)} أسئلة</span> ` : ''}<span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(students)}</span></summary>
         ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
-          <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${esc(s.answer || '')}</td>
-          <td>${['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
+          <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${a.kind === 'quiz' ? esc(s.feedback || '') : esc(s.answer || '')}</td>
+          <td>${a.kind === 'quiz' ? `<b class="num">${fmtNum(s.score ?? 0)} / ${fmtNum(a.max_score)}</b> <span class="hint">آلي</span>` : ['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
   bind(){ $('#hwAdd').onclick = () => { const n = riyadhNow();
       modal(`<h3>واجب جديد</h3><form id="hf" class="grid g2" novalidate>
         <div class="field" style="grid-column:1/-1"><label for="hf-t">العنوان</label><input class="inp" id="hf-t" name="title" maxlength="120"></div>
+        <fieldset class="field" style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">نوع الواجب</legend><div style="display:flex;gap:14px;flex-wrap:wrap">
+          <label class="chk"><input type="radio" name="kind" value="text" checked> واجب كتابي</label><label class="chk"><input type="radio" name="kind" value="quiz"> اختبار من بنك أسئلتي (يُصحَّح آليًا)</label></div></fieldset>
+        <div class="field" data-qk hidden><label for="hf-u">الوحدة</label><select class="inp" id="hf-u" name="unit"></select></div>
+        <div class="field" data-qk hidden><label for="hf-n">عدد الأسئلة</label><select class="inp" id="hf-n" name="count">${[5, 10, 15, 20, 30].map(n => `<option ${n === 10 ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label for="hf-s">المقرر</label><select class="inp" id="hf-s" name="subject">${me.subjects.map(s => `<option>${s}</option>`).join('')}</select></div>
         <div class="field"><label for="hf-m">الدرجة العظمى</label><input class="inp num" id="hf-m" name="max_score" type="number" min="1" value="10"></div>
         <div class="field"><label for="hf-p">تاريخ النشر</label><input class="inp" type="date" id="hf-p" name="publish_date" value="${n.date}"></div>
@@ -119,6 +142,11 @@ export function teacherHomework(D, reload){
         <div class="errtxt" id="hfE" style="grid-column:1/-1"></div>
         <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="hfC">إلغاء</button><button class="btn pri" id="hfS">${ic('check')} نشر</button></div></form>`);
       $('#hfC').onclick = closeModal;
+      const pub = (D.questions || []).filter(q => q.status === 'published'), units = () => { const sub = $('#hf-s').value, us = {};
+          pub.filter(q => q.subject === sub).forEach(q => us[q.unit] = (us[q.unit] || 0) + 1);
+          $('#hf-u').innerHTML = `<option value="">كل الوحدات (${fmtNum(pub.filter(q => q.subject === sub).length)})</option>` + Object.entries(us).map(([u, n]) => `<option value="${esc(u)}">${esc(u)} (${fmtNum(n)})</option>`).join(''); };
+      const kind = () => { const q = $('#hf [name=kind]:checked').value === 'quiz'; $$('[data-qk]').forEach(x => x.hidden = !q); if(q) units(); };
+      $$('#hf [name=kind]').forEach(r => r.onchange = kind); $('#hf-s').addEventListener('change', () => { if(!$('[data-qk]').hidden) units(); });
       $('#hf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), b = $('#hfS'); setBusy(b, true, 'جارٍ النشر');
         try { await Store.saveAssignment(f); closeModal(); toast('نُشر الواجب'); reload(); } catch(x){ setBusy(b, false); $('#hfE').textContent = x.message; } }; };
     $$('[data-gr]').forEach(b => b.onclick = () => { const s = D.submissions.find(x => x.id === b.dataset.gr), a = D.assignments.find(x => x.id === s.assignment_id);
@@ -134,26 +162,32 @@ export function teacherHomework(D, reload){
 export function teacherBank(D, reload){
   const me = D.me, qs = (D.questions || []).slice().sort((a, b) => (a.subject + a.unit).localeCompare(b.subject + b.unit, 'ar'));
   const att = (D.attempts || []).slice().sort((a, b) => b.submitted_at.localeCompare(a.submitted_at)).slice(0, 30);
-  return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('database')}بنك أسئلة ${SECTIONS[secOf(me)]} · ${esc(me.subjects.join('، '))}</h3><button class="btn pri sm" id="qAdd2">${ic('plus')} سؤال</button></div>
+  return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('database')}بنك أسئلتي <span class="pill g">${fmtNum(qs.length)}</span> <span class="hint">${SECTIONS[secOf(me)]} · ${esc(me.subjects.join('، '))}</span></h3><button class="btn pri sm" id="qAdd2">${ic('plus')} سؤال</button></div>
       ${qs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المقرر</th><th>الوحدة</th><th>السؤال</th><th>الحالة</th><th></th></tr></thead><tbody>${qs.map(q => `<tr><td>${esc(q.subject)}</td><td>${esc(q.unit)}</td><td style="max-width:380px">${esc(q.text)}</td>
         <td><span class="pill dot ${q.status === 'published' ? 'ok' : 'g'}">${q.status === 'published' ? 'منشور' : 'مسودة'}</span></td><td style="white-space:nowrap"><button class="btn sm" data-qe="${q.id}" aria-label="تعديل">${ic('edit')}</button> <button class="btn sm" data-qp="${q.id}">${q.status === 'published' ? 'إيقاف' : 'نشر'}</button></td></tr>`).join('')}</tbody></table></div>` : emptyBox('البنك فارغ')}</div>
     <div class="card pad rv" style="margin-top:16px"><h3 class="ctitle">${ic('chart')}نتائج قياس المستوى لمتدربيّ</h3>${att.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>المقرر</th><th>الوحدة</th><th>الدرجة</th><th>التاريخ</th></tr></thead><tbody>${att.map(a => `<tr><td>${esc(D.trainees.find(t => t.id === a.trainee_id)?.full_name || '')}</td><td>${esc(a.subject)}</td><td>${esc(a.unit || '')}</td><td class="num">${fmtNum(a.score)} / ${fmtNum(a.total)}</td><td>${fmtShort(a.submitted_at.slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div>`,
-  bind(){ const edit = q => { modal(`<h3>${q ? 'تعديل سؤال' : 'سؤال جديد'}</h3><form id="qf" class="grid g2" novalidate>
-        <div class="field"><label for="qf-s">المقرر</label><select class="inp" id="qf-s" name="subject">${me.subjects.map(s => `<option ${q?.subject === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
-        <div class="field"><label for="qf-u">الوحدة</label><input class="inp" id="qf-u" name="unit" value="${esc(q?.unit || '')}"></div>
-        <div class="field" style="grid-column:1/-1"><label for="qf-t">نص السؤال</label><textarea class="inp" id="qf-t" name="text" rows="2" style="padding:10px 14px">${esc(q?.text || '')}</textarea></div>
-        ${[0, 1, 2, 3].map(i => `<div class="field"><label class="opt"><input type="radio" name="correct" value="${i}" ${q?.correct === i ? 'checked' : ''}> الخيار ${fmtNum(i + 1)} (الصحيح)</label><input class="inp" name="o${i}" value="${esc(q?.options?.[i] || '')}" aria-label="الخيار ${i + 1}"></div>`).join('')}
-        <div class="field"><label for="qf-k">المهارة</label><input class="inp" id="qf-k" name="skill" value="${esc(q?.skill || '')}"></div>
-        <div class="field"><label for="qf-st">الحالة</label><select class="inp" id="qf-st" name="status"><option value="published">منشور</option><option value="draft" ${q?.status === 'draft' ? 'selected' : ''}>مسودة</option></select></div>
-        <div class="field" style="grid-column:1/-1"><label for="qf-e">التفسير (يظهر بعد التسليم)</label><input class="inp" id="qf-e" name="explanation" value="${esc(q?.explanation || '')}"></div>
-        <p class="hint" style="grid-column:1/-1;margin:0">تعديل سؤال لا يغيّر نتائج محاولات سابقة؛ كل محاولة تحفظ نسخة أسئلتها.</p>
-        <div class="errtxt" id="qfE" style="grid-column:1/-1"></div><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="qfC">إلغاء</button><button class="btn pri" id="qfS">${ic('check')} حفظ</button></div></form>`);
-      $('#qfC').onclick = closeModal; $('#qf').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target), b = $('#qfS');
-        const o = { id:q?.id, subject:fd.get('subject'), unit:fd.get('unit'), text:fd.get('text'), options:[0, 1, 2, 3].map(i => fd.get('o' + i)), correct:fd.get('correct') == null ? -1 : +fd.get('correct'), skill:fd.get('skill'), status:fd.get('status'), explanation:fd.get('explanation') };
-        setBusy(b, true, 'جارٍ الحفظ'); try { await Store.saveQuestion(o); closeModal(); toast('حُفظ السؤال'); reload(); } catch(x){ setBusy(b, false); $('#qfE').textContent = x.message; } }; };
+  bind(){ const edit = q => questionModal({ q, subjects:me.subjects, save:o => Store.saveQuestion(o), done:reload });
     $('#qAdd2').onclick = () => edit(null);
     $$('[data-qe]').forEach(b => b.onclick = () => edit(D.questions.find(q => q.id === b.dataset.qe)));
     $$('[data-qp]').forEach(b => b.onclick = async () => { const q = D.questions.find(x => x.id === b.dataset.qp); await Store.setQuestionStatus(q.id, q.status === 'published' ? 'draft' : 'published'); reload(); }); } };
+}
+
+/* نموذج سؤال مشترك بين بنك المدرب وصفحة بنوك الأسئلة في الإدارة */
+export function questionModal({ q, subjects, save, done, title }){
+  modal(`<h3>${title || (q ? 'تعديل سؤال' : 'سؤال جديد')}</h3><form id="qf" class="grid g2" novalidate>
+    <div class="field"><label for="qf-s">المقرر</label><select class="inp" id="qf-s" name="subject">${subjects.map(s => `<option ${q?.subject === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label for="qf-u">الوحدة</label><input class="inp" id="qf-u" name="unit" value="${esc(q?.unit || '')}" placeholder="عام"></div>
+    <div class="field" style="grid-column:1/-1"><label for="qf-t">نص السؤال</label><textarea class="inp" id="qf-t" name="text" rows="2" style="padding:10px 14px">${esc(q?.text || '')}</textarea></div>
+    ${[0, 1, 2, 3].map(i => `<div class="field"><label class="opt"><input type="radio" name="correct" value="${i}" ${q?.correct === i ? 'checked' : ''}> الخيار ${'أبجد'[i]} (الصحيح)</label><input class="inp" name="o${i}" value="${esc(q?.options?.[i] || '')}" aria-label="الخيار ${'أبجد'[i]}"></div>`).join('')}
+    <div class="field"><label for="qf-k">المهارة</label><input class="inp" id="qf-k" name="skill" value="${esc(q?.skill || '')}"></div>
+    <div class="field"><label for="qf-d">الصعوبة</label><select class="inp" id="qf-d" name="difficulty">${['سهل', 'متوسط', 'صعب'].map(x => `<option ${(q?.difficulty || 'متوسط') === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+    <div class="field"><label for="qf-st">الحالة</label><select class="inp" id="qf-st" name="status"><option value="published">منشور</option><option value="draft" ${q?.status === 'draft' ? 'selected' : ''}>مسودة</option></select></div>
+    <div class="field"><label for="qf-e">التفسير (يظهر بعد التسليم)</label><input class="inp" id="qf-e" name="explanation" value="${esc(q?.explanation || '')}"></div>
+    <p class="hint" style="grid-column:1/-1;margin:0">تعديل سؤال لا يغيّر نتائج محاولات أو واجبات سابقة؛ كل منها يحفظ نسخة أسئلته.</p>
+    <div class="errtxt" id="qfE" style="grid-column:1/-1" aria-live="polite"></div><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="qfC">إلغاء</button><button class="btn pri" id="qfS">${ic('check')} حفظ</button></div></form>`);
+  $('#qfC').onclick = closeModal; $('#qf').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target), b = $('#qfS');
+    const o = { id:q?.id, subject:fd.get('subject'), unit:fd.get('unit'), text:fd.get('text'), options:[0, 1, 2, 3].map(i => fd.get('o' + i)), correct:fd.get('correct') == null ? -1 : +fd.get('correct'), skill:fd.get('skill'), difficulty:fd.get('difficulty'), status:fd.get('status'), explanation:fd.get('explanation') };
+    setBusy(b, true, 'جارٍ الحفظ'); try { await save(o); closeModal(); toast('حُفظ السؤال'); done(); } catch(x){ setBusy(b, false); $('#qfE').textContent = x.message; } };
 }
 
 export function teacherMessages(D, reload){
