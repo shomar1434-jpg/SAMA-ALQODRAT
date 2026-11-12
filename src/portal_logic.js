@@ -3,7 +3,7 @@
    في الوضع السحابي تقابلها دوال SQL بالأسماء نفسها تقريبًا (…_dashboard).
    مصدر بيانات واحد: كل البوابات تقرأ sub_attendance و subStats نفسها.
    ===================================================================== */
-import { riyadhNow, toMin, addDays, uid } from './utils.js';
+import { riyadhNow, toMin, addDays, uid, fmtNum } from './utils.js';
 import { subStats, subStatus, sessionOn, sessionsBetween, planName, SECTIONS } from './qudurat.js';
 
 export const ROLE_TXT = { owner:'مالك النظام', admin:'مدير', registrar:'مسجّل', teacher:'معلم', student:'طالب', guardian:'ولي أمر' };
@@ -24,7 +24,12 @@ export function homeworkIndicator(D, trainee, sub, n = riyadhNow()){
   const subs = (D.submissions || []).filter(x => x.trainee_id === trainee.id);
   const done = due.filter(a => subs.some(x => x.assignment_id === a.id && ['submitted', 'graded'].includes(x.status)));
   const open = (D.assignments || []).filter(a => a.section === sub.section && (!a.subject || (sub.subjects || []).includes(a.subject)) && a.publish_date <= n.date && a.due_date > n.date && !subs.some(x => x.assignment_id === a.id && ['submitted', 'graded'].includes(x.status)));
-  return { due:due.length, done:done.length, pct: due.length ? Math.round(done.length / due.length * 100) : null, pending:open.length };
+  // نجاح الأداء لكل واجب مستحق: المصحَّح بدرجته، والمسلَّم بانتظار التصحيح كاملًا، والمطلوب إعادته نصفًا، وغير المسلَّم صفرًا
+  const quality = due.map(a => { const x = subs.find(y => y.assignment_id === a.id); if(!x) return 0;
+    if(x.status === 'graded') return x.score == null ? 1 : Math.max(0, Math.min(1, x.score / (a.max_score || 10)));
+    return x.status === 'submitted' ? 1 : x.status === 'needs_revision' ? 0.5 : 0; });
+  return { due:due.length, done:done.length, pct: due.length ? Math.round(done.length / due.length * 100) : null, pending:open.length,
+    success: due.length ? Math.round(quality.reduce((t, q) => t + q, 0) / due.length * 100) : null };
 }
 
 /* لوحة الطالب: لكل اشتراك ثلاث بطاقات مستقلة (حضور، واجبات، مؤقت زمني) + التقويم + سجل الأيام */
@@ -40,8 +45,9 @@ export function studentDashboard(D, trainee, n = riyadhNow()){
       return { id:s.id, ref:s.ref, plan:planName(plan), tier:plan?.tier, section:SECTIONS[s.section], subjects:s.subjects || [], status:st.status, start_date:s.start_date, end_date:st.end || null,
         attendance:{ rate:st.rate, attended:st.attended, late:st.late, absent:st.absent, held:st.held, total:st.total, remaining:st.remaining },
         homework: homeworkIndicator(D, trainee, s, n),
-        time:{ pct: s.start_date ? st.timePct : null, daysLeft:st.daysLeft },
-        upcoming, log, teachers, last: st.lastAtt };
+        time:{ pct: s.start_date ? st.timePct : null, daysLeft:st.daysLeft,
+          reach: s.start_date && st.total ? Math.round(Math.min(1, (st.score + st.remaining) / st.total) * 100) : null },
+        upcoming, log, teachers, last: st.lastAtt, threshold: D.settings?.cert_threshold ?? 75 };
     }),
     notifications: (D.notifications || []).filter(x => x.trainee_id === trainee.id && x.to === 'student').slice(-20).reverse() };
 }
@@ -82,4 +88,26 @@ export function makeNotification(D, { sender, to, trainee_id, kind, note, n = ri
   const t = D.trainees.find(x => x.id === trainee_id), ses = sessionOn(D, (D.subscriptions || []).find(s => s.trainee_id === trainee_id)?.section, n.date);
   const text = [String(NOTIFY_TPL[kind] || '').replace('{الاسم}', t?.full_name.split(' ')[0] || '').replace('{التاريخ}', n.date).replace('{النهاية}', ses?.end || ''), (note || '').trim()].filter(Boolean).join(' ');
   return { id:uid(), at:new Date().toISOString(), date:n.date, sender, to, trainee_id, kind, text, read_at:null };
+}
+
+/* مؤشر الأداء العام (عداد): متوسط المحاور المتاحة من ثلاثة.
+   الحضور = نسبة الحضور (التأخر بوزنه)، الواجبات = نسبة النجاح في المستحق، المؤقت = أعلى نسبة حضور نهائية ما زالت ممكنة
+   (الحضور المحقق + الجلسات المتبقية ÷ كل جلسات الباقة) فيقيس ما استُثمر من المدة وما تبقى منها.
+   المناطق: أحمر دون 50، أصفر حتى حد الشهادة، أخضر من حد الشهادة فأعلى. */
+export const GAUGE_RED = 50;
+export function progressGauge(it){
+  const thr = it.threshold ?? 75;
+  const axes = [
+    { key:'attendance', label:'الحضور', value: it.attendance.held ? (it.attendance.rate ?? 0) : null,
+      detail: it.attendance.held ? `${fmtNum(it.attendance.attended)} من ${fmtNum(it.attendance.held)} جلسة` : 'لا جلسات منعقدة بعد' },
+    { key:'homework', label:'الواجبات', value: it.homework.success,
+      detail: it.homework.due ? `${fmtNum(it.homework.done)} من ${fmtNum(it.homework.due)} واجبًا مستحقًا` : 'لا واجبات مستحقة بعد' },
+    { key:'time', label:'المؤقت الزمني', value: it.time.reach,
+      detail: it.time.reach == null ? 'يبدأ من أول حضور' : `${fmtNum(it.time.daysLeft)} يومًا متبقية من الباقة` }
+  ];
+  const got = axes.filter(a => a.value != null);
+  const score = got.length ? Math.round(got.reduce((t, a) => t + a.value, 0) / got.length) : null;
+  const zone = score == null ? null : score < GAUGE_RED ? 'red' : score < thr ? 'yellow' : 'green';
+  const label = { red:'يحتاج متابعة عاجلة', yellow:'تقدّم متوسط — يحتاج متابعة', green:'تقدّم جيد' }[zone] || 'يبدأ القياس من أول يوم حضور';
+  return { score, zone, label, thr, axes };
 }
