@@ -17,7 +17,7 @@
 - `src/learning_logic.js` منطق الواجبات وبنك الأسئلة والمحاولات والتقييم والمراسلة ↔ `supabase/migrations/…_learning.sql`؛ وواجهاتها في `src/learning_views.js` (تبويبات بوابتي الطالب والمعلم).
 - `src/policy_logic.js` ↔ `supabase/migrations/…_policies.sql` مركز السياسات (`currentPolicies` ↔ `current_policies`، `checkAcceptance` ↔ `check_policy_acceptance`)؛ وواجهاته في `src/policy_views.js` (`#policies`، `#policy-<slug>[~<إصدار>]`، `#admin-policies`، وخانة القبول في نموذج التسجيل).
 - `src/qudurat_views.js` شريط الباقات، وصفحة الباقة، وصفحة الإدارة `#admin-qudurat`. `src/marquee.js` الشريط المنزلق العام.
-- `supabase/migrations/` ترحيلات مرقّمة بالتاريخ. `supabase/seed.sql` البرامج الـ 73 والباقات وقالب الجداول. `supabase/tests/` اختبارات SQL (`npm run test:sql`، يحتاج PostgreSQL محليًا).
+- `supabase/migrations/` ترحيلات مرقّمة بالتاريخ. `supabase/seed.sql` البرامج الـ 73 والباقات وقالب الجداول. `supabase/seed_site.sql` السياسات الست والشركاء، مولَّد من `src/policy_texts.js` و`src/site_partners.js` بـ `npm run seed:site` (لا يُعدَّل يدويًا). `supabase/tests/` اختبارات SQL (`npm run test:sql`، يحتاج PostgreSQL محليًا).
 - `docs/` الخطة، والحالة، وبيانات الباقات.
 
 ## الأوامر
@@ -55,6 +55,7 @@ npm run check    # فحص ثابت + بناء + اختبارات (شغّله ق�
 - **الطباعة:** A4 عبر `#printRoot`، والاعتماد بتوقيع مدير المركز والختم فقط.
 - **التصميم:** نظام «سِجِل»: Readex Pro، اللون الأساسي teal، والفاتح والداكن.
 - **الباقات عن بُعد:** تظهر «قريبًا» ولا تُفتح ولا يُسجَّل فيها.
+- **المحتوى من الموقع الرسمي:** السياسات والشركاء والباقات تُنقل من smaalgodrat.com كما هي، لا تُكتب من عندنا.
 
 ## طريقة العمل
 - كل خطوة من الخطة في فرع `step-N-…`، ثم طلب دمج يراجعه المالك.

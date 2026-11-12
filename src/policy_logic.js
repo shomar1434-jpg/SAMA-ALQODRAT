@@ -1,18 +1,15 @@
 /* مركز السياسات: إصدارات مرقّمة بتاريخ سريان وجهة اعتماد، وإقرار قبول عند التسجيل.
    مطابق لـ supabase/migrations/…_policies.sql (current_policies، check_policy_acceptance). */
 import { esc } from './utils.js';
+import { POLICY_TEXTS, POLICY_APPROVER, POLICY_EFFECTIVE } from './policy_texts.js';
 
-export const POLICY_KINDS = [
-  { slug:'terms',      title:'شروط الاستخدام',                 acceptance:true },
-  { slug:'privacy',    title:'سياسة الخصوصية وحماية البيانات',  acceptance:true },
-  { slug:'admission',  title:'آلية التسجيل والقبول',            acceptance:false },
-  { slug:'attendance', title:'الحضور والتأخر والغياب',          acceptance:false },
-  { slug:'assessment', title:'الواجبات والاختبارات',            acceptance:false },
-  { slug:'certificates', title:'سياسة الشهادات',                acceptance:false },
-  { slug:'fees',       title:'الرسوم والدفع والاسترداد',        acceptance:true },
-  { slug:'conduct',    title:'مدونة السلوك',                    acceptance:true },
-  { slug:'complaints', title:'الشكاوى والمقترحات',              acceptance:false },
-  { slug:'rights',     title:'حقوق المتدرب وولي الأمر',         acceptance:false }
+export const POLICY_KINDS = [   // بترتيب صفحة السياسات في الموقع الرسمي
+  { slug:'integrity',     title:'سياسة النزاهة الأكاديمية',                 acceptance:true,  src:'academic-policy' },
+  { slug:'privacy',       title:'سياسة الخصوصية وحماية البيانات',           acceptance:true,  src:'policies' },
+  { slug:'attendance',    title:'سياسات الحضور والانضباط في الدورات التدريبية', acceptance:true,  src:'course-policy' },
+  { slug:'copyright',     title:'سياسة حقوق الملكية الفكرية وحقوق النشر',    acceptance:false, src:'copyright-policy' },
+  { slug:'support',       title:'سياسة الدعم الفني',                        acceptance:false, src:'support-policy' },
+  { slug:'communication', title:'سياسات التواصل وآدابه',                    acceptance:false, src:'communication' }
 ];
 export const PLACEHOLDER = 'يُكمل من الإدارة';
 export const POLICY_STATUS = { draft:'مسودة', published:'منشورة' };
@@ -60,17 +57,8 @@ export function renderPolicyBody(text){
   flush(); return out.join('');
 }
 
-/* مسودات أولية بهيكل مقترح فقط — لا تُنشر حتى تكتب الإدارة النص المعتمد */
-export function demoPolicies(today){
-  const outline = {
-    terms:['نطاق الخدمة','حساب المتدرب ومسؤولية صحة البيانات','الاستخدام المقبول للمنصة','التعديل على الشروط'],
-    privacy:['البيانات التي نجمعها (الاسم، السجل المدني، الجوال، البريد، الحضور)','الغرض من المعالجة','من يطّلع على البيانات','مدة الاحتفاظ والإتلاف','حقوق صاحب البيانات وفق نظام حماية البيانات الشخصية','موافقة ولي الأمر لمن هم دون 18 سنة','التواصل بشأن الخصوصية'],
-    admission:['شروط القبول','خطوات التسجيل','تأكيد المقعد'], attendance:['تسجيل الحضور بالباركود','التأخر والانصراف المبكر','احتساب الغياب ونسبة الحضور','الأعذار'],
-    assessment:['الواجبات ومواعيد التسليم','اختبارات قياس المستوى','النزاهة الأكاديمية'], certificates:['شروط استحقاق الشهادة','التحقق من الشهادة'],
-    fees:['الرسوم والأقساط','طرق الدفع','الاسترداد والإلغاء'], conduct:['الالتزام داخل القاعة','التعامل مع المعلمين والزملاء','المخالفات وإجراءاتها'],
-    complaints:['قنوات تقديم الشكوى','مدة المعالجة','التصعيد'], rights:['حقوق المتدرب','حقوق ولي الأمر','الاطلاع على السجلات']
-  };
-  return POLICY_KINDS.map((k, i) => ({ id:'pol-' + k.slug, slug:k.slug, title:k.title, version:0, status:'draft', requires_acceptance:k.acceptance,
-    effective_date:today, approved_by:'', sort:i, created_at:new Date().toISOString(),
-    body:'مسودة بهيكل مقترح. اكتب النص المعتمد في كل قسم ثم انشر.\n\n' + outline[k.slug].map(h => `## ${h}\n- ${PLACEHOLDER}`).join('\n\n') }));
+/* السياسات المعتمدة المنقولة من الموقع الرسمي: إصدار أول منشور لكل سياسة */
+export function demoPolicies(){
+  return POLICY_KINDS.map((k, i) => ({ id:'pol-' + k.slug, slug:k.slug, title:k.title, version:1, status:'published', requires_acceptance:k.acceptance,
+    effective_date:POLICY_EFFECTIVE, approved_by:POLICY_APPROVER, sort:i, body:POLICY_TEXTS[k.slug], created_at:POLICY_EFFECTIVE + 'T00:00:00Z', published_at:POLICY_EFFECTIVE + 'T00:00:00Z' }));
 }

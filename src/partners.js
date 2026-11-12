@@ -13,12 +13,11 @@ import { closeModal, confirmBox, modal, swRow } from './views2_programs.js';
    ===================================================================== */
 export const PARTNER_TYPES = ['جهة اعتماد','شريك نجاح','جهة حكومية','جهة تعليمية','قطاع خاص','جهة مجتمعية'];
 export const DEFAULT_ABOUT = `مركز سما القدرات للتدريب مركز تدريب في منطقة جازان، يقدّم ${'٧٣'} برنامجًا تدريبيًا معتمدًا من المؤسسة العامة للتدريب التقني والمهني في ستة مجالات: الإدارة والأعمال، والتربية والمجتمع، والحاسب والتقنية، والفنون والمهارات، والتهيئة لاختبارات قياس، والشريعة والقانون.\nيعمل المركز على أن يكون بيت الخبرة الأول في المنطقة، بتدريب بنّاء يقدّمه مدربون متخصصون، وبمتابعة منتظمة لحضور كل متدرب من التسجيل في دفعته حتى إتمام برنامجه وحصوله على شهادته.`;
-export const defaultPartners = () => [
-  {id:uid(), name:'المؤسسة العامة للتدريب التقني والمهني', name_en:'Technical and Vocational Training Corporation', type:'جهة اعتماد', logo:LOGOS.tvtc,
-   description:'الجهة التي تعتمد البرامج التدريبية في المركز، ويحمل كل برنامج في دليلنا رقم اعتماد صادرًا عنها.', website:'https://www.tvtc.gov.sa', since:'', order:1, active:true},
-  {id:uid(), name:'المركز الوطني للتعليم الإلكتروني', name_en:'National eLearning Center', type:'جهة اعتماد', logo:LOGOS.nelc,
-   description:'من جهات الاعتماد الظاهرة في دليل برامج المركز.', website:'https://nelc.gov.sa', since:'', order:2, active:true}
-];
+import { SITE_PARTNERS, defaultPartners as basePartners } from './site_partners.js';
+export { SITE_PARTNERS };
+/* شعارات الشركاء من ملفات المنصة نفسها (src/assets/partners/) حتى لا تعتمد على موقع خارجي */
+const PARTNER_FILES = import.meta.glob('./assets/partners/*', { eager:true, query:'?url', import:'default' });
+export const defaultPartners = () => basePartners(Object.fromEntries(Object.entries(PARTNER_FILES).map(([k, v]) => [k.split('/').pop(), v])));
 
 /* ---------- أقسام الصفحة الرئيسية ---------- */
 export function aboutSectionHtml(about, P){
@@ -40,14 +39,14 @@ export function partnersSectionHtml(list){
   const ps = (list||[]).filter(p=>p.active!==false).sort((a,b)=>(a.order||0)-(b.order||0));
   if(!ps.length) return '';
   return `<section class="partners" aria-labelledby="ptTitle">
-    <div class="sec-head" data-reveal><span class="kicker">شركاء النجاح</span><h2 id="ptTitle">جهات <em>نعتز بشراكتها</em></h2><p class="hint" style="margin:8px 0 0">اسحب الشريط أو اضغط على أي شريك لعرض بياناته.</p></div>
+    <div class="sec-head" data-reveal><span class="kicker">شركاء النجاح</span><h2 id="ptTitle">نفخر بثقة <em>شركائنا</em></h2><p class="hint" style="margin:8px 0 0">نفتخر بشراكاتنا مع العديد من الجهات والمؤسسات التي تشاركنا رؤية التطوير والتميز، ونسعى دائمًا لبناء علاقات استراتيجية تحقق النجاح المستدام للجميع.</p></div>
     <div class="pt-wrap" data-reveal>
       <button class="pt-nav prev" aria-label="الشريك السابق">${ic('prev')}</button>
       <div class="pt-viewport" id="ptView" role="region" aria-roledescription="شريط منزلق" aria-label="شركاء النجاح" tabindex="0"><div class="pt-track" id="ptTrack"></div></div>
       <button class="pt-nav next" aria-label="الشريك التالي">${ic('next')}</button>
     </div></section>`;
 }
-export const partnerCard = (p, clone) => `<button class="pt-card" data-pid="${p.id}" ${clone?'aria-hidden="true" tabindex="-1"':''} aria-label="${esc(p.name)}${p.type?'، '+esc(p.type):''}"><span class="pt-logo"><img src="${p.logo||LOGOS.sama}" alt="" draggable="false"></span><b>${esc(p.name)}</b>${p.type?`<span class="pill dot ${p.type==='جهة اعتماد'?'':'o'}">${esc(p.type)}</span>`:''}</button>`;
+export const partnerCard = (p, clone) => `<button class="pt-card" data-pid="${p.id}" ${clone?'aria-hidden="true" tabindex="-1"':''} aria-label="${esc(p.name)}${p.type?'، '+esc(p.type):''}"><span class="pt-logo"><img src="${p.logo||LOGOS.sama}" alt="" draggable="false" loading="eager" referrerpolicy="no-referrer"></span>${p.name==='شريك نجاح'?'':`<b>${esc(p.name)}</b>`}${p.type?`<span class="pill dot ${p.type==='جهة اعتماد'?'':'o'}">${esc(p.type)}</span>`:''}</button>`;
 
 /* ---------- محرّك الشريط: انزلاق تلقائي + سحب باللمس + قصور ذاتي ---------- */
 export function initPartnerMarquee(list){
@@ -55,10 +54,12 @@ export function initPartnerMarquee(list){
   const ps=list.filter(p=>p.active!==false).sort((a,b)=>(a.order||0)-(b.order||0));
   // كرّر المجموعة حتى تملأ عرض الشاشة، ثم ضاعفها للحلقة اللانهائية
   track.innerHTML = ps.map(p=>partnerCard(p,false)).join('');
+  const fix = img => { if(img.dataset.fb) return; img.dataset.fb='1'; img.src=LOGOS.sama; img.closest('.pt-card')?.classList.add('no-logo'); };
   const setW = () => track.scrollWidth;
   let reps=1; while(setW() < view.clientWidth*1.2 && reps<12){ track.insertAdjacentHTML('beforeend', ps.map(p=>partnerCard(p,true)).join('')); reps++; }
   const unit = setW()+16;                                   // عرض مجموعة واحدة كاملة (مع التكرار)
   track.insertAdjacentHTML('beforeend', track.innerHTML.replace(/<button class="pt-card" data-pid="([^"]+)" (?!aria-hidden)/g,'<button class="pt-card" data-pid="$1" aria-hidden="true" tabindex="-1" '));
+  $$('img',track).forEach(img=>{ img.addEventListener('error',()=>fix(img)); if(img.complete && !img.naturalWidth && img.src) fix(img); });
   const still = reduceMotion();
   let x=-1, v=0, last=performance.now(), drag=null, hover=false, raf=0, idleUntil=0;
   const speed = still ? 0 : 0.035;                       // بكسل لكل ملّي ثانية
