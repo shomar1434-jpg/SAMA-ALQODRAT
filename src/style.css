@@ -1022,10 +1022,10 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 /* ---------- بنوك أسئلة المدربين ---------- */
 .bank-ts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:14px}
 .bank-t{display:grid;gap:4px;text-align:start;padding:12px 14px;border:1px solid var(--border);border-radius:16px;background:var(--surface-card);color:inherit;font:inherit;cursor:pointer;min-height:44px}
-.bank-t span:not(.pill){font-size:13px;color:var(--text-muted)}.bank-t .pill{justify-self:start}
-.bank-t[aria-selected="true"]{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 25%,transparent)}
+.bank-t span:not(.pill){font-size:13px;color:var(--ink-subtle)}.bank-t .pill{justify-self:start}
+.bank-t[aria-selected="true"]{border-color:var(--brand);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 25%,transparent)}
 .bank-kpi{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.kpi-s{display:grid;padding:8px 14px;border-radius:12px;background:var(--surface-sunken);min-width:110px}.kpi-s b{font-size:22px;font-weight:600}.kpi-s small{color:var(--text-muted)}
+.kpi-s{display:grid;padding:8px 14px;border-radius:12px;background:var(--surface-sunken);min-width:110px}.kpi-s b{font-size:22px;font-weight:600}.kpi-s small{color:var(--ink-subtle)}
 .bank-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
 .imp-steps{margin:0 0 10px;padding-inline-start:20px;line-height:1.9}.imp-err{margin:6px 0 0;padding-inline-start:18px;font-size:13.5px}
 .hw-quiz{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
@@ -1035,9 +1035,9 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .en-kind legend{font-weight:500;font-size:13.5px;margin-bottom:6px;padding:0}.en-kind legend i{color:var(--danger-ink);font-style:normal}
 .en-opt{position:relative;cursor:pointer}.en-opt input{position:absolute;opacity:0;inset:0;cursor:pointer}
 .en-opt span{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;padding:12px 14px;min-height:56px;border:1.5px solid var(--border);border-radius:16px;background:var(--surface-card)}
-.en-opt span .ic{grid-row:span 2;width:24px;height:24px;color:var(--primary)}.en-opt small{color:var(--text-muted);font-size:13px}
-.en-opt input:checked+span{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--surface-card))}
-.en-opt input:focus-visible+span{outline:2px solid var(--primary);outline-offset:2px}
+.en-opt span .ic{grid-row:span 2;width:24px;height:24px;color:var(--brand)}.en-opt small{color:var(--ink-subtle);font-size:13px}
+.en-opt input:checked+span{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--surface-card))}
+.en-opt input:focus-visible+span{outline:2px solid var(--brand);outline-offset:2px}
 
 /* ---------- التطبيق القابل للتثبيت ---------- */
 .pwa-steps{margin:0;padding-inline-start:22px;line-height:2;font-size:14.5px}.pwa-more{margin-top:12px}.pwa-more summary{cursor:pointer;color:var(--brand);font-weight:500;min-height:32px}
@@ -1046,3 +1046,50 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
   padding:10px 14px;border-radius:16px;background:var(--surface-card);border:1px solid var(--border);box-shadow:var(--shadow-secondary);font-size:14.5px}
 #pwaUpdate span{display:flex;align-items:center;gap:6px}
 .ibp-dev{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border)}
+
+/* ===================== التوافقية: الجوال واللوحي واللمس والحواف الآمنة ===================== */
+/* مناطق آمنة (نتوء الآيفون وشريط التنقل) عند العرض بملء الشاشة */
+.topbar{padding-top:env(safe-area-inset-top,0px)}
+.topbar .in{padding-inline-start:max(20px,env(safe-area-inset-left,0px));padding-inline-end:max(20px,env(safe-area-inset-right,0px))}
+body{padding-bottom:env(safe-area-inset-bottom,0px)}
+.modal-bg{padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+/* ارتفاعات الشاشة الحقيقية على الجوال (شريط العنوان المتحرك) */
+@supports(height:100dvh){.display{min-height:calc(100dvh - 66px)}.admin{min-height:calc(100dvh - 66px)}}
+@supports(height:100dvh){@media(min-width:901px){.side{height:calc(100dvh - 66px)}}}
+.bell .bdg[hidden]{display:none}
+/* لمس: كل هدف 44px على الأقل، ولا تأخير للنقر، ولا تكبير عند لمس الحقول */
+html{touch-action:manipulation}
+@media (pointer:coarse),(max-width:1024px){
+  .btn,.btn.sm,.tab,.inp,select.inp,.themebtn,.bell,.seg button,.cats button,.msg-th,.mq-toggle,.ibt-x,.ibp-it,summary,.bank-t,.nav a,.side a,.linkbtn,.daychips span,.opt,.chk,.check,.sw{min-height:44px}
+  .themebtn,.bell,.mq-toggle,.ibt-x,.btn.sm{min-width:44px}
+  .themebtn,.bell{width:44px;height:44px}
+  .linkbtn{display:inline-flex;align-items:center;min-width:44px}
+  summary{display:list-item;padding-block:10px}
+  .inp,select.inp,textarea.inp,input[type=search],input[type=date],input[type=time]{font-size:16px}
+  .tb .btn.sm{padding-inline:12px}
+  .filters .inp,.filters select.inp,.enr{min-height:44px;font-size:16px}
+}
+/* منع تمدد الشبكات خارج الشاشة (محتوى عريض داخل خلايا grid) */
+.grid>*,.admin>*,#main{min-width:0}
+.heat{max-width:100%;overflow-x:auto}
+@media(max-width:640px){.nav{min-width:0;flex:1 1 0}}
+/* الشريط العلوي على الشاشات الضيقة: لا يتجاوز العرض */
+@media(max-width:480px){
+  .topbar .in{gap:6px;padding-inline-start:max(10px,env(safe-area-inset-left,0px));padding-inline-end:max(10px,env(safe-area-inset-right,0px))}
+  body.portal .topbar .in{gap:6px}.bell{margin-inline-end:0}
+  #logoutBtn{padding-inline:10px;font-size:13px;white-space:nowrap}
+  .brand{min-width:0;flex:0 1 auto}.brand img{height:36px}
+  #portalTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+}
+@media(max-width:360px){#logoutBtn{font-size:0;padding-inline:0;min-width:44px}#logoutBtn::before{content:"خروج";font-size:13px}}
+/* الجداول العريضة تتمرر داخل إطارها لا داخل الصفحة */
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+img,svg,video,canvas{max-width:100%}
+/* شاشات عريضة جدًا: لا يتمدد المحتوى بلا حد */
+@media(min-width:1800px){.wrap{max-width:1400px}}
+/* وضع التطبيق المثبّت: لا تحديد نص عرضي للأزرار، ولا ارتداد للتمرير خارج الصفحة */
+@media (display-mode:standalone){body{overscroll-behavior-y:none}.btn,.tab,.nav a{-webkit-user-select:none;user-select:none}}
+/* لوحة مفاتيح وحركة: تركيز واضح دائمًا */
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+@media (forced-colors:active){.btn,.inp,.card,.tab{border:1px solid ButtonText}}

@@ -15,6 +15,21 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm test
+  compat:
+    # التوافقية على محركي Firefox وWebKit (Safari): كل الصفحات على مقاسات الجوال واللوحي والكمبيوتر
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: { browser: [firefox, webkit] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: node tests/compat.mjs
+        env: { BROWSER: '${{ matrix.browser }}' }
   sql:
     # يطبّق الترحيلات على PostgreSQL نظيف ويشغّل اختبارات قاعدة البيانات
     runs-on: ubuntu-latest
