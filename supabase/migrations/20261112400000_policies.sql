@@ -4,7 +4,7 @@
 -- =====================================================================
 create table if not exists policies (
   id uuid primary key default gen_random_uuid(),
-  slug text not null check (slug in ('terms','privacy','admission','attendance','assessment','certificates','fees','conduct','complaints','rights')),
+  slug text not null check (slug in ('integrity','privacy','attendance','copyright','support','communication')),
   title text not null check (length(trim(title)) >= 3), body text not null check (length(trim(body)) >= 20),
   version int not null default 0, status text not null default 'draft' check (status in ('draft','published')),
   effective_date date not null, approved_by text not null default '', requires_acceptance boolean not null default false,

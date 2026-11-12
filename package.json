@@ -9,7 +9,8 @@
     "lint": "eslint src tests",
     "test": "node tests/smoke.mjs && node tests/e2e.mjs && node tests/qudurat.mjs && node tests/portals.mjs && node tests/daily.mjs && node tests/learning.mjs && node tests/policies.mjs",
     "check": "npm run lint && npm run build && npm test",
-    "test:sql": "bash supabase/tests/run.sh"
+    "test:sql": "bash supabase/tests/run.sh",
+    "seed:site": "node scripts/seed_site.mjs"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
