@@ -1,0 +1,41 @@
+# يدوي: ينزّل شعارات شركاء النجاح من روابطها الأصلية ويرفعها ملفًا مضغوطًا لتُضاف إلى src/assets/partners/
+name: fetch-partner-logos
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'روابط الشعارات (رابط في كل سطر)'
+        required: false
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download logos
+        env:
+          INPUT_URLS: ${{ inputs.urls }}
+        run: |
+          mkdir -p out
+          if [ -n "$INPUT_URLS" ]; then printf '%s\n' "$INPUT_URLS" > list.txt; else cat > list.txt <<'LIST'
+          https://i.ibb.co/RZ58jgZ/Whats-App-Image-2026-07-20-at-17-59-22-9.jpg
+          https://i.ibb.co/nNmYnNgc/Whats-App-Image-2026-07-20-at-17-59-22-10.jpg
+          https://i.ibb.co/C3JVZBM8/Whats-App-Image-2026-07-21-at-10-52-34.jpg
+          https://i.ibb.co/5xCVXptC/Whats-App-Image-2026-07-20-at-17-59-20-4.jpg
+          https://i.ibb.co/rKn4MzZM/Whats-App-Image-2026-07-20-at-17-59-20-5.jpg
+          https://i.ibb.co/xSGqMscM/Whats-App-Image-2026-07-20-at-17-59-21-8.jpg
+          https://i.ibb.co/xKd4R5bh/Whats-App-Image-2026-07-20-at-17-59-21-12.jpg
+          https://i.ibb.co/4RFpDDcG/Whats-App-Image-2026-07-20-at-17-59-21-13.jpg
+          https://i.ibb.co/84bwb7Ks/Whats-App-Image-2026-07-20-at-17-59-21-15.jpg
+          https://i.ibb.co/sdGgjFmM/Whats-App-Image-2026-07-20-at-17-59-21-17.jpg
+          https://i.ibb.co/Q7wGt2Pc/Whats-App-Image-2026-07-20-at-17-59-21-20.jpg
+          https://i.ibb.co/GfFvwHkb/Whats-App-Image-2026-07-20-at-17-59-22-1.jpg
+          https://i.ibb.co/35bygKG1/Whats-App-Image-2026-07-20-at-17-59-22-2.jpg
+          https://i.ibb.co/gZK97Sh2/Whats-App-Image-2026-07-20-at-17-59-22-3.jpg
+          https://i.ibb.co/d4Yh74DW/Whats-App-Image-2026-07-20-at-17-59-22-5.jpg
+          LIST
+          fi
+          while read -r u; do u=$(echo "$u" | xargs); [ -z "$u" ] && continue; curl -fsSL "$u" -o "out/$(basename "$u")"; done < list.txt
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: partner-logos, path: out }
