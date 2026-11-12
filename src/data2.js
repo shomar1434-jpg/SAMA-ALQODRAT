@@ -6,7 +6,7 @@ import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
-import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning } from './learning_logic.js';
+import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -197,10 +197,9 @@ export function scopeData(D, role, phone){
   const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true}));
   const forTrainees=ids=>{ const subs=(D.subscriptions||[]).filter(s=>ids.includes(s.trainee_id)), sid=subs.map(s=>s.id);
     const scopes=subs.flatMap(s=>(s.subjects||[]).map(x=>s.section+':'+x));
-    const units={}; (D.questions||[]).filter(q=>q.status==='published'&&scopes.includes(q.section+':'+q.subject)).forEach(q=>{ const k=q.section+'|'+q.subject+'|'+(q.unit||''); units[k]=(units[k]||0)+1; });
     return { trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs, sub_attendance:(D.sub_attendance||[]).filter(a=>sid.includes(a.subscription_id)),
-      assignments:(D.assignments||[]).filter(a=>scopes.includes(a.section+':'+a.subject)), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), teachers:teachersPub,
-      bank_units:Object.entries(units).map(([k,count])=>{ const [section,subject,unit]=k.split('|'); return {section,subject,unit,count}; }),
+      assignments:(D.assignments||[]).filter(a=>scopes.includes(a.section+':'+a.subject)).map(quizPublic), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)), teachers:teachersPub,
+      bank_units:bankUnitsOf(D, subs, D.teachers),
       // البرامج: دفعات المتدرب وحضورها وشهاداتها (للبوابة بدل «حضوري»)
       ...(()=>{ const en=(D.enrollments||[]).filter(e=>ids.includes(e.trainee_id)), cids=en.map(e=>e.cohort_id), pids=en.map(e=>e.program_id), eids=en.map(e=>e.id);
         return { enrollments:en, cohorts:(D.cohorts||[]).filter(c=>cids.includes(c.id)), programs:(D.programs||[]).filter(p=>pids.includes(p.id)).map(p=>({id:p.id, code:p.code, name:p.name, category:p.category, accreditation_no:p.accreditation_no, hours:p.hours})),
@@ -216,8 +215,8 @@ export function scopeData(D, role, phone){
       sub_attendance:(D.sub_attendance||[]).filter(a=>subs.some(s=>s.id===a.subscription_id)), guardian_links:(D.guardian_links||[]).filter(l=>l.status==='verified'&&ids.includes(l.trainee_id)).map(l=>({id:l.id, trainee_id:l.trainee_id, status:l.status, relation:l.relation})),
       assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&(D.assignments||[]).some(a=>a.id===x.assignment_id&&a.teacher_id===me.id)),
       notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id), notifications_in:(D.notifications||[]).filter(x=>x.to==='teacher'&&x.teacher_id===me.id),
-      questions:(D.questions||[]).filter(q=>q.section===me.section&&(me.subjects||[]).includes(q.subject)&&q.status!=='deleted'),
-      attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.section===me.section&&(me.subjects||[]).includes(a.subject)&&a.submitted_at),
+      questions:(D.questions||[]).filter(q=>q.teacher_id===me.id&&q.status!=='deleted'),
+      attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject))),
       rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
       // مرآة الإنجاز: واجبات كل مقررات متدربيه (حقول التوقيت فقط) وحالات تسليمها، دون نصوص الإجابات
       ...(()=>{ const sc=subs.flatMap(s=>(s.subjects||[]).map(x=>s.section+':'+x)), hw=(D.assignments||[]).filter(a=>sc.includes(a.section+':'+a.subject));
@@ -469,25 +468,32 @@ export const LocalStore = {
   async _student(trainee_id){ const s=await this.portalSession('student'); const t=s&&this.data.trainees.find(x=>x.id===trainee_id&&normPhone(x.phone)===s.phone); if(!t) throw new Error('غير مصرح'); return t; },
   async saveAssignment(a){ const me=await this._me(); validateAssignment(a); if(!teacherCovers(me, me.section, a.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.assignments, row={title:a.title.trim(), body:String(a.body||'').slice(0,4000), subject:a.subject, section:me.section, publish_date:a.publish_date, due_date:a.due_date, max_score:+a.max_score||10};
+    if(a.kind==='quiz'&&!a.id){ row.kind='quiz'; row.quiz=buildQuiz(this.data, me, a.subject, a.unit||null, a.count); } else if(!a.id) row.kind='text';
+    if(a.id){ const ex=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(ex?.kind==='quiz'){ delete row.subject; } }
     if(a.id){ const x=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row); } else L.push({id:uid(), teacher_id:me.id, ...row, created_at:new Date().toISOString()});
     this.save(); return {ok:true}; },
   async gradeSubmission(id, g){ const me=await this._me(), D=this.data, s=D.submissions.find(x=>x.id===id), a=s&&D.assignments.find(y=>y.id===s.assignment_id&&y.teacher_id===me.id); if(!a) throw new Error('غير مصرح');
     if(!['graded','needs_revision'].includes(g.status)) throw new Error('حالة غير صالحة'); const sc=g.score===''||g.score==null?null:+g.score; if(sc!=null&&(sc<0||sc>a.max_score)) throw new Error(`الدرجة من 0 إلى ${a.max_score}`);
     Object.assign(s,{status:g.status, score:sc, feedback:String(g.feedback||'').slice(0,1000), graded_at:new Date().toISOString()}); this.save(); return {ok:true}; },
-  async submitAssignment({trainee_id, assignment_id, answer, draft}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
+  async submitAssignment({trainee_id, assignment_id, answer, answers, draft}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
     if(!a||!studentHasScope(D,trainee_id,a.section,a.subject)||a.publish_date>riyadhNow().date) throw new Error('الواجب غير متاح لك');
     let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s&&s.status==='graded') throw new Error('صُحّح الواجب ولا يمكن تعديله');
+    if(a.kind==='quiz'){ // اختبار من البنك: يُصحَّح فورًا ولا يُعاد
+      const g=gradeQuiz(a, answers||{}), now=new Date().toISOString();
+      const row={answer:'', answers:g.answers, review:g.review, status:'graded', score:g.score, feedback:`أجبت ${g.right} من ${g.total} إجابة صحيحة`, submitted_at:now, graded_at:now, late:riyadhNow().date>a.due_date};
+      if(s) Object.assign(s,row); else D.submissions.push({id:uid(), assignment_id:a.id, trainee_id, ...row}); this.save(); return {ok:true, right:g.right, total:g.total, score:g.score}; }
     const txt=String(answer||'').trim(); if(!draft&&!txt) throw new Error('اكتب إجابتك قبل الإرسال');
     const row={answer:txt.slice(0,6000), status:draft?'draft':'submitted', submitted_at:draft?null:new Date().toISOString(), late:!draft&&riyadhNow().date>a.due_date};
     if(s) Object.assign(s,row); else D.submissions.push({id:uid(), assignment_id:a.id, trainee_id, ...row}); this.save(); return {ok:true}; },
   async saveQuestion(q){ const me=await this._me(); validateQuestion(q); if(!teacherCovers(me, me.section, q.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.questions, row={subject:q.subject, section:me.section, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
-    if(q.id){ const x=L.find(y=>y.id===q.id&&y.section===me.section&&me.subjects.includes(y.subject)); if(!x) throw new Error('غير مصرح'); Object.assign(x,row,{version:(x.version||1)+1}); }
+    if(q.id){ const x=L.find(y=>y.id===q.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row,{version:(x.version||1)+1}); }
     else L.push({id:uid(), teacher_id:me.id, version:1, created_at:new Date().toISOString(), ...row}); this.save(); return {ok:true}; },
-  async setQuestionStatus(id, status){ const me=await this._me(), x=this.data.questions.find(y=>y.id===id&&y.section===me.section&&me.subjects.includes(y.subject)); if(!x) throw new Error('غير مصرح');
+  async setQuestionStatus(id, status){ const me=await this._me(), x=this.data.questions.find(y=>y.id===id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح');
     if(!['draft','published','deleted'].includes(status)) throw new Error('حالة غير صالحة'); x.status=status; this.save(); return {ok:true}; },
-  async startAttempt({trainee_id, section, subject, unit, count}){ await this._student(trainee_id); const D=this.data; if(!studentHasScope(D,trainee_id,section,subject)) throw new Error('هذا المقرر ليس ضمن اشتراكك');
-    const at=buildAttempt(D, trainee_id, section, subject, unit, count); (D.attempts=D.attempts||[]).push(at); this.save(); return attemptPublic(at); },
+  async startAttempt({trainee_id, section, subject, unit, count, teacher_id}){ await this._student(trainee_id); const D=this.data; if(!studentHasScope(D,trainee_id,section,subject)) throw new Error('هذا المقرر ليس ضمن اشتراكك');
+    if(teacher_id&&!teacherCovers((D.teachers||[]).find(t=>t.id===teacher_id), section, subject)) throw new Error('هذا البنك ليس لمدرب مقررك');
+    const at=buildAttempt(D, trainee_id, section, subject, unit, count, teacher_id||null); (D.attempts=D.attempts||[]).push(at); this.save(); return attemptPublic(at); },
   async finishAttempt({attempt_id, answers}){ const D=this.data, at=(D.attempts||[]).find(x=>x.id===attempt_id); if(!at) throw new Error('المحاولة غير موجودة'); await this._student(at.trainee_id);
     if(at.submitted_at) return at; const g=gradeAttempt(at, answers); Object.assign(at, g); this.save(); return at; },
   async rateTeacher({trainee_id, teacher_id, stars, items, comment}){ await this._student(trainee_id); const D=this.data, t=D.teachers.find(x=>x.id===teacher_id); const c=canRate(D, trainee_id, t); if(!c.ok) throw new Error(c.why);
@@ -502,6 +508,18 @@ export const LocalStore = {
     (D.messages=D.messages||[]).push({id:uid(), trainee_id, teacher_id, from, text:body, at:new Date().toISOString(), read_at:null}); this.save(); return {ok:true}; },
   async markThreadRead({trainee_id, teacher_id}, role){ const s=await this.portalSession(role); if(!s) return; (this.data.messages||[]).forEach(m=>{ if(m.trainee_id===trainee_id&&m.teacher_id===teacher_id&&m.from!==role&&!m.read_at) m.read_at=new Date().toISOString(); }); this.save(); },
   async revokeGuardianLink(id){ const l=this.data.guardian_links.find(x=>x.id===id); if(l){ l.status='revoked'; l.revoked_at=new Date().toISOString(); this.audit('guardian_link.revoke', id); this.save(); } },
+  /* بنوك أسئلة المدربين من الإدارة: إضافة وتعديل واستيراد لمدرب محدد، ضمن قسمه ومقرراته */
+  _bankTeacher(id){ const t=(this.data.teachers||[]).find(x=>x.id===id); if(!t) throw new Error('اختر المدرب'); return t; },
+  async adminSaveQuestion(q){ const t=this._bankTeacher(q.teacher_id); validateQuestion(q); if(!(t.subjects||[]).includes(q.subject)) throw new Error('المقرر ليس من مقررات المدرب');
+    const L=(this.data.questions=this.data.questions||[]), row={teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
+    if(q.id){ const x=L.find(y=>y.id===q.id); if(!x) throw new Error('السؤال غير موجود'); Object.assign(x,row,{version:(x.version||1)+1}); } else L.push({id:uid(), version:1, created_at:new Date().toISOString(), ...row});
+    this.audit('question.save', q.id||'new', t.id); this.save(); return {ok:true}; },
+  async adminQuestionStatus(id, status){ const x=(this.data.questions||[]).find(y=>y.id===id); if(!x) throw new Error('السؤال غير موجود'); if(!['draft','published','deleted'].includes(status)) throw new Error('حالة غير صالحة'); x.status=status; this.audit('question.status', id, status); this.save(); return {ok:true}; },
+  async adminImportQuestions(teacher_id, rows, status){ const t=this._bankTeacher(teacher_id); if(!Array.isArray(rows)||!rows.length) throw new Error('لا توجد أسئلة صالحة للاستيراد'); if(rows.length>2000) throw new Error('الحد 2000 سؤال في المرة الواحدة');
+    rows.forEach((q,i)=>{ try { validateQuestion(q); } catch(e){ throw new Error(`السطر ${i+1}: ${e.message}`); } if(!(t.subjects||[]).includes(q.subject)) throw new Error(`السطر ${i+1}: المقرر ليس من مقررات المدرب`); });
+    const L=(this.data.questions=this.data.questions||[]), at=new Date().toISOString(), st=status==='draft'?'draft':'published';
+    rows.forEach(q=>L.push({id:uid(), teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:st, version:1, created_at:at}));
+    this.audit('question.import', t.id, String(rows.length)); this.save(); return {count:rows.length}; },
   audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'admin', action, entity:String(entity), detail:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
   async resetDemo(){ this.data = makeDemo(); this.autoArchive(); this.save(); },
   async clearPeople(){ const D=this.data; D.trainees=[]; D.enrollments=[]; D.attendance=[]; D.cohorts=[]; D.certificates=[]; D.subscriptions=[]; D.sub_attendance=[]; D.checkin_attempts=[]; this.save(); }
@@ -524,17 +542,17 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa,pcr] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa,pcr,qs] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
       q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
       q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
       q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500)),
-      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000)), q('profile_change_requests',x=>x.order('created_at',{ascending:false}).limit(500))]);
+      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000)), q('profile_change_requests',x=>x.order('created_at',{ascending:false}).limit(500)), q('questions',x=>x.neq('status','deleted').limit(20000))]);
     const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr)};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs)};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -595,6 +613,9 @@ export const CloudStore = {
   async gradeSubmission(id, g){ return this._e(await this.sb.rpc('teacher_grade',{p_id:id, p:g})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
   async saveQuestion(q){ return this._e(await this.sb.rpc('teacher_save_question',{p:q})); },
+  async adminSaveQuestion(q){ return this._e(await this.sb.rpc('admin_save_question',{p:q})); },
+  async adminQuestionStatus(id, status){ this._e(await this.sb.rpc('admin_question_status',{p_id:id, p_status:status})); return {ok:true}; },
+  async adminImportQuestions(teacher_id, rows, status){ return this._e(await this.sb.rpc('admin_import_questions',{p_teacher:teacher_id, p_rows:rows, p_status:status==='draft'?'draft':'published'})); },
   async setQuestionStatus(id, status){ this._e(await this.sb.rpc('teacher_question_status',{p_id:id, p_status:status})); return {ok:true}; },
   async startAttempt(p){ return this._e(await this.sb.rpc('student_start_attempt',{p})); },
   async finishAttempt({attempt_id, answers}){ return this._e(await this.sb.rpc('student_finish_attempt',{p_id:attempt_id, p_answers:answers||{}})); },

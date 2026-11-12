@@ -26,7 +26,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)
@@ -42,7 +42,7 @@ npm run check    # فحص ثابت + بناء + اختبارات (شغّله ق�
 الباقات: باقة ← اشتراك (`pending` حتى أول حضور، ثم `active` بنهاية محسوبة) ← `sub_attendance` بقيد `unique (subscription_id, att_date)`. القسم (بنون/بنات) من جنس الطالب.
 التحضير الموحد: `#checkin` = باركود واحد ثابت. يبحث في اشتراكات لها جلسة الآن ثم الدفعات، ويطلب الاختيار عند التعدد، ويسجّل كل محاولة في `checkin_attempts` (السجل المدني مجزّأ).
 تقرير اليوم: `src/report_logic.js` ↔ `build_daily_report()`؛ لقطة واحدة لكل تاريخ ثم مراجعات مرقّمة (`daily_reports`)، وتُجدول عند 17:30 UTC = 20:30 الرياض.
-التعليم: النطاق = القسم × المقرر من اشتراك قائم. محاولة الاختبار تحفظ نسخة الأسئلة (`snapshot`)، ولا تُرسل الإجابة الصحيحة قبل التسليم. تقييم واحد لكل (طالب، معلم، شهر).
+التعليم: النطاق = القسم × المقرر من اشتراك قائم. لكل مدرب بنك أسئلة مستقل (`questions.teacher_id`) تديره الإدارة من `#admin-bank` (`src/admin_bank.js`، `admin_save_question`/`admin_import_questions`) والمدرب لبنكه فقط؛ الاستيراد `parseBank` (لصق من Excel/CSV). واجب `kind='quiz'` يحفظ نسخة الأسئلة ويُصحَّح آليًا (`gradeQuiz` ↔ `student_submit`)، والإجابات تُحذف من بيانات المتدرب قبل التسليم (`quizPublic` ↔ `portal_data`). محاولة الاختبار تحفظ نسخة الأسئلة (`snapshot`)، ولا تُرسل الإجابة الصحيحة قبل التسليم. تقييم واحد لكل (طالب، معلم، شهر).
 السياسات: مسودة ← نشر بإصدار (يلزم جهة اعتماد ونص مكتمل)، والمنشور ثابت. السياسات للاطلاع ولا تُلزم عند التسجيل (قرار المالك)؛ آلية القبول (`requires_acceptance`، `policy_acceptances`) باقية في الخادم معطّلة.
 نسبة الإنجاز: `achievementOf` في `src/portal_logic.js` = متوسط (أيام الحضور ÷ جلسات الباقة) و(الواجبات المحلولة ÷ المرسلة). يراها المتدرب وولي أمره، ويراها المدرب مرآةً في كشفه عبر `hw_assignments`/`hw_submissions` (`…_trainer_mirror.sql`).
 حماية الهوية: إعادة التسجيل بسجل مدني موجود تضيف التسجيل للملف نفسه ولا تغيّر الاسم أو الجوال المعتمد (الجوال مفتاح البوابة)؛ تُكمَّل الحقول الفارغة فقط، والفروق تصبح `profile_change_requests` تبت فيها الإدارة (`mergeOnRegister` ↔ `trainees_register_guard`).
