@@ -94,7 +94,7 @@ export function cohortItemsOf(D, t){
   return (D.enrollments||[]).filter(e=>e.trainee_id===t.id && e.status!=='ملغى').map(e=>{ const c=D.cohorts.find(x=>x.id===e.cohort_id), p=D.programs.find(x=>x.id===e.program_id); if(!c||!p) return null;
     const s=enrollmentStats(D,e,c), n=riyadhNow(), state=cohortState(c); const next=sessionDays(c).find(d=>d>n.date||(d===n.date&&toMin(n.hm)<toMin(c.end_time)));
     const cert=(D.certificates||[]).find(x=>x.enrollment_id===e.id&&!x.revoked), level=attendanceLevel(s,state,D.settings);
-    return {program:p.name, code:progCode(p), number:c.number, state, start_date:c.start_date, end_date:c.end_date, start_time:c.start_time, ...s, next: cohortArchived(c)?null:(next||null), cert: cert?cert.serial:null,
+    return {program:p.name, code:progCode(p), number:c.number, trainer:c.trainer||'', hall:c.hall||'', state, start_date:c.start_date, end_date:c.end_date, start_time:c.start_time, ...s, next: cohortArchived(c)?null:(next||null), cert: cert?cert.serial:null,
       enrollment_id:e.id, hours:p.hours||null, level, message: levelMessage(level,s,D.settings,{'البرنامج':p.name,'الاسم':t.full_name.split(' ')[0],'البداية':fmtDate(c.start_date)})}; }).filter(Boolean);
 }
 export function traineeAttendanceLogic(D, nid){
@@ -219,6 +219,10 @@ export function scopeData(D, role, phone){
       questions:(D.questions||[]).filter(q=>q.teacher_id===me.id&&q.status!=='deleted'),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject))),
       rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
+      // دفعات البرامج المسندة إليه: كشفها وحضورها (أسماء المتدربين فقط)
+      ...(()=>{ const cs=(D.cohorts||[]).filter(c=>c.teacher_id===me.id&&!cohortArchived(c)), cids=cs.map(c=>c.id), en=(D.enrollments||[]).filter(e=>cids.includes(e.cohort_id)&&e.status!=='ملغى'), eids=en.map(e=>e.id), tids=en.map(e=>e.trainee_id);
+        return { cohorts:cs, programs:(D.programs||[]).filter(p=>cs.some(c=>c.program_id===p.id)).map(p=>({id:p.id, code:p.code, name:p.name, hours:p.hours})), enrollments:en,
+          attendance:(D.attendance||[]).filter(a=>eids.includes(a.enrollment_id)), cohort_trainees:D.trainees.filter(t=>tids.includes(t.id)).map(tSafe) }; })(),
       // مرآة الإنجاز: واجبات كل مقررات متدربيه (حقول التوقيت فقط) وحالات تسليمها، دون نصوص الإجابات
       ...(()=>{ const sc=subs.flatMap(s=>(s.subjects||[]).map(x=>s.section+':'+x)), hw=(D.assignments||[]).filter(a=>sc.includes(a.section+':'+a.subject));
         return { hw_assignments:hw.map(a=>({id:a.id, section:a.section, subject:a.subject, publish_date:a.publish_date, due_date:a.due_date, max_score:a.max_score})),
@@ -569,7 +573,7 @@ export const CloudStore = {
   async deleteProgram(id){ this._e(await this.sb.from('programs').delete().eq('id',id)); },
   async savePackage(p){ const row=this._strip(p,['id','created_at']); this._e(p.id ? await this.sb.from('packages').update(row).eq('id',p.id) : await this.sb.from('packages').insert(row)); },
   async deletePackage(id){ this._e(await this.sb.from('packages').delete().eq('id',id)); },
-  async saveCohort(c){ const row=this._strip(c,['id','created_at','number','taken']); if(c.id){ this._e(await this.sb.from('cohorts').update(row).eq('id',c.id)); } else { this._e(await this.sb.rpc('open_cohort',{p:row})); } },
+  async saveCohort(c){ const row=this._strip(c,['id','created_at','number','taken']); if(c.id){ this._e(await this.sb.from('cohorts').update(row).eq('id',c.id)); } else { const r=this._e(await this.sb.rpc('open_cohort',{p:row})); if(c.teacher_id&&r?.id) this._e(await this.sb.from('cohorts').update({teacher_id:c.teacher_id}).eq('id',r.id)); } },
   async archiveCohort(id){ this._e(await this.sb.from('cohorts').update({archived_at:new Date().toISOString(), archived_auto:false, reg_open:false}).eq('id',id)); await this.sb.rpc('issue_certificates',{p_cohort:id}); },
   async issueCertificates(cid){ return this._e(await this.sb.rpc('issue_certificates',{p_cohort:cid})); },
   async revokeCertificate(id, on=true){ this._e(await this.sb.from('certificates').update({revoked:on}).eq('id',id)); },

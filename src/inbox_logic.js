@@ -35,6 +35,8 @@ export function sessionReminders(D, n){
     (D.enrollments || []).filter(e => e.cohort_id === c.id && e.status !== 'ملغى').forEach(e => { const t = D.trainees.find(x => x.id === e.trainee_id); if(!t) return;
       out.push(note(D, { to:'student', trainee_id:t.id, date:d, dedupe_key:`soon:s:${t.id}:${key}`, text:`تبدأ محاضرة «${p?.name || 'برنامجك'}» الساعة ${when}، بعد ${mins} دقائق. لا تنسَ تسجيل حضورك.` }));
       if(guardians(t.id).length) out.push(note(D, { to:'guardian', trainee_id:t.id, date:d, dedupe_key:`soon:g:${t.id}:${key}`, text:`تبدأ محاضرة ${t.full_name.split(' ')[0]} في «${p?.name || 'البرنامج'}» الساعة ${when}، بعد ${mins} دقائق.` })); });
+    const ct = c.teacher_id && (D.teachers || []).find(t => t.id === c.teacher_id && t.active !== false);
+    if(ct) out.push(note(D, { to:'teacher', teacher_id:ct.id, trainee_id:null, date:d, dedupe_key:`soon:t:${ct.id}:${key}`, text:`تبدأ محاضرتك في «${p?.name || 'البرنامج'}» الساعة ${when}، بعد ${mins} دقائق.` }));
   }
   return out;
 }

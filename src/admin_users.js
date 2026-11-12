@@ -25,10 +25,10 @@ export function pageUsers(){
   $$('[data-ut]').forEach(b => b.onclick = () => { uTab = b.dataset.ut; pageUsers(); });
   const body = $('#uBody');
   if(uTab === 'teachers'){
-    body.innerHTML = `<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('book')}مدربو المقررات</h3><button class="btn pri sm" id="tAdd">${ic('plus')} مدرب</button></div>
+    body.innerHTML = `<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('book')}المدربون</h3><button class="btn pri sm" id="tAdd">${ic('plus')} مدرب</button></div>
       ${teachers.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المدرب</th><th>الجوال</th><th>القسم</th><th>المقررات</th><th>المتدربون</th><th>بنك الأسئلة</th><th>الحالة</th><th></th></tr></thead><tbody>
         ${teachers.map(t => { const n = (D.subscriptions || []).filter(s => s.section === t.section && ['pending', 'active'].includes(s.status) && (s.subjects || []).some(x => (t.subjects || []).includes(x))).length;
-          return `<tr class="${t.active === false ? 'muted' : ''}"><td><b style="font-weight:500">${esc(t.full_name)}</b></td><td dir="ltr" style="text-align:right">${esc(t.phone)}</td><td>${SECTIONS[t.section]}</td><td>${esc((t.subjects || []).join('، '))}</td><td class="num">${fmtNum(n)}</td>
+          return `<tr class="${t.active === false ? 'muted' : ''}"><td><b style="font-weight:500">${esc(t.full_name)}</b></td><td dir="ltr" style="text-align:right">${esc(t.phone)}</td><td>${SECTIONS[t.section]}</td><td>${esc((t.subjects || []).join('، ')) || '<span class="hint">برامج تدريبية</span>'}${(() => { const k = (D.cohorts || []).filter(c => c.teacher_id === t.id && !c.archived_at).length; return k ? ` <span class="pill info">${fmtNum(k)} دفعة</span>` : ''; })()}</td><td class="num">${fmtNum(n)}</td>
           <td><button class="btn sm" data-tb="${t.id}">${ic('database')} ${fmtNum((D.questions || []).filter(q => q.teacher_id === t.id && q.status === 'published').length)}</button></td>
           <td><span class="pill dot ${t.active === false ? 'g' : 'ok'}">${t.active === false ? 'موقوف' : 'نشط'}</span></td><td><button class="btn sm" data-te="${t.id}" aria-label="تعديل ${esc(t.full_name)}">${ic('edit')}</button></td></tr>`; }).join('')}
       </tbody></table></div>` : emptyBox('لا يوجد مدربون', 'أضف مدربي المقررات ليصلوا إلى كشوف متدربيهم.')}</div>`;
@@ -52,8 +52,9 @@ function teacherModal(t){
     <div class="field" style="grid-column:1/-1"><label for="tf-name">الاسم <i>*</i></label><input class="inp" id="tf-name" name="full_name" value="${esc(t?.full_name || '')}" maxlength="80"></div>
     <div class="field"><label for="tf-phone">الجوال (للدخول) <i>*</i></label><input class="inp num" id="tf-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" value="${esc(t?.phone || '')}" placeholder="05XXXXXXXX"></div>
     <div class="field"><label for="tf-sec">القسم</label><select class="inp" id="tf-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${t?.section === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    <fieldset class="field" style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">المقررات</legend><div style="display:flex;gap:14px;flex-wrap:wrap">
+    <fieldset class="field" style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">مقررات باقات القدرات والتحصيلي</legend><div style="display:flex;gap:14px;flex-wrap:wrap">
       ${SUBJECTS.map(s => `<label class="chk"><input type="checkbox" name="subjects" value="${s}" ${(t?.subjects || []).includes(s) ? 'checked' : ''}> ${s}</label>`).join('')}</div></fieldset>
+    <p class="hint" style="grid-column:1/-1;margin:0">مدرب البرامج التدريبية: اتركه بلا مقررات، ثم اربطه بدفعته من «الدفعات والكشوف» ← تعديل الدفعة ← المدرب.</p>
     ${t ? `<label class="chk" style="grid-column:1/-1"><input type="checkbox" name="active" ${t.active !== false ? 'checked' : ''}> نشط (يستطيع الدخول)</label>` : ''}
     <div class="errtxt" id="tfE" style="grid-column:1/-1"></div>
     <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="tfC">إلغاء</button><button class="btn pri" id="tfS">${ic('check')} حفظ</button></div></form>`);
@@ -62,7 +63,6 @@ function teacherModal(t){
   $('#tf').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target);
     const o = { id:t?.id, full_name:fd.get('full_name').trim(), phone:fd.get('phone'), section:fd.get('section'), subjects:fd.getAll('subjects'), active: t ? !!fd.get('active') : true };
     if(o.full_name.split(/\s+/).length < 2) return $('#tfE').textContent = 'اكتب الاسم الثنائي على الأقل.';
-    if(!o.subjects.length) return $('#tfE').textContent = 'اختر مقررًا واحدًا على الأقل.';
     const b = $('#tfS'); setBusy(b, true, 'جارٍ الحفظ');
     try { await Store.saveTeacher(o); await reloadAD(); closeModal(); toast('حُفظ المدرب'); pageUsers(); } catch(x){ setBusy(b, false); $('#tfE').textContent = x.message; } };
 }

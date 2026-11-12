@@ -19,7 +19,7 @@ let cur = null, fSub = '', fUnit = '', fSt = '', fQ = '';
 export const openBank = id => { cur = id; fSub = fUnit = fSt = fQ = ''; };
 
 export function pageBank(){
-  const m = $('#main'), teachers = (AD.teachers || []).filter(t => t.active !== false).sort((a, b) => a.section.localeCompare(b.section) || a.full_name.localeCompare(b.full_name, 'ar'));
+  const m = $('#main'), teachers = (AD.teachers || []).filter(t => t.active !== false && (t.subjects || []).length).sort((a, b) => a.section.localeCompare(b.section) || a.full_name.localeCompare(b.full_name, 'ar'));
   const qs = (AD.questions || []).filter(q => q.status !== 'deleted');
   if(!teachers.some(t => t.id === cur)) cur = teachers[0]?.id || null;
   m.innerHTML = titleBar(`${ic('database')}بنوك الأسئلة`, 'بنوك أسئلة <em>المدربين</em>',
