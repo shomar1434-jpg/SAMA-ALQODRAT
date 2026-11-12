@@ -4,7 +4,7 @@
    ===================================================================== */
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, DAYS } from './utils.js';
 import { ic, emptyBox, ringSvg, toast, statusPill, applyTheme, getTheme, setTheme } from './views2_head.js';
-import { Store, initStore, cohortItemsOf, LEVEL_TXT } from './data2.js';
+import { Store, initStore, cohortItemsOf, LEVEL_TXT, enrollmentStats, isSessionDay, cohortState } from './data2.js';
 import { setPage, publicBase } from './config.js';
 import { LOGO } from './assets/logo.js';
 import { studentDashboard, teacherDashboard, guardianDashboard, ROLE_TXT, NOTIFY_TPL, normPhone, progressGauge, GAUGE_RED, mirrorData } from './portal_logic.js';
@@ -15,7 +15,7 @@ import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
-const T_TABS = [['today','calendar','كشف اليوم'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
+const T_TABS = [['today','calendar','كشف اليوم'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
 let sTab = 'dash', tTab = 'today';
 const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
@@ -158,7 +158,7 @@ export function programPanelHtml(x, threshold = 75){
   const tone = rate == null ? 'success' : rate < threshold ? 'warning' : 'success';
   const zone = v => v == null ? '' : v < GAUGE_RED ? 'red' : v < threshold ? 'yellow' : 'green';
   return `<div class="card pad rv prog-head"><div><span class="pill ${x.state === 'running' ? 'ok' : x.state === 'upcoming' ? 'info' : 'g'}">${STATE_TXT[x.state]}</span>
-      <h2>${esc(x.program)}</h2><p class="hint">الدفعة ${fmtNum(x.number)} · من ${fmtShort(x.start_date)} إلى ${fmtShort(x.end_date)}${x.hours ? ` · ${fmtNum(x.hours)} ساعة تدريبية` : ''}</p></div>
+      <h2>${esc(x.program)}</h2><p class="hint">الدفعة ${fmtNum(x.number)} · من ${fmtShort(x.start_date)} إلى ${fmtShort(x.end_date)}${x.hours ? ` · ${fmtNum(x.hours)} ساعة تدريبية` : ''}${x.trainer ? ` · المدرب: ${esc(x.trainer)}` : ''}${x.hall ? ` · ${esc(x.hall)}` : ''}</p></div>
       ${x.next ? `<p class="prog-next">${ic('calendar')} المحاضرة القادمة: <b>${DAYS[new Date(x.next + 'T12:00:00Z').getUTCDay()]} ${fmtShort(x.next)}</b> · <span class="num">${t12(String(x.start_time).slice(0, 5))}</span></p>` : ''}</div>
     ${x.message ? `<div class="alert t-${{ ok:'success', done:'success', low:'warning', consec:'warning', last:'danger', lost:'danger' }[x.level] || 'info'} rv" role="status" style="margin-top:12px"><span class="aic">${ic('alert')}</span><div><b>${LEVEL_TXT[x.level] || ''}</b><div>${esc(x.message)}</div></div></div>` : ''}
     <div class="card pad ach-card rv"><div class="ach-head"><div class="ind-h">${ic('award')}<b>نسبة الإنجاز في البرنامج</b></div><div class="ach-big num">${ach == null ? '—' : fmtNum(ach) + '٪'}</div></div>
@@ -219,6 +219,24 @@ function viewGuardian(D, s){
   if(ch.notifications.some(x => !x.read_at)) Store.markRead('guardian');
 }
 
+/* دفعات البرامج المسندة للمدرب: كشف كل دفعة وحضور اليوم ونسبة كل متدرب */
+function teacherCohorts(D){
+  const n = riyadhNow(), cs = (D.cohorts || []).slice().sort((a, b) => a.start_date.localeCompare(b.start_date));
+  return { html: cs.length ? cs.map(c => { const p = (D.programs || []).find(x => x.id === c.program_id), st = cohortState(c), today = st === 'running' && isSessionDay(c, n.date);
+      const rows = (D.enrollments || []).filter(e => e.cohort_id === c.id).map(e => { const t = (D.cohort_trainees || []).find(x => x.id === e.trainee_id), s = enrollmentStats(D, e, c), a = (D.attendance || []).find(x => x.enrollment_id === e.id && x.att_date === n.date);
+        return { name:t?.full_name || '—', s, a }; }).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      const here = rows.filter(r => r.a).length;
+      return `<div class="card pad rv co-card" data-co="${c.id}" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+          <div><span class="pill ${st === 'running' ? 'ok' : st === 'upcoming' ? 'info' : 'g'}">${STATE_TXT[st] || st}</span><h3 class="ctitle" style="margin:6px 0 2px">${esc(p?.name || '')} · الدفعة ${fmtNum(c.number)}</h3>
+            <p class="hint" style="margin:0">${fmtShort(c.start_date)} – ${fmtShort(c.end_date)} · ${(c.days || []).map(d => DAYS[d]).join('، ')} · ${t12(String(c.start_time).slice(0, 5))} – ${t12(String(c.end_time).slice(0, 5))}${c.hall ? ' · ' + esc(c.hall) : ''}</p></div>
+          <div class="pill ${today ? 'info' : 'g'}" style="padding:6px 12px">${today ? `حضر اليوم ${fmtNum(here)} من ${fmtNum(rows.length)}` : `${fmtNum(rows.length)} متدربًا · لا محاضرة اليوم`}</div></div>
+        ${rows.length ? `<div class="tblwrap" style="margin-top:10px"><table class="tb"><thead><tr><th>المتدرب</th><th>اليوم</th><th>الوقت</th><th>حضر</th><th>غاب</th><th>نسبة الحضور</th><th>غياب متتالٍ</th></tr></thead><tbody>
+          ${rows.map(r => `<tr><td>${esc(r.name)}</td><td><span class="pill dot ${r.a ? statusPill(r.a.status) : 'g'}">${r.a ? r.a.status : today ? 'لم يسجل بعد' : '—'}</span></td><td class="num">${r.a?.time ? t12(String(r.a.time).slice(0, 5)) : '—'}</td>
+            <td class="num">${fmtNum(r.s.attended)}</td><td class="num">${fmtNum(r.s.absent)}</td><td class="num">${r.s.rate == null ? '—' : fmtNum(r.s.rate) + '٪'}</td><td class="num">${r.s.consec ? `<span class="pill ${r.s.consec >= 2 ? 'bad' : 'warn'}">${fmtNum(r.s.consec)}</span>` : '—'}</td></tr>`).join('')}
+        </tbody></table></div>` : `<p class="hint" style="margin:10px 0 0">لا يوجد مسجلون في هذه الدفعة بعد.</p>`}</div>`; }).join('')
+    : `<div class="card pad">${emptyBox('لا توجد دفعات مسندة إليك', 'تُسند إدارة المعهد الدفعة للمدرب من صفحة «الدفعات والكشوف».')}</div>`, bind(){} };
+}
+
 /* ربط ولي الأمر بابنه: يكتب السجل المدني للمتدرب الذي صرّح بجوال ولي الأمر عند التسجيل */
 function linkFormHtml(first){
   return `<h3 class="ctitle">${ic('users')}${first ? 'اربط حسابك بابنك أو ابنتك' : 'ربط ابن أو ابنة'}</h3>
@@ -240,11 +258,14 @@ function bindLinkForm(){
 }
 
 /* ---------- المدرب ---------- */
+/* تبويبات المدرب حسب ما أُسند إليه: مقررات الباقات، أو دفعات البرامج، أو كلاهما */
+const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
 function viewTeacher(D, quiet){
+  { const TT = tTabsOf(D); if(!TT.some(x => x[0] === tTab)) tTab = TT[0][0]; }
   if(tTab !== 'today'){ if(quiet) return; const t = teacherDashboard(D, D.me), reload = async () => viewTeacher(await Store.portalData('teacher'));
     $('#app').innerHTML = `<div class="wrap"><section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1><p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))}</p></div></section>
-      ${tabBar(T_TABS, tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}<div id="tBody"></div></div>`;
-    const v = ({ hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings })[tTab](D, reload); $('#tBody').innerHTML = v.html; v.bind();
+      ${tabBar(tTabsOf(D), tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}<div id="tBody"></div></div>`;
+    const v = ({ cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings })[tTab](D, reload); $('#tBody').innerHTML = v.html; v.bind();
     $$('[data-tt]').forEach(b => b.onclick = () => { tTab = b.dataset.tt; viewTeacher(D); }); return; }
   const t = teacherDashboard(D, D.me), n = riyadhNow();
   const PH = { none:'لا توجد جلسة اليوم', before:'الجلسة لم تبدأ', live:'الجلسة جارية', after:'انتهت جلسة اليوم' };
@@ -252,7 +273,7 @@ function viewTeacher(D, quiet){
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1>
       <p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))} · ${fmtNum(t.rows.length)} متدرب</p></div>
       <div class="next-ses"><span>${PH[t.phase]}</span><b>${t.session ? `${t12(t.session.start)} – ${t12(t.session.end)}` : fmtShort(n.date)}</b><span class="hint" style="color:inherit">آخر تحديث ${t12(n.hm)}</span></div></section>
-    ${tabBar(T_TABS, tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}
+    ${tabBar(tTabsOf(D), tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}
     ${t.reminder ? `<div class="alert t-warning rv" role="alert" style="margin-top:14px"><span class="aic">${ic('timer')}</span><div style="flex:1"><b style="font-weight:600">باقي أقل من ${fmtNum(t.remind)} دقيقة على نهاية الجلسة، و${fmtNum(t.missing.length)} متدرب لم يُسجَّل حضوره</b>
       <p style="margin:4px 0 8px">${t.missing.map(m => esc(m.name.split(' ').slice(0, 2).join(' '))).join('، ')}</p>
       <button class="btn sm pri" id="tRemind">${ic('alert')} إرسال تذكير لهم</button> <span class="hint">التذكير يطلب المسح إن كانوا حاضرين، أو إبلاغك بالعذر.</span></div></div>` : ''}

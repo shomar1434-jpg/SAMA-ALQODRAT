@@ -304,7 +304,8 @@ export function cohortModal(p, c, back){
       <div class="field"><label>وقت النهاية</label><input class="inp" name="end_time" type="time" value="${String(c.end_time).slice(0,5)}"></div>
       <div class="field"><label>عدد المقاعد</label><input class="inp" name="seats" type="number" min="1" value="${c.seats}"></div>
       <div class="field"><label>القاعة</label><input class="inp" name="hall" value="${esc(c.hall||'')}"></div>
-      <div class="field" style="grid-column:1/-1"><label>المدرب</label><input class="inp" name="trainer" value="${esc(c.trainer||'')}"></div>
+      <div class="field"><label>المدرب (حساب مسجّل)</label><select class="inp" name="teacher_id"><option value="">غير مرتبط بحساب</option>${(AD.teachers||[]).filter(t=>t.active!==false||t.id===c.teacher_id).sort((a,b)=>a.full_name.localeCompare(b.full_name,'ar')).map(t=>`<option value="${t.id}" ${c.teacher_id===t.id?'selected':''}>${esc(t.full_name)}</option>`).join('')}</select><span class="hint">المدرب المرتبط يرى كشف الدفعة وحضورها في بوابته. أضف المدربين من «المدربون وأولياء الأمور».</span></div>
+      <div class="field"><label>اسم المدرب في الكشوف</label><input class="inp" name="trainer" value="${esc(c.trainer||'')}"></div>
       <div style="grid-column:1/-1">${swRow('reg_open','استقبال التسجيل الآن',c.reg_open,'يظهر نموذج التسجيل في صفحة البرنامج وعند مسح الباركود.')}</div>
       <div class="errtxt" id="cmE" style="grid-column:1/-1"></div>
       <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="cmC">إلغاء</button><button class="btn pri">${ic('check')} ${isNew?'فتح الدفعة':'حفظ'}</button></div></form>`);
@@ -312,8 +313,9 @@ export function cohortModal(p, c, back){
   const auto=()=>{ if(touched) return; const days=$$('[name=d]:checked',f).map(x=>+x.value); if(f.start_date.value&&p.duration_days&&days.length) f.end_date.value=computeEnd(f.start_date.value,p.duration_days,days); };
   f.end_date.oninput=()=>touched=true; f.start_date.onchange=()=>{ touched=false; auto(); }; $$('[name=d]',f).forEach(x=>x.onchange=()=>{ touched=false; auto(); }); auto();
   $('#cmC').onclick=closeModal;
+  f.teacher_id.onchange=()=>{ const t=(AD.teachers||[]).find(x=>x.id===f.teacher_id.value); if(t) f.trainer.value=t.full_name; };
   f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f), E=t=>$('#cmE').textContent=t;
-    const o={...c, days:fd.getAll('d').map(Number), start_date:fd.get('start_date'), end_date:fd.get('end_date'), start_time:fd.get('start_time'), end_time:fd.get('end_time'), seats:+fd.get('seats')||25, hall:fd.get('hall').trim(), trainer:fd.get('trainer').trim(), reg_open:!!fd.get('reg_open')};
+    const o={...c, days:fd.getAll('d').map(Number), start_date:fd.get('start_date'), end_date:fd.get('end_date'), start_time:fd.get('start_time'), end_time:fd.get('end_time'), seats:+fd.get('seats')||25, hall:fd.get('hall').trim(), teacher_id:fd.get('teacher_id')||null, trainer:fd.get('trainer').trim()||((AD.teachers||[]).find(x=>x.id===fd.get('teacher_id'))?.full_name||''), reg_open:!!fd.get('reg_open')};
     if(!o.days.length) return E('اختر يومًا واحدًا على الأقل للمحاضرات.');
     if(!o.start_date||!o.end_date) return E('حدّد تاريخ البداية والنهاية.');
     if(o.end_date<o.start_date) return E('تاريخ النهاية قبل تاريخ البداية. صحّح أحدهما.');
