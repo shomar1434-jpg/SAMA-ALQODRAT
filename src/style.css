@@ -1038,3 +1038,11 @@ details.hw{margin-top:10px}details.hw summary{cursor:pointer}
 .en-opt span .ic{grid-row:span 2;width:24px;height:24px;color:var(--primary)}.en-opt small{color:var(--text-muted);font-size:13px}
 .en-opt input:checked+span{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--surface-card))}
 .en-opt input:focus-visible+span{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ---------- التطبيق القابل للتثبيت ---------- */
+.pwa-steps{margin:0;padding-inline-start:22px;line-height:2;font-size:14.5px}.pwa-more{margin-top:12px}.pwa-more summary{cursor:pointer;color:var(--brand);font-weight:500;min-height:32px}
+#installBtn .ic{width:18px;height:18px}
+#pwaUpdate{position:fixed;inset-inline:0;top:calc(10px + env(safe-area-inset-top,0px));margin-inline:auto;width:max-content;max-width:calc(100vw - 24px);z-index:90;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;border-radius:16px;background:var(--surface-card);border:1px solid var(--border);box-shadow:var(--shadow-secondary);font-size:14.5px}
+#pwaUpdate span{display:flex;align-items:center;gap:6px}
+.ibp-dev{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border)}

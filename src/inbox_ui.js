@@ -1,5 +1,6 @@
 /* واجهة صندوق الوارد (الخطوة D): جرس وعدّاد، ولائحة الإشعارات والرسائل، ولافتة منبثقة، وصوت المعهد المخصص،
    ووميض عنوان التبويب في الخلفية، ورقم على أيقونة التطبيق المثبّت. لا يتكرر التنبيه للعنصر نفسه (يُحفظ ما رُئي في الجهاز). */
+import { notifyState, askNotify, deviceNotify } from './pwa.js';
 import { $, esc, fmtShort, t12 } from './utils.js';
 import { ic } from './views2_head.js';
 import { Store } from './data2.js';
@@ -57,6 +58,9 @@ function panelHtml(){
   const L = st.items || [];
   return `<div class="ibp-head"><b>${ic('bell')} الإشعارات</b>
       <button class="btn sm ghost" id="ibSound" aria-pressed="${soundOn()}">${soundOn() ? '🔔 الصوت مفعّل' : '🔕 الصوت متوقف'}</button></div>
+    ${(() => { const s = notifyState(); return s === 'unsupported' ? '' : `<div class="ibp-dev">${s === 'granted' ? `<span class="hint">${ic('check')} إشعارات الجهاز مفعّلة: تصلك حين تكون المنصة في الخلفية.</span>`
+      : s === 'denied' ? '<span class="hint">إشعارات الجهاز محظورة. اسمح بها لهذا الموقع من إعدادات المتصفح.</span>'
+      : `<button class="btn sm" id="ibDev">${ic('bell')} تفعيل إشعارات الجهاز</button><span class="hint">على الآيفون: ثبّت المنصة أولًا على الشاشة الرئيسية.</span>`}</div>`; })()}
     ${L.length ? `<ul class="ibp-list">${L.map((x, i) => `<li><button type="button" class="ibp-it ${x.read ? '' : 'new'}" data-ii="${i}">
         <span class="ibt-ic t-${KIND_TONE[x.kind] || 'info'}">${ic(x.action === 'msg' ? 'activity' : 'alert')}</span>
         <span class="ibt-body"><b>${esc(x.title)}</b><span>${esc(String(x.text).slice(0, 160))}</span><small>${when(x.at)}</small></span></button></li>`).join('')}</ul>`
@@ -71,6 +75,7 @@ function openPanel(){
   if((st.items || []).some(x => x.action === 'notice' && !x.read)) Store.markRead(st.role).then(tick).catch(() => {});
 }
 function bindPanel(p){
+  if(p.querySelector('#ibDev')) p.querySelector('#ibDev').onclick = async () => { const r = await askNotify(); if(r === 'granted') deviceNotify('منصة سما القدرات', 'فُعّلت إشعارات الجهاز.', 'sama-enabled'); p.innerHTML = panelHtml(); bindPanel(p); };
   p.querySelector('#ibSound').onclick = () => { setSound(!soundOn()); unlockAudio(); if(soundOn()) setTimeout(chime, 50); p.innerHTML = panelHtml(); bindPanel(p); };
   p.querySelectorAll('[data-ii]').forEach(b => b.onclick = () => openItem(st.items[+b.dataset.ii]));
 }
@@ -85,7 +90,8 @@ async function tick(){
   if($('#inboxPanel')){ const p = $('#inboxPanel'); p.innerHTML = panelHtml(); bindPanel(p); }
   const fresh = st.items.filter(x => !x.read && !st.seen.has(x.id));
   if(st.first) st.first = false;   // أول تحميل في هذا الجهاز: لا صوت لما سبق
-  else if(fresh.length){ chime(); toastItem(fresh[0], fresh.length - 1); flashTitle(r.unread); st.onNew?.(fresh); }
+  else if(fresh.length){ chime(); toastItem(fresh[0], fresh.length - 1); flashTitle(r.unread); st.onNew?.(fresh);
+    if(document.hidden) deviceNotify(fresh[0].title, String(fresh[0].text).slice(0, 160) + (fresh.length > 1 ? ` (+${fresh.length - 1})` : ''), 'sama-' + fresh[0].id); }
   st.items.forEach(x => st.seen.add(x.id)); saveSeen();
 }
 export function mountInbox(role, who, { onOpen, onNew } = {}){

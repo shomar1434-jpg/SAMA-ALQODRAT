@@ -3,6 +3,7 @@ import { setPage } from './config.js';
 import { initStore, Store, LocalStore, cohortArchived, cohortState, progCode, enrollsOf, takenOf, activeCohortOf } from './data2.js';
 import { applyTheme, getTheme, setTheme } from './views2_head.js';
 import { route } from './views2_main.js';
+import { initPwa } from './pwa.js';
 import { $, makeSaudiId, riyadhNow } from './utils.js';
 
 export function boot(page){
@@ -20,4 +21,5 @@ export function boot(page){
   if(window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if(getTheme() === 'auto') applyTheme('auto'); });
   window.addEventListener('hashchange', route);
   route();
+  initPwa();
 }
