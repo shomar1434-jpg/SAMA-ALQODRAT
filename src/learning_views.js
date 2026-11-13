@@ -40,6 +40,9 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
 }
 
 /* واجب اختبار من بنك المدرب: قبل التسليم أسئلة بلا إجابات، وبعده مراجعة بالإجابة الصحيحة والتفسير */
+/* تجهيز واجب علاجي من مجموعة ذكية: يفتح نموذج الواجب بقائمة مستهدفين جاهزة، والنشر بيد المدرب */
+let HW_PRESET = null;
+export const setHwPreset = p => { HW_PRESET = p; };
 /* نص السؤال أو صورته (البنك المشترك مصوَّر)، ورابط صفحة القطعة عند وجودها. base يضبطه setBankAssets عند تحميل البوابة */
 let ASSETS = '';
 export const setBankAssets = b => { ASSETS = b || ''; };
@@ -134,7 +137,8 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
         ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
           <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${a.kind === 'quiz' ? esc(s.feedback || '') : esc(s.answer || '')}</td>
           <td>${a.kind === 'quiz' ? `<b class="num">${fmtNum(s.score ?? 0)} / ${fmtNum(a.max_score)}</b> <span class="hint">آلي</span>` : ['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
-  bind(){ $('#hwAdd').onclick = () => { const n = riyadhNow();
+  bind(){ if(HW_PRESET) queueMicrotask(() => $('#hwAdd')?.click());
+    $('#hwAdd').onclick = () => { const n = riyadhNow();
       modal(`<h3>واجب جديد</h3><form id="hf" class="grid g2" novalidate>
         <div class="field" style="grid-column:1/-1"><label for="hf-t">العنوان</label><input class="inp" id="hf-t" name="title" maxlength="120"></div>
         <fieldset class="field" style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">نوع الواجب</legend><div style="display:flex;gap:14px;flex-wrap:wrap">
@@ -169,6 +173,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
         tgN(); };
       const tgN = () => { const ids = tgIds(); $('#hfTgN').textContent = ids ? `سيُرسل إلى ${fmtNum(ids.length)} متدربًا، وتُثبَّت القائمة عند النشر.` : ''; };
       $('#hf-tg').onchange = tgDraw; $('#hf-tp').onchange = tgN; $('#hf-s').addEventListener('change', tgDraw);
+      if(HW_PRESET){ const P = HW_PRESET; HW_PRESET = null; $('#hf-t').value = P.title || ''; $('#hf-ty').value = 'practice'; $('#hf-tg').value = 'pick'; P.ids.forEach(id => tgPicked.add(id)); tgDraw(); }
       const chosen = [], pickOn = () => !$('[data-qk]').hidden && $('#hf-m').value === 'pick';
       const pool = () => pub.filter(q => q.subject === $('#hf-s').value && (!$('#hf-u').value || q.unit === $('#hf-u').value)).sort((a, b) => (a.order || 0) - (b.order || 0));
       const drawPick = () => { const k = $('#hf-k').value, list = pool().filter(q => !k || (q.skill || '') === k).slice(0, 120);

@@ -38,7 +38,7 @@ export function homeworkIndicator(D, trainee, sub, n = riyadhNow()){
    الحضور = أيام الحضور ÷ كل جلسات الباقة المقررة × 100، والواجبات = ما حُلّ ÷ ما أُرسل × 100، والإنجاز = متوسطهما.
    «أُرسل» = واجب منشور حتى اليوم في قسم المتدرب ومقرراته (ومنذ بداية اشتراكه)، و«حُلّ» = مسلَّم أو مصحَّح. */
 export function achievementOf(D, trainee, sub, st, n = riyadhNow()){
-  const sent = (D.assignments || []).filter(a => a.section === sub.section && (!a.subject || (sub.subjects || []).includes(a.subject)) && a.publish_date <= n.date && (!sub.start_date || a.due_date >= sub.start_date));
+  const sent = (D.assignments || []).filter(a => a.section === sub.section && (!a.subject || (sub.subjects || []).includes(a.subject)) && a.publish_date <= n.date && (!sub.start_date || a.due_date >= sub.start_date) && (!Array.isArray(a.targets) || a.targets.includes(trainee.id)));   // الواجب المستهدَف يُحسب على مستهدفيه فقط
   const solved = sent.filter(a => (D.submissions || []).some(x => x.trainee_id === trainee.id && x.assignment_id === a.id && ['submitted', 'graded'].includes(x.status)));
   const att = st.total ? Math.round(Math.min(1, st.attended / st.total) * 100) : null;
   const hw = sent.length ? Math.round(solved.length / sent.length * 100) : null;
