@@ -11,7 +11,8 @@ import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
 import { planOpen } from './qudurat.js';
-import { ageOn, isMinor } from './identity_logic.js';
+import { ageOn, isMinor, isChild, MIN_AGE } from './identity_logic.js';
+import { waLink, WA_LOGO, viewContact } from './landing.js';
 import { viewPolicies, viewPolicy, bindPolicyConsent } from './policy_views.js';
 
 /* =====================================================================
@@ -47,7 +48,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['home','register','enroll','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
@@ -68,6 +69,7 @@ export async function route(){
   if(h==='me'){ history.replaceState(null,'','#portals'); return viewPortals(); }   // «حضوري» انتقلت إلى بوابة المتدرب
   if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
   if(h==='enroll' || h.startsWith('enroll-')) return viewEnroll(h.slice(7));
+  if(h==='contact') return viewContact();
   if(h.startsWith('policy-')) return viewPolicy(h.slice(7));
   if(/^p[a-z0-9]+$/i.test(h) && !ROUTES.includes(h)) return viewProgramPage(h);
   if(h.startsWith('qr-')){ if(!(await Store.isAdmin())) return viewLogin(); return h==='qr-checkin' ? viewQRCheckin() : viewQR(h.slice(3)); }
@@ -187,6 +189,7 @@ export function regFormHtml(title, sub, chooser=''){
       ${fld('email','البريد الإلكتروني',false,`<input class="inp" name="email" type="email" inputmode="email" maxlength="100" dir="ltr" style="text-align:right" placeholder="name@example.com" autocomplete="email" autocapitalize="off" spellcheck="false">`,'يجب أن يحوي علامة @ ونطاقًا، مثل name@gmail.com')}
       ${fld('gender','الجنس',true,`<select class="inp" name="gender"><option value="">اختر</option><option>ذكر</option><option>أنثى</option></select>`)}
       ${fld('birth_date','تاريخ الميلاد',true,`<input class="inp" name="birth_date" type="date" min="1930-01-01" max="${riyadhNow().date}" autocomplete="bday">`,'لمن هم دون 19 سنة يُطلب جوال ولي الأمر.')}
+      <p id="rfChild" class="alert t-info" style="grid-column:1/-1;margin:0" hidden><span class="aic">${ic('users')}</span><span>تسجيل طفل دون 13 سنة: اكتب <b>جوال ولي الأمر</b> في خانة «رقم الجوال». به يدخل ولي الأمر بوابته ويتابع حضور الطفل وتقدّمه.</span></p>
       <div id="rfGuard" style="grid-column:1/-1" hidden>${fld('guardian_phone','جوال ولي الأمر',true,`<input class="inp num" name="guardian_phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" dir="ltr" style="text-align:right" placeholder="05XXXXXXXX" autocomplete="off">`,'يدخل به ولي الأمر بوابته لمتابعة حضورك وتقدّمك، بعد تأكيده برمز تحقق وبرقم سجلك المدني.')}</div>
       ${fld('city','المدينة أو المحافظة',true,`<select class="inp" name="city"><option value="">اختر</option>${CITIES.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
@@ -200,8 +203,9 @@ export function regFormHtml(title, sub, chooser=''){
 export function bindRegForm(target, cohortsFn){
   const f=$('#rf'); wireFormA11y(f,'rf'); bindPolicyConsent($('#rfPol',f));
   const bd=$('[name=birth_date]',f), minor=()=>isMinor(bd.value, riyadhNow().date);
-  const birthMsg=v=>{ const a=ageOn(v, riyadhNow().date); return !v ? 'اختر تاريخ الميلاد.' : a==null||v>riyadhNow().date||a<5||a>100 ? 'تاريخ الميلاد غير صحيح.' : ''; };
-  const syncGuard=()=>{ const m=minor(); $('#rfGuard',f).hidden=!m; if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
+  const birthMsg=v=>{ const a=ageOn(v, riyadhNow().date); return !v ? 'اختر تاريخ الميلاد.' : a==null||v>riyadhNow().date||a<MIN_AGE||a>100 ? 'تاريخ الميلاد غير صحيح.' : ''; };
+  const child=()=>isChild(bd.value, riyadhNow().date);
+  const syncGuard=()=>{ const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
   bd.addEventListener('change',()=>{ const m=birthMsg(bd.value); $('[data-e=birth_date]',f).textContent=m; bd.classList.toggle('err',!!m); m?bd.setAttribute('aria-invalid','true'):bd.removeAttribute('aria-invalid'); syncGuard(); }); bd.addEventListener('input',syncGuard);
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
@@ -218,7 +222,7 @@ export function bindRegForm(target, cohortsFn){
       if(/[a-zA-Z]/.test(v) && /[\u0621-\u06FF]/.test(v)) return 'اكتب الاسم بلغة واحدة: العربية أو الإنجليزية.'; if(parts.length<3) return 'اكتب الاسم الثلاثي على الأقل.'; if(parts.some(x=>x.replace(/[\u064B-\u0652]/g,'').length<2)) return 'كل مقطع في الاسم حرفان على الأقل.'; return ''; },
     national_id: v => !v ? 'اكتب رقم السجل المدني.' : !/^\d+$/.test(v) ? blocked.national_id : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : !/^[12]/.test(v) ? 'يبدأ رقم السجل بـ 1 أو 2.' : !validSaudiId(v) ? 'رقم السجل غير صحيح. تحقق من الأرقام.' : '',
     phone: v => !v ? 'اكتب رقم الجوال.' : !/^\d+$/.test(v) ? blocked.phone : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
-    guardian_phone: v => !minor() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
+    guardian_phone: v => !minor()||child() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
     email: v => !v ? '' : !v.includes('@') ? 'البريد يجب أن يحوي علامة @' : (v.match(/@/g)||[]).length>1 ? 'البريد يحوي علامة @ واحدة فقط.' : !/^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(v) ? 'صيغة البريد غير صحيحة، مثل name@gmail.com' : ''
   };
   const setState=(el,msg)=>{ const n=el.name, e=$(`[data-e=${n}]`,f); e.textContent=msg; el.classList.toggle('err',!!msg); el.classList.toggle('ok',!msg && !!el.value); msg?el.setAttribute('aria-invalid','true'):el.removeAttribute('aria-invalid'); };
@@ -236,7 +240,7 @@ export function bindRegForm(target, cohortsFn){
     $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
     Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
     ['gender','city','education'].forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
-    { const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()) delete F.guardian_phone; }
+    { const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
     const tg = typeof target==='function' ? target() : target;
     if(!tg){ ok=false; const el=$('#en-item',f)||$('#en-kind-program',f); errs.push({id:el?.id||'rf-full_name',label:'البرنامج أو الباقة',msg:'اختر ما تريد التسجيل فيه.'}); const e2=$('[data-e=en_item]',f); if(e2) e2.textContent='اختر ما تريد التسجيل فيه.'; }
     if($('#rf-pol',f) && !F.policies){ ok=false; errs.push({id:'rf-pol',label:'السياسات',msg:'اقرأ السياسات ووافق عليها للمتابعة.'}); $('#rfE').textContent='اقرأ السياسات ووافق عليها للمتابعة.'; }
@@ -248,6 +252,8 @@ export function bindRegForm(target, cohortsFn){
     setBusy(b,true,'جارٍ حفظ التسجيل');
     try{
       delete F.en_kind; delete F.en_item;
+      const waBtn = (ref, what) => `<p style="margin:14px 0 0"><a class="btn sm" target="_blank" rel="noopener" href="${waLink(`السلام عليكم، سجّلت في ${what} عبر المنصة.\nرقم المرجع: ${ref}\nالاسم: ${F.full_name}`)}">${WA_LOGO} تواصل مع المركز عبر واتساب</a></p>`;
+      const manarNote = `<p class="hint" style="max-width:480px;margin:10px auto 0">${ic('award')} شهادتك المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:500">منصة منار</a> التابعة للمؤسسة العامة للتدريب التقني والمهني. أنشئ حسابك فيها بنفس بياناتك.</p>`;
       const gNote = F.guardian_phone ? `<p class="hint" style="max-width:480px;margin:10px auto 0">${ic('users')} لمتابعة ولي الأمر: يدخل «بوابة ولي الأمر» بجواله ${esc(F.guardian_phone)}، ثم يكتب رقم سجلك المدني مرة واحدة.</p>` : '';
       if(tg.plan_id){
         const r = await Store.registerSubscription({...F, ...tg});
@@ -255,7 +261,7 @@ export function bindRegForm(target, cohortsFn){
           <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
           <div class="grid" style="gap:6px;max-width:480px;margin:0 auto 12px"><div class="pill info" style="justify-content:center;padding:6px 12px">${esc(r.plan)} · ${esc(r.section)}</div>
             <div class="pill g" style="justify-content:center;padding:6px 12px;white-space:normal">مواعيدك: ${esc(r.schedule)}</div></div>
-          <p class="hint" style="max-width:480px;margin:0 auto">يبدأ اشتراكك من أول يوم تحضر فيه: امسح باركود الحضور في المعهد وأدخل رقم سجلك المدني.</p>${gNote}</div>`;
+          <p class="hint" style="max-width:480px;margin:0 auto">يبدأ اشتراكك من أول يوم تحضر فيه: امسح باركود الحضور في المعهد وأدخل رقم سجلك المدني.</p>${gNote}${manarNote}${waBtn(r.ref, 'باقة '+r.plan)}</div>`;
         liveSay('اكتمل اشتراكك. رقم طلبك '+r.ref); return;
       }
       const r = await Store.register({...F, ...tg});
@@ -263,7 +269,7 @@ export function bindRegForm(target, cohortsFn){
       $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك</h2>
         <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
         <div class="grid" style="gap:6px;max-width:460px;margin:0 auto 12px">${cs.map(c=>`<div class="pill info" style="justify-content:center;padding:6px 12px">${c.program?esc(c.program)+' · ':''}${cohortLabel(c)} · تبدأ ${fmtShort(c.start)}</div>`).join('')}</div>
-        <p class="hint" style="max-width:480px;margin:0 auto">في أيام البرنامج امسح باركود البرنامج المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p>${gNote}</div>`;
+        <p class="hint" style="max-width:480px;margin:0 auto">في أيام البرنامج امسح باركود البرنامج المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p>${gNote}${manarNote}${waBtn(r.ref, 'برنامج '+((r.cohorts||[]).map(x=>x.program).join('، ')))}</div>`;
       liveSay('اكتمل تسجيلك. رقم طلبك '+r.ref);
     }catch(er){ setBusy(b,false); showErrorSummary($('#rfSum'), [{id:'rf-full_name',label:'تعذّر التسجيل',msg:er.message}]); $('#rfE').textContent=er.message; }
   };
@@ -356,6 +362,7 @@ export async function viewProgramPage(code, tab){
       <span class="hero-pill">${ic(CAT_ICON[p.category]||'book')}${esc(p.category)}${p.accreditation_no?` · رقم الاعتماد ${esc(p.accreditation_no)}`:''}</span>
       <h1>${esc(p.name)}</h1>
       ${p.description?`<p>${esc(p.description)}</p>`:''}
+      <p class="hero-note">${ic('award')} الشهادة المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener">منصة منار</a> (المؤسسة العامة للتدريب التقني والمهني)؛ يلزم المتدرب إنشاء حساب فيها.</p>
       <ul class="stats" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
         <li>${ic('hourglass')}<b>${p.hours==null?'—':fmtNum(p.hours)}</b><span>ساعة تدريبية</span></li>
         <li>${ic('calendar')}<b>${p.duration_days==null?'—':fmtNum(p.duration_days)}</b><span>أيام</span></li>

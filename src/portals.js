@@ -2,6 +2,8 @@
    البوابات: المتدرب، والمدرب، وولي الأمر. لكل بوابة صفحة مستقلة ودور محدد،
    والبيانات محصورة بالدور من الخادم (portalData). الحساب من portal_logic.js.
    ===================================================================== */
+import { CENTER } from './catalog.js';
+import { waLink, WA_LOGO } from './landing.js';
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, DAYS } from './utils.js';
 import { ic, emptyBox, ringSvg, toast, statusPill, applyTheme, getTheme, setTheme } from './views2_head.js';
 import { Store, initStore, cohortItemsOf, LEVEL_TXT, enrollmentStats, isSessionDay, cohortState } from './data2.js';
@@ -174,7 +176,7 @@ export function programPanelHtml(x, threshold = 75){
       <div class="card pad ind rv" style="--i:2"><div class="ind-h">${ic('award')}<b>الشهادة</b></div>
         ${x.cert ? `<div class="ind-big"><b>${ic('check')}</b> صدرت شهادتك</div><p class="hint">الرقم التسلسلي <b dir="ltr">${esc(x.cert)}</b></p><a class="btn sm" href="${publicBase()}#v-${encodeURIComponent(x.cert)}" target="_blank" rel="noopener">${ic('expand')} التحقق من الشهادة</a>`
           : x.state === 'archived' ? `<p class="ind-empty">انتهت الدفعة دون بلوغ حد الشهادة ${fmtNum(threshold)}٪</p>`
-          : `<p class="ind-big"><b>${fmtNum(threshold)}٪</b> حد الشهادة</p><p class="hint">${x.needed ? `يلزمك حضور ${fmtNum(x.needed)} من ${fmtNum(x.remaining)} محاضرة متبقية.` : 'بلغت حد الشهادة، وتصدر عند انتهاء الدفعة.'}</p>`}</div>
+          : `<p class="ind-big"><b>${fmtNum(threshold)}٪</b> حد الشهادة</p><p class="hint">الشهادة المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:500">منصة منار</a>؛ أنشئ حسابك فيها.</p><p class="hint">${x.needed ? `يلزمك حضور ${fmtNum(x.needed)} من ${fmtNum(x.remaining)} محاضرة متبقية.` : 'بلغت حد الشهادة، وتصدر عند انتهاء الدفعة.'}</p>`}</div>
       <div class="card pad ind rv" style="--i:3"><div class="ind-h">${ic('hourglass')}<b>مدة البرنامج</b></div>
         ${x.total ? `<div class="ind-big"><b>${fmtNum(x.remaining)}</b> محاضرة متبقية</div><div class="tbar big" role="img" aria-label="انعقد ${fmtNum(x.held)} من ${fmtNum(x.total)}"><i style="width:${Math.round(x.held / x.total * 100)}%"></i></div>
           <p class="hint">انعقد ${fmtNum(x.held)} من ${fmtNum(x.total)} محاضرة.</p>` : '<p class="ind-empty">—</p>'}</div>
@@ -195,7 +197,7 @@ function viewStudent(D){
     ${tabBar(pr.items.length ? S_TABS : S_TABS.slice(0, 1), sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length })}
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
-  if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75));
+  if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
   $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
@@ -260,6 +262,8 @@ function bindLinkForm(){
 }
 
 /* ---------- المدرب ---------- */
+/* مساعدة: واتساب المركز واتصال — في أسفل لوحات البوابات */
+const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي على منصة مركز سما القدرات.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
 /* تبويبات المدرب حسب ما أُسند إليه: مقررات الباقات، أو دفعات البرامج، أو كلاهما */
 const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
 function viewTeacher(D, quiet){

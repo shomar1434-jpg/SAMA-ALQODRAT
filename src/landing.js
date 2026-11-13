@@ -1,4 +1,4 @@
-import { CAT_ICON, CAT_TONE, CENTER } from './catalog.js';
+import { CAT_ICON, CAT_TONE, CENTER, KIDS_PROGRAMS, KIDS_ACCREDITATION } from './catalog.js';
 import { Store } from './data2.js';
 import { LOGOS } from './logos.js';
 import { DEFAULT_ABOUT, aboutSectionHtml, initPartnerMarquee, partnersSectionHtml } from './partners.js';
@@ -11,7 +11,17 @@ import { plansSectionHtml, initPlansMarquee } from './qudurat_views.js';
    الصفحات الافتتاحية — مستوحاة من صفحتي الغلاف والرؤية في دليل برامج المركز
    ===================================================================== */
 export const X_URL = 'https://x.com/' + CENTER.x;
-export const MAP_URL = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('مركز سما القدرات للتدريب جازان حي الصفا');
+export const MAP_URL = CENTER.map;
+/* رابط واتساب المركز: برسالة مجهزة يرسلها المستخدم بنفسه (لا إرسال آلي) */
+export const waLink = text => text ? `https://wa.me/${CENTER.whatsapp}?text=${encodeURIComponent(text)}` : CENTER.whatsappLink;
+const svg = d => `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${d}</svg>`;
+export const WA_LOGO = svg('<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.4-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.2.2 1.9 2.9 4.6 4 1.7.7 2.3.7 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/>');
+const SOC = [
+  ['snapchat', 'سناب شات', `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 0 5 2.2 5 5v3l2 1-2 1.2c.6 1.6 1.6 2.6 3 3.2-1 .8-2.2.8-3 1.2l-.5 1.4c-1.3-.2-2.2.2-3 .8-.8.5-2.2.5-3 0-.8-.6-1.7-1-3-.8L7 18.6c-.8-.4-2-.4-3-1.2 1.4-.6 2.4-1.6 3-3.2L5 12l2-1V8c0-2.800 2-5 5-5z"/></svg>`],
+  ['tiktok', 'تيك توك', svg('<path d="M16.5 2c.3 2.300 1.600 3.800 3.900 4v3c-1.400.1-2.700-.3-3.900-1v6.200c0 3.200-2.300 5.800-5.600 5.800S5.500 17.600 5.500 14.600c0-3.300 2.800-5.800 6.300-5.300v3.100c-1.600-.4-3.200.5-3.200 2.200 0 1.400 1 2.400 2.400 2.400 1.500 0 2.400-1 2.400-2.800V2z"/>')],
+  ['instagram', 'إنستقرام', `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>`],
+];
+export const socialHtml = () => `<div class="soc">${SOC.map(([k, t, i]) => `<a href="${CENTER.social[k]}" target="_blank" rel="noopener" aria-label="${t}" title="${t}">${i}</a>`).join('')}<a href="${X_URL}" target="_blank" rel="noopener" aria-label="منصة إكس" title="إكس">${X_LOGO}</a></div>`;
 /* المصباح المضيء بعلامة الصح (من غلاف الدليل) مرسومًا بالمتجهات ومتحركًا */
 export const BULB_SVG = `<svg class="bulb-art" viewBox="0 0 320 340" aria-hidden="true">
   <defs><radialGradient id="bg1" cx="42%" cy="38%" r="70%"><stop offset="0" stop-color="#FFE27A"/><stop offset=".55" stop-color="#FCC23E"/><stop offset="1" stop-color="#E17D32"/></radialGradient>
@@ -40,19 +50,49 @@ export function siteFooter(){
       <div class="sf-col"><h4>تواصل معنا</h4>
         ${ph.map(n=>`<a class="sf-item" href="tel:${n}" dir="ltr">${ic('activity')}<span>${n}</span></a>`).join('')}
         <a class="sf-item" href="mailto:${CENTER.email}" dir="ltr">${ic('form')}<span>${CENTER.email}</span></a>
-        <a class="sf-item" href="${X_URL}" target="_blank" rel="noopener" dir="ltr">${X_LOGO}<span>@${CENTER.x}</span></a></div>
+        <a class="sf-item" href="${waLink()}" target="_blank" rel="noopener">${WA_LOGO}<span>واتساب المركز</span></a>
+        ${socialHtml()}</div>
       <div class="sf-col"><h4>العنوان</h4>
         <a class="sf-item" href="${MAP_URL}" target="_blank" rel="noopener">${ic('pin')}<span>${CENTER.address}</span></a>
         <span class="sf-item">${ic('database')}<span>صندوق البريد ${CENTER.pobox}</span></span>
         <h4 style="margin-top:14px">روابط سريعة</h4>
-        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من شهادة</a><a href="#policies">السياسات</a></div></div>
+        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من شهادة</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
       <div class="sf-col"><h4>معتمد من</h4>
-        <div class="sf-acc"><span><img src="${LOGOS.tvtc}" alt="المؤسسة العامة للتدريب التقني والمهني"></span><span><img src="${LOGOS.nelc}" alt="المركز الوطني للتعليم الإلكتروني"></span></div></div>
+        <div class="sf-acc"><span><img src="${LOGOS.tvtc}" alt="المؤسسة العامة للتدريب التقني والمهني"></span><span><img src="${LOGOS.nelc}" alt="المركز الوطني للتعليم الإلكتروني"></span></div>
+        <a class="sf-item" href="${CENTER.manar}" target="_blank" rel="noopener" style="margin-top:10px">${ic('award')}<span>منصة منار: إصدار الشهادات المعتمدة</span></a></div>
     </div>
     <div class="sfoot-bar"><span>© ${new Date().getFullYear()} ${CENTER.name}. جميع الحقوق محفوظة.</span><span dir="ltr">${ph.join(' · ')} · ${CENTER.email}</span></div>
   </footer>`;
 }
 export const X_LOGO = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.8-6.3L5.4 21H2.3l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>`;
+
+/* برامج الأطفال: قسم مستقل في الرئيسية، والتسجيل من صفحة البرنامج المعتمد */
+function kidsSectionHtml(P){
+  const prog = P.find(p => p.accreditation_no === KIDS_ACCREDITATION), href = prog ? '#' + (prog.code || 'p' + KIDS_ACCREDITATION) : '#register';
+  return `<section class="kids" id="kids">
+    <div class="sec-head" data-reveal><span class="kicker">برامج الأطفال</span><h2>تنمية مهارات <em>القراءة والكتابة</em></h2><p class="hint">برامج حضورية معتمدة (رقم الاعتماد ${KIDS_ACCREDITATION}). يسجّل ولي الأمر طفله بجواله ويتابع حضوره وتقدّمه من بوابته.</p></div>
+    <div class="kids-grid">${KIDS_PROGRAMS.map((k, i) => `<article class="card pad kid" data-reveal style="--i:${i}"><span class="pill info">${esc(k.age)}</span><h3>${esc(k.title)}</h3><p>${esc(k.text)}</p>
+      <ul>${k.points.map(x => `<li>${ic('check')}<span>${esc(x)}</span></li>`).join('')}</ul><p class="hint">${esc(k.by)}</p>
+      <div class="kid-foot"><b>${esc(k.fee)}</b><span><a class="btn pri sm" href="${href}">${ic('form')} التفاصيل والتسجيل</a> <a class="btn sm" target="_blank" rel="noopener" href="${waLink('السلام عليكم، أستفسر عن: ' + k.title)}">${WA_LOGO} استفسار</a></span></div></article>`).join('')}</div>
+  </section>`;
+}
+
+/* صفحة «تواصل معنا»: كل قنوات المركز في مكان واحد (بدل صفحة الروابط الخارجية) */
+export function viewContact(){
+  const card = (href, icon, title, sub, ext = true) => `<a class="card pad ct-card rv" href="${href}" ${ext ? 'target="_blank" rel="noopener"' : ''}><span class="kic-lg t-info">${icon}</span><b>${title}</b><span class="hint" ${/^[0-9+@a-z. ]+$/i.test(sub) ? 'dir="ltr"' : ''}>${sub}</span></a>`;
+  $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">تواصل معنا</span><h2>قنوات <em>${esc(CENTER.name)}</em></h2><p class="hint">${esc(CENTER.address)}</p></div>
+    <h3 class="ct-h">التواصل المباشر</h3><div class="ct-grid">
+      ${card(waLink('السلام عليكم، لدي استفسار عن برامج مركز سما القدرات.'), WA_LOGO, 'واتساب المركز', 'للاستفسار والتسجيل ومتابعة السداد')}
+      ${CENTER.phones.map(n => card('tel:' + n, ic('activity'), 'اتصال', n, false)).join('')}
+      ${card('mailto:' + CENTER.email, ic('form'), 'البريد الإلكتروني', CENTER.email, false)}
+      ${card(CENTER.map, ic('pin'), 'موقعنا على الخريطة', 'خرائط قوقل')}</div>
+    <h3 class="ct-h">منصات التواصل الاجتماعي</h3><div class="ct-grid">
+      ${card(CENTER.social.snapchat, SOC[0][2], 'سناب شات', 'samagodrat.sa')}${card(CENTER.social.tiktok, SOC[1][2], 'تيك توك', '@samagodrat.sa')}${card(CENTER.social.instagram, SOC[2][2], 'إنستقرام', 'samagodrat.sa')}${card(X_URL, X_LOGO, 'إكس', '@' + CENTER.x)}
+      ${card(CENTER.telegram, ic('book'), 'قناة تيليجرام', 'مواد علمية خاصة بالقدرات')}</div>
+    <h3 class="ct-h">البرامج والخدمات</h3><div class="ct-grid">
+      ${card('#register', ic('book'), 'البرامج التدريبية', 'دليل البرامج المعتمدة والتسجيل', false)}${card('#home', ic('award'), 'باقات القدرات والتحصيلي', 'الباقات والأسعار والتسجيل', false)}${card('#enroll', ic('form'), 'سجّل الآن', 'نموذج التسجيل الموحّد', false)}
+      ${card(CENTER.manar, ic('award'), 'منصة منار', 'إصدار الشهادات المعتمدة من المؤسسة العامة للتدريب التقني والمهني')}</div></div>${siteFooter()}`;
+}
 
 export async function viewHome(){
   const app=$('#app');
@@ -101,6 +141,8 @@ export async function viewHome(){
     </section>
 
     ${plansSectionHtml(pl.plans)}
+
+    ${kidsSectionHtml(P)}
 
     ${partnersSectionHtml(site.partners)}
 
