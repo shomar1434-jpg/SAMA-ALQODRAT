@@ -28,6 +28,17 @@ export function pageBank(){
         return `<button class="bank-t" role="tab" data-bt="${t.id}" aria-selected="${t.id === cur}"><b>${esc(t.full_name)}</b><span>${SECTIONS[t.section]} · ${esc((t.subjects || []).join('، '))}</span>
           <span class="pill ${pub ? 'ok' : 'g'}">${fmtNum(pub)} منشور${mine.length - pub ? ` · ${fmtNum(mine.length - pub)} مسودة` : ''}</span></button>`; }).join('')}</div><div id="bankBody"></div>`
       : `<div class="card pad">${emptyBox('لا يوجد مدربون بعد', 'أضف المدرب أولًا من «المدربون وأولياء الأمور»، ثم ارجع لبناء بنكه.')}<div style="text-align:center;margin-top:10px"><a class="btn pri" href="#admin-users">${ic('plus')} إضافة مدرب</a></div></div>`);
+  /* البنوك المشتركة: محتوى واحد لكل مقرر يراه مدربا المقرر (بنين وبنات) */
+  const sh = (AD.questions || []).filter(q => q.shared && q.status !== 'deleted'), bySub = {}; sh.forEach(q => { const o = bySub[q.subject] = bySub[q.subject] || { n:0, pub:0, ok:0, units:new Set() }; o.n++; o.units.add(q.unit); if(q.status === 'published') o.pub++; if(q.key_status === 'approved') o.ok++; });
+  m.insertAdjacentHTML('beforeend', `<div class="card pad rv" id="sharedBank" style="margin-top:18px"><h3 class="ctitle">${ic('database')}البنوك المشتركة للمقررات</h3>
+    <p class="hint" style="margin:-4px 0 10px">بنك واحد لكل مقرر يستخدمه مدربا المقرر (بنين وبنات)، والواجبات والنتائج تبقى لكل مدرب مع طلابه. الأسئلة مصوَّرة، ومفاتيحها لا تصل للمتدرب قبل التسليم.</p>
+    ${Object.keys(bySub).length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المقرر</th><th>الأسئلة</th><th>المنشور</th><th>النماذج/الوحدات</th><th>مفاتيح معتمدة</th></tr></thead><tbody>${Object.entries(bySub).map(([s, o]) => `<tr><td><b>${esc(s)}</b></td><td class="num">${fmtNum(o.n)}</td><td class="num">${fmtNum(o.pub)}</td><td class="num">${fmtNum(o.units.size)}</td><td class="num">${fmtNum(o.ok)} من ${fmtNum(o.n)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لم يُستورد بنك مشترك بعد.</p>'}
+    <div class="grid g2" style="margin-top:12px;align-items:end"><div class="field"><label for="sb-base">مسار تخزين صور البنك (رابط المجلد)</label><input class="inp" id="sb-base" dir="ltr" placeholder="https://…/bank" value="${esc(AD.settings?.bank_assets || '')}"></div>
+      <div class="field"><label for="sb-file">استيراد حزمة بنك (JSON)</label><input class="inp" type="file" id="sb-file" accept=".json,application/json"></div></div>
+    <div class="errtxt" id="sbE" role="alert"></div><div style="text-align:end"><button class="btn sm" id="sb-save">${ic('check')} حفظ المسار</button></div></div>`);
+  $('#sb-save').onclick = async () => { await Store.saveSettings({ bank_assets:$('#sb-base').value.trim() }); await reloadAD(); toast('حُفظ مسار صور البنك'); };
+  $('#sb-file').onchange = async e => { const f = e.target.files[0]; if(!f) return; $('#sbE').textContent = '';
+    try { const r = await Store.importSharedBank(JSON.parse(await f.text())); await reloadAD(); toast(`بنك مشترك: أضيف ${fmtNum(r.added)} وحُدّث ${fmtNum(r.updated)}`); pageBank(); } catch(x){ $('#sbE').textContent = x instanceof SyntaxError ? 'الملف ليس JSON صالحًا' : x.message; } };
   $$('[data-bt]').forEach(b => b.onclick = () => { openBank(b.dataset.bt); pageBank(); });
   if(cur) body(teachers.find(t => t.id === cur), qs.filter(q => q.teacher_id === cur));
 }

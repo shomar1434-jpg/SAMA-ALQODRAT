@@ -10,7 +10,7 @@ import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { keepNote } from './import_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
-import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz } from './learning_logic.js';
+import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -220,7 +220,7 @@ export function scopeData(D, role, phone){
       sub_attendance:(D.sub_attendance||[]).filter(a=>subs.some(s=>s.id===a.subscription_id)), guardian_links:(D.guardian_links||[]).filter(l=>l.status==='verified'&&ids.includes(l.trainee_id)).map(l=>({id:l.id, trainee_id:l.trainee_id, status:l.status, relation:l.relation})),
       assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&(D.assignments||[]).some(a=>a.id===x.assignment_id&&a.teacher_id===me.id)),
       notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id), notifications_in:(D.notifications||[]).filter(x=>x.to==='teacher'&&x.teacher_id===me.id),
-      questions:(D.questions||[]).filter(q=>q.teacher_id===me.id&&q.status!=='deleted'),
+      questions:teacherBank(D, me),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject))),
       rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
       // دفعات البرامج المسندة إليه: كشفها وحضورها (أسماء المتدربين فقط)
@@ -449,7 +449,7 @@ export const LocalStore = {
   },
   async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role); }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); }catch(e){} },
-  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); return JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); },
+  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; return out; },
   /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
   runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
     const add=sessionReminders(D, riyadhNow()).filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },
@@ -570,7 +570,7 @@ export const LocalStore = {
   async _student(trainee_id){ const s=await this.portalSession('student'); const t=s&&this.data.trainees.find(x=>x.id===trainee_id&&normPhone(x.phone)===s.phone); if(!t) throw new Error('غير مصرح'); return t; },
   async saveAssignment(a){ const me=await this._me(); validateAssignment(a); if(!teacherCovers(me, me.section, a.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.assignments, row={title:a.title.trim(), body:String(a.body||'').slice(0,4000), subject:a.subject, section:me.section, publish_date:a.publish_date, due_date:a.due_date, max_score:+a.max_score||10};
-    if(a.kind==='quiz'&&!a.id){ row.kind='quiz'; row.quiz=buildQuiz(this.data, me, a.subject, a.unit||null, a.count); } else if(!a.id) row.kind='text';
+    if(a.kind==='quiz'&&!a.id){ row.kind='quiz'; row.quiz=buildQuiz(this.data, me, a.subject, a.unit||null, a.count, a.question_ids); } else if(!a.id) row.kind='text';
     if(a.id){ const ex=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(ex?.kind==='quiz'){ delete row.subject; } }
     if(a.id){ const x=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row); } else L.push({id:uid(), teacher_id:me.id, ...row, created_at:new Date().toISOString()});
     this.save(); return {ok:true}; },
@@ -616,6 +616,12 @@ export const LocalStore = {
     const L=(this.data.questions=this.data.questions||[]), row={teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
     if(q.id){ const x=L.find(y=>y.id===q.id); if(!x) throw new Error('السؤال غير موجود'); Object.assign(x,row,{version:(x.version||1)+1}); } else L.push({id:uid(), version:1, created_at:new Date().toISOString(), ...row});
     this.audit('question.save', q.id||'new', t.id); this.save(); return {ok:true}; },
+  /* استيراد بنك مشترك للمقرر (محتوى واحد يراه مدربا المقرر): يُضاف الجديد ويُحدَّث الموجود برمزه؛ تغيّر المفتاح يرفع الإصدار */
+  async importSharedBank(bundle){ const b=normalizeBundle(bundle), L=(this.data.questions=this.data.questions||[]), at=new Date().toISOString(); let added=0, updated=0;
+    for(const q of b.questions){ const row={shared:true, teacher_id:null, section:'all', subject:b.subject, unit:q.unit, skill:q.skill, order:q.order, text:q.text, image:q.image, page_image:q.page_image, options:[...LETTERS], correct:q.correct, explanation:'', difficulty:q.difficulty, key_status:q.key_status, key_source:q.key_source, status:q.status};
+      const x=L.find(y=>y.shared && y.code===q.code);
+      if(x){ const v=(x.version||1)+(x.correct!==q.correct?1:0); Object.assign(x,row,{version:v}); updated++; } else { L.push({id:uid(), code:q.code, ...row, version:1, created_at:at}); added++; } }
+    this.audit('bank.shared_import', b.subject, {added, updated}); this.save(); return {added, updated}; },
   async adminQuestionStatus(id, status){ const x=(this.data.questions||[]).find(y=>y.id===id); if(!x) throw new Error('السؤال غير موجود'); if(!['draft','published','deleted'].includes(status)) throw new Error('حالة غير صالحة'); x.status=status; this.audit('question.status', id, status); this.save(); return {ok:true}; },
   async adminImportQuestions(teacher_id, rows, status){ const t=this._bankTeacher(teacher_id); if(!Array.isArray(rows)||!rows.length) throw new Error('لا توجد أسئلة صالحة للاستيراد'); if(rows.length>2000) throw new Error('الحد 2000 سؤال في المرة الواحدة');
     rows.forEach((q,i)=>{ try { validateQuestion(q); } catch(e){ throw new Error(`السطر ${i+1}: ${e.message}`); } if(!(t.subjects||[]).includes(q.subject)) throw new Error(`السطر ${i+1}: المقرر ليس من مقررات المدرب`); });
@@ -717,6 +723,7 @@ export const CloudStore = {
   async saveQuestion(q){ return this._e(await this.sb.rpc('teacher_save_question',{p:q})); },
   async adminSaveQuestion(q){ return this._e(await this.sb.rpc('admin_save_question',{p:q})); },
   async adminQuestionStatus(id, status){ this._e(await this.sb.rpc('admin_question_status',{p_id:id, p_status:status})); return {ok:true}; },
+  async importSharedBank(bundle){ return this._e(await this.sb.rpc('admin_import_shared_bank',{p:normalizeBundle(bundle)})); },
   async adminImportQuestions(teacher_id, rows, status){ return this._e(await this.sb.rpc('admin_import_questions',{p_teacher:teacher_id, p_rows:rows, p_status:status==='draft'?'draft':'published'})); },
   async setQuestionStatus(id, status){ this._e(await this.sb.rpc('teacher_question_status',{p_id:id, p_status:status})); return {ok:true}; },
   async startAttempt(p){ return this._e(await this.sb.rpc('student_start_attempt',{p})); },
