@@ -38,7 +38,23 @@ export function validateAssignment(a){
 export const bankKey = (section, subject) => `${section}:${subject}`;
 /* بنك كل مدرب مستقل: teacher_id يحدد صاحب البنك (إن مُرّر) */
 export function bankFor(D, section, subject, unit, published = true, teacher_id = null){
-  return (D.questions || []).filter(q => q.section === section && q.subject === subject && (!unit || q.unit === unit) && (!published || q.status === 'published') && (!teacher_id || q.teacher_id === teacher_id));
+  return (D.questions || []).filter(q => q.subject === subject && (!unit || q.unit === unit) && (!published || q.status === 'published') && (q.shared ? true : q.section === section && (!teacher_id || q.teacher_id === teacher_id)));
+}
+/* البنك المشترك: محتوى واحد لكل مقرر يراه كل مدرب مكلف به (بنين وبنات)؛ الواجبات والنتائج تبقى لكل مدرب */
+export const KEY_ST = { unverified:'مفتاح غير معتمد', approved:'مفتاح معتمد' };
+export const LETTERS = ['أ', 'ب', 'ج', 'د'];
+export const teacherBank = (D, me) => (D.questions || []).filter(q => q.status !== 'deleted' && (q.shared ? (me.subjects || []).includes(q.subject) : q.teacher_id === me.id));
+/* مسار صورة السؤال: رابط كامل أو data: كما هو، وإلا يُلحق بقاعدة التخزين */
+export const assetUrl = (path, base) => !path ? '' : /^(data:image\/|https?:\/\/)/.test(path) ? path : base ? String(base).replace(/\/+$/, '') + '/' + String(path).replace(/^\/+/, '') : '';
+/* حزمة بنك مشترك (ناتج scripts/build_bank_bundle.mjs): تحقق وتطبيع قبل الاستيراد */
+export function normalizeBundle(b){
+  if(!b || !SUBJECTS.includes(b.subject) || !Array.isArray(b.questions) || !b.questions.length) throw new Error('ملف البنك غير صالح: يلزم المقرر وقائمة الأسئلة');
+  const seen = new Set();
+  return { subject:b.subject, title:String(b.title || '').slice(0, 120), questions:b.questions.map((q, i) => { const code = String(q.code || '').trim(), c = typeof q.correct === 'number' ? q.correct : LETTERS.indexOf(String(q.correct || '').trim());
+    if(!/^[A-Za-z0-9_-]{2,30}$/.test(code)) throw new Error(`السؤال ${i + 1}: الرمز غير صالح`); if(seen.has(code)) throw new Error(`الرمز ${code} مكرر`); seen.add(code);
+    if(!(c >= 0 && c < 4)) throw new Error(`${code}: الإجابة الصحيحة غير محددة`); if(!q.image && !String(q.text || '').trim()) throw new Error(`${code}: بلا صورة ولا نص`);
+    return { code, unit:String(q.unit || 'عام').trim().slice(0, 80), skill:String(q.skill || '').trim().slice(0, 120), order:+q.order || i + 1, text:String(q.text || '').trim(), image:String(q.image || ''), page_image:String(q.page_image || ''), correct:c,
+      key_status:q.key_status === 'approved' ? 'approved' : 'unverified', key_source:String(q.key_source || '').slice(0, 160), status:q.active === false ? 'draft' : 'published', difficulty:String(q.difficulty || 'متوسط').slice(0, 20) }; }) };
 }
 /* وحدات البنوك المتاحة لمتدرب: لكل مدرب يدرّسه (القسم × المقرر) وحداته المنشورة وعددها */
 export function bankUnitsOf(D, subs, teachers){
@@ -46,10 +62,14 @@ export function bankUnitsOf(D, subs, teachers){
   (D.questions || []).filter(q => q.status === 'published' && q.teacher_id && scopes.has(q.section + ':' + q.subject)).forEach(q => {
     const t = (teachers || []).find(x => x.id === q.teacher_id && teacherCovers(x, q.section, q.subject)); if(!t) return;
     const k = [q.section, q.subject, q.unit || 'عام', q.teacher_id].join('|'); units[k] = units[k] || { section:q.section, subject:q.subject, unit:q.unit || 'عام', teacher_id:q.teacher_id, teacher_name:t.full_name, count:0 }; units[k].count++; });
+  for(const s of subs) for(const x of s.subjects || []) for(const t of (teachers || []).filter(y => teacherCovers(y, s.section, x)))
+    (D.questions || []).filter(q => q.shared && q.status === 'published' && q.subject === x).forEach(q => { const k = [s.section, x, q.unit || 'عام', t.id].join('|'); units[k] = units[k] || { section:s.section, subject:x, unit:q.unit || 'عام', teacher_id:t.id, teacher_name:t.full_name, count:0, counted:new Set() };
+      if(units[k].counted && !units[k].counted.has(q.id)){ units[k].counted.add(q.id); units[k].count++; } });
+  Object.values(units).forEach(u => delete u.counted);
   return Object.values(units).sort((a, b) => (a.subject + a.teacher_name + a.unit).localeCompare(b.subject + b.teacher_name + b.unit, 'ar'));
 }
 export function validateQuestion(q){
-  if(!q.text || q.text.trim().length < 5) throw new Error('اكتب نص السؤال');
+  if(!q.image && (!q.text || q.text.trim().length < 5)) throw new Error('اكتب نص السؤال');
   if(!Array.isArray(q.options) || q.options.filter(x => String(x || '').trim()).length !== 4) throw new Error('اكتب الخيارات الأربعة');
   if(!(q.correct >= 0 && q.correct < 4)) throw new Error('حدد الإجابة الصحيحة');
 }
@@ -60,14 +80,17 @@ export function buildAttempt(D, trainee_id, section, subject, unit, count, teach
   for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const qs = pool.slice(0, Math.max(1, Math.min(count || 10, pool.length)));
   return { id:uid(), trainee_id, teacher_id:teacher_id || null, section, subject, unit:unit || null, started_at:new Date().toISOString(), submitted_at:null, minutes:Math.max(5, qs.length * 2),
-    snapshot: qs.map(q => ({ id:q.id, text:q.text, options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1 })), answers:{}, score:null, total:qs.length };
+    snapshot: qs.map(snapOf), answers:{}, score:null, total:qs.length };
 }
-export const snapOf = q => ({ id:q.id, text:q.text, options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1 });
+export const snapOf = q => ({ id:q.id, text:q.text || '', options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1, ...(q.image ? { image:q.image, page_image:q.page_image || '', code:q.code || '' } : {}) });
 export const shuffle = a => { for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 /* ---------- واجب اختبار من بنك المدرب ----------
    تُحفظ نسخة الأسئلة في الواجب وقت النشر (quiz)، ولا يرى المتدرب الإجابات الصحيحة إلا في مراجعة تسليمه. */
-export function buildQuiz(D, teacher, subject, unit, count){
+export function buildQuiz(D, teacher, subject, unit, count, ids){
+  if(Array.isArray(ids) && ids.length){   // انتقاء أسئلة بعينها بترتيب المدرب
+    if(ids.length > 100) throw new Error('الحد 100 سؤال في الواجب'); const all = bankFor(D, teacher.section, subject, null, true, teacher.id), picked = [...new Set(ids)].map(id => all.find(q => q.id === id));
+    if(picked.some(q => !q)) throw new Error('أحد الأسئلة المختارة ليس منشورًا في بنكك'); return picked.map(snapOf); }
   const pool = shuffle(bankFor(D, teacher.section, subject, unit, true, teacher.id).slice());
   if(!pool.length) throw new Error('لا توجد أسئلة منشورة في بنكك لهذا المقرر' + (unit ? ' وهذه الوحدة' : ''));
   return pool.slice(0, Math.max(1, Math.min(+count || 10, 50, pool.length))).map(snapOf);
