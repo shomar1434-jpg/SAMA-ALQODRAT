@@ -59,7 +59,7 @@ function orderModal(o){
     <div class="field"><label for="om-r">السبب أو المطلوب استكماله (إلزامي عند الرفض أو طلب الاستكمال)</label><input class="inp" id="om-r" maxlength="300" value="${esc(o.note || '')}"></div>
     <div class="ord-acts"><button class="btn pri sm" data-od="approved">${ic('check')} موافقة</button><button class="btn sm" data-od="needs_information">طلب استكمال معلومات</button><button class="btn sm danger soft" data-od="rejected">رفض مع السبب</button></div>
     <h4 class="ord-sec">2. تأكيد السداد (بعد مطابقة كشف البنك)</h4>
-    ${o.payment === 'confirmed' ? `<div class="ord-acts"><span class="pill ok">${ic('check')} مؤكَّد ${sar(o.paid_amount)}</span><button class="btn sm" id="om-un">إلغاء التأكيد</button></div>`
+    ${o.payment === 'confirmed' ? `<div class="ord-acts"><span class="pill ok">${ic('check')} مؤكَّد ${sar(o.paid_amount)}</span><button class="btn sm" id="om-un">إلغاء التأكيد (بسبب في الخانة أعلاه)</button><a class="btn sm" href="#admin-invoices">الفواتير</a></div>`
       : `<div class="ord-acts"><div class="field" style="flex:1;min-width:140px;margin:0"><label for="om-a">المبلغ الواصل فعليًا (ريال)</label><input class="inp num" id="om-a" inputmode="decimal" value="${o.claim?.amount ?? ''}"></div><button class="btn pri sm" id="om-pay">${ic('wallet')} تأكيد وصول المبلغ</button></div>`}
     <h4 class="ord-sec">3. قبول مؤقت</h4>
     <div class="ord-acts"><span class="hint" style="flex:1;min-width:200px">يسمح بالحضور قبل اكتمال السداد أو المراجعة (لمن وعد بالسداد). يحتاج سببًا في الخانة أعلاه.</span><button class="btn sm" id="om-prov">${o.provisional ? 'إلغاء القبول المؤقت' : 'منح قبول مؤقت'}</button></div>
@@ -69,7 +69,7 @@ function orderModal(o){
   const E = x => { $('#omE').textContent = x; }, run = async (btn, fn, msg) => { E(''); setBusy(btn, true, 'جارٍ الحفظ'); try { await fn(); await reloadAD(); closeModal(); toast(msg); pageOrders(); } catch(x){ setBusy(btn, false); E(x.message); } };
   $('#om-x').onclick = closeModal;
   $$('[data-od]').forEach(b => b.onclick = () => run(b, () => Store.reviewOrder(o.id, b.dataset.od, $('#om-r').value, o.version), { approved:'وُوفق على الطلب', needs_information:'طُلب استكمال المعلومات', rejected:'رُفض الطلب' }[b.dataset.od]));
-  if($('#om-pay')) $('#om-pay').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, toLatin($('#om-a').value), true), 'تأكد السداد');
-  if($('#om-un')) $('#om-un').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, 0, false), 'أُلغي تأكيد السداد');
+  if($('#om-pay')) $('#om-pay').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, toLatin($('#om-a').value), true), 'تأكد السداد وصدرت الفاتورة');
+  if($('#om-un')) $('#om-un').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, 0, false, $('#om-r').value), 'أُلغي تأكيد السداد وأُلغيت فاتورته');
   $('#om-prov').onclick = e => run(e.currentTarget, () => Store.setOrderProvisional(o.id, !o.provisional, $('#om-r').value), o.provisional ? 'أُلغي القبول المؤقت' : 'مُنح قبول مؤقت');
 }

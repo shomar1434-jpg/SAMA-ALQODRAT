@@ -1141,3 +1141,21 @@ img,svg,video,canvas{max-width:100%}
 .ord-log ol{margin:6px 0 0;padding-inline-start:20px;font-size:13.5px;color:var(--ink-subtle)}
 .linkbtn{background:none;border:0;color:var(--brand);font:inherit;cursor:pointer;padding:6px 8px;min-height:32px}
 .ostat{display:flex;flex-direction:column;gap:4px;min-width:0}.ostat b{font-size:26px}
+
+/* ---------- الفواتير ---------- */
+.inv-thumb{max-width:100%;max-height:220px;border:1px solid var(--border);border-radius:10px;display:block}
+.pdoc .inv-t{width:100%;border-collapse:collapse;margin:8px 0;font-size:11.5px}
+.pdoc .inv-t th{background:#e6f2f0;color:#0f4d47;font-weight:700;text-align:start}
+.pdoc .inv-t th,.pdoc .inv-t td{border:1px solid #b9cfcc;padding:6px 8px;vertical-align:top;overflow-wrap:anywhere}
+.pdoc .inv-t .n{font-variant-numeric:tabular-nums;text-align:end;white-space:nowrap}
+.pdoc .inv-t tr.void td{color:#8a8f90;text-decoration:line-through}
+.pdoc .inv-2{display:grid;grid-template-columns:1.2fr 1fr;gap:10px;margin:10px 0;break-inside:avoid}
+.pdoc .inv-k{width:100%;border-collapse:collapse;font-size:11.5px}
+.pdoc .inv-k caption{text-align:start;font-weight:700;color:#0f4d47;padding:0 0 4px}
+.pdoc .inv-k th{width:42%;text-align:start;font-weight:600;background:#f3f8f7}
+.pdoc .inv-k th,.pdoc .inv-k td{border:1px solid #b9cfcc;padding:6px 8px}
+.pdoc .inv-sum td{font-variant-numeric:tabular-nums;text-align:end}
+.pdoc .inv-void{border:2px solid #b3261e;color:#b3261e;font-weight:700;text-align:center;padding:6px;margin:6px 0;border-radius:6px}
+.pdoc.inv-rc{display:flex;flex-direction:column;gap:6mm;align-items:center}
+.pdoc.inv-rc h2{font-size:14px;margin:0;align-self:stretch}
+.pdoc.inv-rc img{max-width:100%;max-height:250mm;object-fit:contain;border:1px solid #b9cfcc}
