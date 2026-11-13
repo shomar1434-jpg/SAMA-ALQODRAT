@@ -59,9 +59,9 @@ async function render(){
 function viewLogin(){
   const demo = Store.mode !== 'cloud';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
-    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">ادخل برقم جوالك المسجّل في المعهد</div></div></div>
+    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">${ROLE === 'guardian' ? 'ادخل برقم هوية ابنك المسجّل في المعهد' : 'ادخل برقم هويتك المسجّل في المعهد'}</div></div></div>
     <form id="pl" class="grid pad" novalidate>
-      <div class="field"><label for="pl-phone">رقم الجوال</label><input class="inp num" id="pl-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="05XXXXXXXX" autocomplete="tel-national"></div>
+      <div class="field"><label for="pl-phone">${ROLE === 'guardian' ? 'رقم هوية المتدرب (ابنك)' : 'رقم الهوية'}</label><input class="inp num" id="pl-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="10 أرقام" autocomplete="off"></div>
       <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق المرسل إلى جوالك</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
       <div class="errtxt" id="plE" role="alert"></div>
       <button class="btn pri" id="plB">${ic('lock')} إرسال رمز التحقق</button>
@@ -72,10 +72,10 @@ function viewLogin(){
   let step = 1;
   $('#pl').onsubmit = async e => { e.preventDefault(); const b = $('#plB'); $('#plE').textContent = '';
     try {
-      if(step === 1){ if(!/^05\d{8}$/.test(normPhone(ph.value))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05');
-        setBusy(b, true, 'جارٍ الإرسال'); const rq = await Store.requestOtp(ph.value); setBusy(b, false);
+      if(step === 1){ if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('رقم الهوية 10 أرقام');
+        setBusy(b, true, 'جارٍ الإرسال'); const rq = await Store.requestOtp(ph.value, ROLE); setBusy(b, false);
         $('#plCodeL').textContent = rq?.activation ? 'رمز التفعيل (من إدارة المركز)' : 'رمز التحقق أو رمز التفعيل من إدارة المركز';
-        if(!$('#plActH')) $('#otpF').insertAdjacentHTML('beforeend', '<p class="hint" id="plActH" style="margin:6px 0 0">رمز التفعيل تصدره إدارة المركز لرقم جوالك. تكتبه مرة واحدة فيُعتمد هذا الجهاز وتبقى داخلًا.</p>');
+        if(!$('#plActH')) $('#otpF').insertAdjacentHTML('beforeend', `<p class="hint" id="plActH" style="margin:6px 0 0">إن كان الرقم مسجّلًا فقد صدر رمز تحقق لهذا الجهاز <b dir="ltr">${esc(rq?.device || '')}</b>. تجده في صندوق الرسائل على جهازك المعتمد سابقًا، أو اطلبه من إدارة المركز بذكر رمز الجهاز. يُكتب مرة واحدة فيُعتمد هذا الجهاز وتبقى داخلًا.</p>`);
         step = 2; $('#otpF').hidden = false; ph.readOnly = true; b.innerHTML = `${ic('check')} دخول`; code.focus(); liveSay('أُرسل رمز التحقق'); return; }
       if(!/^\d{4,6}$/.test(code.value)) throw new Error('اكتب رمز التحقق');
       setBusy(b, true, 'جارٍ التحقق'); await Store.portalLogin(ph.value, code.value, ROLE); render();

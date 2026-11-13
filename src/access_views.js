@@ -15,7 +15,7 @@ import { ROLE_TXT } from './portal_logic.js';
 import { subStatus } from './qudurat.js';
 import { ACT_ST, ACT_TTL_DAYS, actStatus, actMessage } from './device_logic.js';
 
-let aRole = 'student', aQ = '', aOnly = 'all', issued = [], X = { devices:[], activations:[] };
+let aRole = 'student', aQ = '', aOnly = 'all', issued = [], X = { devices:[], activations:[], requests:[] };
 const PATH = { student:'student/', guardian:'guardian/', teacher:'teacher/' };
 /* أصحاب الحسابات لكل دور: الجوال هو المفتاح */
 function people(role){
@@ -31,13 +31,26 @@ const stateOf = p => { const dev = X.devices.filter(d => d.phone === p.phone && 
 
 export async function pageAccess(){
   $('#main').innerHTML = titleBar(`${ic('lock')}تفعيل الأجهزة`, 'تفعيل الأجهزة <em>ورموز الدخول</em>', `يدخل المتدرب وولي الأمر والمدرب برقم الجوال ورمز تفعيل تصدره الإدارة. يُكتب الرمز مرة واحدة فيُعتمد الجهاز ويبقى صاحبه داخلًا. الرمز صالح ${fmtNum(ACT_TTL_DAYS)} أيام ولمرة واحدة، وجهاز جديد يحتاج رمزًا جديدًا.`) + '<div id="acBody" aria-busy="true"></div>';
-  try { X = await Store.accessData(); } catch(_){ X = { devices:[], activations:[] }; }
-  draw();
+  try { X = await Store.accessData(); } catch(_){ X = { devices:[], activations:[], requests:[] }; }
+  draw(); admins();
+}
+/* مسؤولو النظام: أكثر من مسؤول؛ يُدعى ببريده ثم ينشئ حسابه من صفحة الدخول بكلمة مرور يختارها */
+async function admins(){
+  let L = []; try { L = await Store.listAdmins(); } catch(x){ L = []; }
+  let box = $('#acAdmins'); if(!box){ $('#main').insertAdjacentHTML('beforeend', '<div class="card pad rv" id="acAdmins" style="margin-top:18px"></div>'); box = $('#acAdmins'); }
+  box.innerHTML = `<h3 class="ctitle">${ic('lock')}مسؤولو النظام</h3><p class="hint" style="margin:-4px 0 10px">أضف بريد المسؤول الجديد واسمه، ثم ينشئ هو حسابه من صفحة دخول الإدارة («إنشاء حساب مسؤول مدعوّ») بكلمة مرور يختارها. لا يُحذف آخر مسؤول ولا يحذف المسؤول نفسه.</p>
+    <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>البريد</th><th>الحالة</th><th></th></tr></thead><tbody>${L.filter(a => a.active !== false).map(a => `<tr><td>${esc(a.name || '—')}</td><td dir="ltr" style="text-align:right">${esc(a.email || '')}</td><td><span class="pill dot ${a.pending ? 'warn' : 'ok'}">${a.pending ? 'مدعوّ لم ينشئ حسابه' : 'نشط'}</span></td><td>${a.self ? '<span class="hint">أنت</span>' : `<button class="btn sm danger soft" data-adr="${esc(a.id)}">إزالة</button>`}</td></tr>`).join('')}</tbody></table></div>
+    <form id="adF" class="filters" style="margin-top:12px" novalidate><div class="field" style="margin:0;flex:1;min-width:160px"><label for="ad-n">اسم المسؤول</label><input class="inp" id="ad-n" maxlength="80"></div><div class="field" style="margin:0;flex:1;min-width:200px"><label for="ad-e">البريد الإلكتروني</label><input class="inp" id="ad-e" type="email" dir="ltr"></div>
+      <div style="align-self:end"><button class="btn pri sm">${ic('plus')} إضافة مسؤول</button></div></form><div class="errtxt" id="adE" role="alert"></div>`;
+  $('#adF').onsubmit = async e => { e.preventDefault(); $('#adE').textContent = ''; try { await Store.addAdmin($('#ad-e').value, $('#ad-n').value); toast('أضيف المسؤول'); admins(); } catch(x){ $('#adE').textContent = x.message; } };
+  $$('[data-adr]', box).forEach(b => b.onclick = () => confirmBox('إزالة مسؤول', 'يفقد هذا الحساب صلاحية لوحة الإدارة فورًا.', async () => { try { await Store.removeAdmin(b.dataset.adr); toast('أزيل المسؤول'); } catch(x){ toast(x.message); } admins(); }, 'إزالة'));
 }
 function draw(){
   const all = people(aRole).map(p => ({ ...p, ...stateOf(p) })), list = all.filter(p => (!aQ || p.name.includes(aQ) || p.phone.includes(aQ)) && (aOnly === 'all' || p.st === aOnly)), n = k => all.filter(p => p.st === k).length;
   $('#acBody').removeAttribute('aria-busy');
-  $('#acBody').innerHTML = `<div class="tabs" style="margin-bottom:12px">${Object.entries({ student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' }).map(([k, v]) => `<button class="tab" data-ar="${k}" aria-selected="${aRole === k}">${v}</button>`).join('')}</div>
+  const RQ = X.requests || [];
+  $('#acBody').innerHTML = `${RQ.length ? `<div class="card pad rv" id="acReq" style="margin-bottom:14px"><h3 class="ctitle">${ic('bell')}طلبات دخول الآن (${fmtNum(RQ.length)})</h3><p class="hint" style="margin:-4px 0 10px">كتب صاحب الحساب رقم هويته على جهاز جديد فصدر له رمز تحقق. تأكد من هويته ومن رمز الجهاز الظاهر عنده، ثم أبلغه الرمز. الرمز صالح ربع ساعة ولهذا الجهاز وحده.</p>
+      <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الدور</th><th>رمز الجهاز</th><th>رمز التحقق</th><th>الوقت</th></tr></thead><tbody>${RQ.map(r => `<tr><td>${esc(r.name || '—')}</td><td>${ROLE_TXT[r.role] || ''}</td><td class="num" dir="ltr"><b>${esc(r.device)}</b></td><td class="num" dir="ltr"><b class="ac-code">${esc(r.code)}</b></td><td class="num">${esc(String(r.created_at).slice(11, 16))}</td></tr>`).join('')}</tbody></table></div></div>` : ''}<div class="tabs" style="margin-bottom:12px">${Object.entries({ student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' }).map(([k, v]) => `<button class="tab" data-ar="${k}" aria-selected="${aRole === k}">${v}</button>`).join('')}</div>
     <div class="ord-amt" style="margin:0 0 12px"><span>الحسابات <b>${fmtNum(all.length)}</b></span><span>جهاز مفعَّل <b>${fmtNum(n('on'))}</b></span><span>رمز بانتظار الاستخدام <b>${fmtNum(n('wait'))}</b></span><span>بلا رمز <b>${fmtNum(n('none'))}</b></span></div>
     <div class="filters"><label class="sr-only" for="ac-q">بحث</label><input class="inp" id="ac-q" type="search" placeholder="الاسم أو الجوال" value="${esc(aQ)}" style="flex:1;min-width:200px">
       <label class="sr-only" for="ac-o">الحالة</label><select class="inp" id="ac-o">${[['all', 'الكل'], ['none', 'بلا رمز'], ['wait', 'رمز بانتظار الاستخدام'], ['on', 'جهاز مفعَّل']].map(([k, v]) => `<option value="${k}" ${aOnly === k ? 'selected' : ''}>${v}</option>`).join('')}</select>

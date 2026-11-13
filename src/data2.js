@@ -8,7 +8,7 @@ import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_lo
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { keepNote } from './import_logic.js';
-import { ACT_TTL_DAYS, newActCode, checkActivation } from './device_logic.js';
+import { ACT_TTL_DAYS, newActCode, checkActivation, resolveIdent, deviceShort, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL } from './device_logic.js';
 import { checkProfile } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
@@ -444,10 +444,22 @@ export const LocalStore = {
     if(approve){ const t=D.trainees.find(x=>x.id===r.trainee_id); for(const f in r.changes) t[f]=r.changes[f].new; }
     Object.assign(r,{status:approve?'approved':'rejected', decided_at:new Date().toISOString()}); this.audit('profile.'+(approve?'approve':'reject'), id); this.save(); return {ok:true}; },
   /* ---- البوابات: دخول بالجوال ورمز تحقق (تجريبيًا الرمز 1234) ---- */
-  async requestOtp(phone){ if(!/^05\d{8}$/.test(normPhone(phone))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05'); return {demo:true}; },
+  _deviceId(){ try{ let d=localStorage.getItem(this.key+'_devid'); if(!d){ d=uid(); localStorage.setItem(this.key+'_devid', d); } return d; }catch(e){ return 'nodevice'; } },
+  /* طلب الدخول برقم الهوية: يولّد رمز تحقق لهذا الجهاز يصل عبر المراسلات الداخلية (صندوق الحساب على جهازه المعتمد، وطلبات الدخول عند الإدارة). الرد واحد سواء وُجد الحساب أم لا */
+  async requestOtp(ident, role){ const D=this.data, ph=resolveIdent(D, ident, role), dev=this._deviceId(), now=Date.now();
+    if(ph && role && rolesOfPhone(D, ph).includes(role)){ D.login_requests=D.login_requests||[];
+      if(D.login_requests.filter(r=>r.phone===ph && now-Date.parse(r.created_at)<3600e3).length<REQ_MAX_HOUR){
+        D.login_requests.forEach(r=>{ if(r.phone===ph && r.role===role && r.device===dev && !r.used_at) r.used_at='replaced'; });
+        const tr=role==='teacher'?null:(D.trainees||[]).find(t=>role==='guardian'?t.guardian_phone===ph:t.phone===ph), name=role==='teacher'?(D.teachers.find(t=>t.phone===ph)?.full_name||''):(role==='guardian'?'ولي أمر ':'')+(tr?.full_name||'');
+        const r={id:uid(), phone:ph, role, device:dev, code:newActCode(), name, created_at:new Date(now).toISOString(), expires_at:new Date(now+REQ_TTL_MIN*60000).toISOString(), used_at:null}; D.login_requests.push(r);
+        if(tr){ const n=riyadhNow(); D.notifications=D.notifications||[]; D.notifications.push({id:uid(), at:r.created_at, date:n.date, sender:'system', to:role, trainee_id:tr.id, kind:'login_code', text:`رمز الدخول لجهاز جديد (${deviceShort(dev)}): ${r.code} — صالح ${REQ_TTL_MIN} دقيقة. إن لم تطلبه فتجاهله ولا تشاركه.`, read_at:null}); }
+        this.save(); } }
+    return {demo:true, activation:true, device:deviceShort(dev)}; },
   async portalLogin(phone, code, role){
-    const ph=normPhone(phone), D=this.data; let act=null;
-    if(code!=='1234'){ D.activation_attempts=D.activation_attempts||[]; const r=checkActivation(D, ph, role, code);   // الرمز التجريبي 1234 في الوضع التجريبي فقط
+    const D=this.data, ph=resolveIdent(D, phone, role)||normPhone(phone); let act=null;
+    const lr=(D.login_requests||[]).find(r=>r.phone===ph && r.role===role && r.device===this._deviceId() && reqLive(r) && r.code===String(code));
+    if(lr){ lr.used_at=new Date().toISOString(); act={used_at:null}; }
+    else if(code!=='1234'){ D.activation_attempts=D.activation_attempts||[]; const r=checkActivation(D, ph, role, code);   // الرمز التجريبي 1234 في الوضع التجريبي فقط
       if(!r.ok){ if(!r.locked){ D.activation_attempts.push({phone:ph, ok:false, at:new Date().toISOString()}); this.save(); } throw new Error(r.error); } act=r.activation; }
     if(!rolesOfPhone(D, ph).includes(role)) throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}. راجع إدارة المعهد.`);
     if(act){ act.used_at=new Date().toISOString(); D.devices=D.devices||[]; const dev={id:uid(), phone:ph, role, label:(typeof navigator!=='undefined'?navigator.userAgent:'').slice(0,80), created_at:act.used_at, revoked_at:null}; D.devices.push(dev); this.save();
@@ -462,7 +474,12 @@ export const LocalStore = {
   async issueActivationBulk(role, phones){ const out=[]; for(const p of [...new Set((phones||[]).map(normPhone))]){ try{ out.push(await this.issueActivation(p, role)); }catch(e){ out.push({phone:p, role, error:e.message}); } } return out; },
   async revokeDevices(phone, role){ const ph=normPhone(phone), D=this.data, at=new Date().toISOString(); (D.devices||[]).forEach(d=>{ if(d.phone===ph && d.role===role && !d.revoked_at) d.revoked_at=at; });
     (D.activations||[]).forEach(a=>{ if(a.phone===ph && a.role===role && !a.used_at) a.revoked=true; }); this.audit('activation.revoke', ph, {role}); this.save(); return {ok:true}; },
-  async accessData(){ const D=this.data; return JSON.parse(JSON.stringify({devices:D.devices||[], activations:(D.activations||[]).map(({code, ...a})=>a)})); },
+  async accessData(){ const D=this.data; return JSON.parse(JSON.stringify({devices:D.devices||[], activations:(D.activations||[]).map(({code, ...a})=>a), requests:(D.login_requests||[]).filter(r=>reqLive(r)).map(r=>({...r, device:deviceShort(r.device)}))})); },
+  /* مسؤولو النظام (تجريبيًا: قائمة للعرض، والدخول بالرمز المشترك) */
+  async listAdmins(){ const D=this.data; D.admins=D.admins||[{id:'demo-admin', email:'admin@demo.local', name:'مدير النظام', active:true, pending:false, self:true}]; return JSON.parse(JSON.stringify(D.admins)); },
+  async addAdmin(email, name){ const D=this.data, e=String(email||'').trim().toLowerCase(); await this.listAdmins(); if(!/^\S+@\S+\.\S+$/.test(e)) throw new Error('اكتب بريدًا صحيحًا'); if(String(name||'').trim().length<3) throw new Error('اكتب اسم المسؤول');
+    if(D.admins.some(a=>a.email===e && a.active)) throw new Error('هذا البريد مسؤول بالفعل'); D.admins.push({id:uid(), email:e, name:String(name).trim(), active:true, pending:true, created_at:new Date().toISOString()}); this.audit('admin.add', e); this.save(); return {ok:true}; },
+  async removeAdmin(id){ const D=this.data; await this.listAdmins(); const act=D.admins.filter(a=>a.active); if(act.length<=1) throw new Error('لا يُحذف آخر مسؤول'); const a=D.admins.find(x=>x.id===id); if(!a) throw new Error('غير موجود'); if(a.id==='demo-admin') throw new Error('لا تحذف حسابك الحالي'); a.active=false; this.audit('admin.remove', a.email); this.save(); return {ok:true}; },
   async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role);
       if(!ph){ const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); this.load(); if(d && (this.data.devices||[]).some(x=>x.id===d.id && x.phone===d.phone && x.role===role && !x.revoked_at)) ph=d.phone; else if(d) localStorage.removeItem(this.key+'_dev_'+role); } }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); localStorage.removeItem(this.key+'_dev_'+role);
@@ -491,6 +508,7 @@ export const LocalStore = {
   /* إدارة المدربين وأولياء الأمور */
   async saveTeacher(t){ const a=this.data.teachers; if(!/^05\d{8}$/.test(normPhone(t.phone))) throw new Error('رقم الجوال غير صحيح');
     if(a.some(x=>x.id!==t.id && x.active!==false && normPhone(x.phone)===normPhone(t.phone))) throw new Error('رقم الجوال مستخدم لمدرب آخر');
+    if(t.national_id && !/^[12]\d{9}$/.test(t.national_id)) throw new Error('رقم الهوية 10 أرقام'); if(t.national_id && a.some(x=>x.id!==t.id && x.national_id===t.national_id)) throw new Error('رقم الهوية مستخدم لمدرب آخر');
     const i=a.findIndex(x=>x.id===t.id); if(i>=0) a[i]={...a[i],...t, phone:normPhone(t.phone)}; else a.push({...t, id:uid(), phone:normPhone(t.phone), active:true, created_at:new Date().toISOString()}); this.audit('teacher.save', t.id||'new'); this.save(); },
   /* ---------- طلبات الشراء (docs/payments، المرحلة 1) ---------- */
   _newOrder(o){ const D=this.data, n=riyadhNow(); D.orders=D.orders||[]; D.order_seq=(D.order_seq||0)+1;
@@ -681,7 +699,7 @@ export const CloudStore = {
   async checkin(nid, code, programCode, opts={}){ return this._e(await this.sb.rpc('checkin',{p_nid:nid, p_code:code||null, p_program:programCode||null, p_device:opts.device||'', p_choice:opts.choice||null})); },
   async todayCode(){ return this._e(await this.sb.rpc('daily_code')); },
   async isAdmin(){ const {data:{session}} = await this.sb.auth.getSession(); if(!session) return false; const r=await this.sb.from('admins').select('user_id').eq('user_id',session.user.id); return !!(r.data&&r.data.length); },
-  async login(email, pass){ const r=await this.sb.auth.signInWithPassword({email,password:pass}); if(r.error) throw new Error('بيانات الدخول غير صحيحة'); if(!(await this.isAdmin())){ await this.sb.auth.signOut(); throw new Error('هذا الحساب ليس مديرًا للنظام'); } return true; },
+  async login(email, pass){ const r=await this.sb.auth.signInWithPassword({email,password:pass}); if(r.error) throw new Error('بيانات الدخول غير صحيحة'); await this.sb.rpc('claim_admin'); if(!(await this.isAdmin())){ await this.sb.auth.signOut(); throw new Error('هذا الحساب ليس مديرًا للنظام'); } return true; },
   async logout(){ await this.sb.auth.signOut(); },
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
@@ -732,9 +750,10 @@ export const CloudStore = {
   async setCustomRequestStatus(id, status){ this._e(await this.sb.from('custom_requests').update({status}).eq('id',id)); },
   /* ---- البوابات: Supabase Auth برقم الجوال ورمز SMS، والصلاحية من portal_roles() على الخادم ---- */
   _e164(phone){ return '+966' + normPhone(phone).slice(1); },
-  async requestOtp(phone){ if(!/^05\d{8}$/.test(normPhone(phone))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05'); const {data:{session}}=await this.sb.auth.getSession(); if(!session){ const r=await this.sb.auth.signInAnonymously(); if(r.error) throw new Error('تعذّر بدء الجلسة. حاول بعد قليل.'); } return {activation:true}; },   // تفعيل الجهاز: لا رسائل؛ جلسة مجهولة تُربط بالجوال بعد إدخال رمز التفعيل
+  async requestOtp(ident, role){ let {data:{session}}=await this.sb.auth.getSession(); if(!session){ const r=await this.sb.auth.signInAnonymously(); if(r.error) throw new Error('تعذّر بدء الجلسة. حاول بعد قليل.'); session=r.data.session; }
+    await this.sb.rpc('request_login',{p_ident:String(ident), p_role:role, p_label:(navigator.userAgent||'').slice(0,80)}); return {activation:true, device:deviceShort(session?.user?.id)}; },   // تفعيل الجهاز: لا رسائل؛ جلسة مجهولة تُربط بالجوال بعد إدخال رمز التفعيل
   async portalLogin(phone, code, role){
-    this._e(await this.sb.rpc('activate_device',{p_phone:normPhone(phone), p_code:String(code), p_role:role, p_label:(navigator.userAgent||'').slice(0,80)}));
+    { const r=this._e(await this.sb.rpc('activate_device',{p_phone:String(phone).replace(/\D/g,''), p_code:String(code), p_role:role, p_label:(navigator.userAgent||'').slice(0,80)})); if(r && r.ok===false) throw new Error(r.error||ACT_FAIL); }
     const roles=this._e(await this.sb.rpc('portal_roles'))||[]; if(!roles.includes(role)){ await this.sb.auth.signOut(); throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}. راجع إدارة المعهد.`); } return {ok:true};
   },
   async portalSession(role){ const {data:{session}}=await this.sb.auth.getSession(); if(!session) return null; const r=await this.sb.rpc('portal_roles'); if(!(r.data||[]).includes(role)) return null; const ph=await this.sb.rpc('my_phone'); return {phone:normPhone(ph.data||session.user.phone||''), role}; },
@@ -742,7 +761,13 @@ export const CloudStore = {
   async issueActivationBulk(role, phones){ return this._e(await this.sb.rpc('admin_issue_activation_bulk',{p_role:role, p_phones:[...new Set((phones||[]).map(normPhone))]})); },
   async revokeDevices(phone, role){ return this._e(await this.sb.rpc('admin_revoke_devices',{p_phone:normPhone(phone), p_role:role})); },
   async accessData(){ const [d,a]=await Promise.all([this.sb.from('device_sessions').select('uid,phone,role,label,created_at,revoked_at').order('created_at',{ascending:false}).limit(5000), this.sb.from('activation_codes').select('id,phone,role,expires_at,used_at,revoked,created_at').order('created_at',{ascending:false}).limit(5000)]);
-    return {devices:this._e(d).map(x=>({...x, id:x.uid})), activations:this._e(a)}; },
+    const q=await this.sb.rpc('admin_login_requests'); return {devices:this._e(d).map(x=>({...x, id:x.uid})), activations:this._e(a), requests:this._e(q)||[]}; },
+  async listAdmins(){ return this._e(await this.sb.rpc('admin_list')); },
+  async addAdmin(email, name){ return this._e(await this.sb.rpc('admin_add',{p_email:String(email||'').trim().toLowerCase(), p_name:String(name||'').trim()})); },
+  async removeAdmin(id){ return this._e(await this.sb.rpc('admin_remove',{p_id:id})); },
+  /* إنشاء حساب مسؤول مدعوّ: يسجّل ببريده وكلمة مرور يختارها، ثم يُمنح الصلاحية إن كان بريده في قائمة المدعوين */
+  async adminSignup(email, pass){ const r=await this.sb.auth.signUp({email, password:pass}); if(r.error) throw new Error(r.error.message.includes('registered')?'هذا البريد له حساب؛ ادخل بكلمة مرورك':'تعذّر إنشاء الحساب: '+r.error.message);
+    if(!r.data.session) return {confirm:true}; const c=await this.sb.rpc('claim_admin'); if(c.error||!c.data) { await this.sb.auth.signOut(); throw new Error('هذا البريد غير مدعوّ كمسؤول. اطلب من مدير النظام إضافتك.'); } return {ok:true}; },
   async portalLogout(){ try{ await this.sb.rpc('device_logout'); }catch(e){} await this.sb.auth.signOut(); },
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
   async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
@@ -776,7 +801,7 @@ export const CloudStore = {
   async rateTeacher(p){ return this._e(await this.sb.rpc('student_rate',{p})); },
   async sendMessage(p, role){ return this._e(await this.sb.rpc('send_message',{p, p_role:role})); },
   async markThreadRead({trainee_id, teacher_id}, role){ await this.sb.rpc('mark_thread_read',{p_trainee:trainee_id, p_teacher:teacher_id, p_role:role}); },
-  async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
+  async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), national_id:t.national_id||null, section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
   async orderReportTransfer(f){ return this._e(await this.sb.rpc('order_report_transfer',{p:f})); },
   async reviewOrder(id, decision, reason, expected_version){ return this._e(await this.sb.rpc('admin_review_order',{p_id:id, p_decision:decision, p_reason:reason||'', p_version:expected_version??null})); },
   async confirmOrderPayment(id, amount, confirmed=true, reason='', method='transfer'){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed, p_reason:reason||'', p_method:method})); },
