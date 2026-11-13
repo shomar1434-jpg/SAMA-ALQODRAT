@@ -16,6 +16,7 @@
 - `src/qudurat.js` منطق باقات القدرات والتحصيلي (الباقات، جداول البنين والبنات، الاشتراكات، الإحصاء) ↔ `supabase/migrations/…_qudurat.sql` (`sub_end`، `session_on`، `sub_stats`، `checkin`).
 - `src/learning_logic.js` منطق الواجبات وبنك الأسئلة والمحاولات والتقييم والمراسلة ↔ `supabase/migrations/…_learning.sql`؛ وواجهاتها في `src/learning_views.js` (تبويبات بوابتي الطالب والمعلم).
 - `src/policy_logic.js` ↔ `supabase/migrations/…_policies.sql` مركز السياسات (`currentPolicies` ↔ `current_policies`، `checkAcceptance` ↔ `check_policy_acceptance`)؛ وواجهاته في `src/policy_views.js` (`#policies`، `#policy-<slug>[~<إصدار>]`، `#admin-policies`، وخانة القبول في نموذج التسجيل).
+- `src/plan_art.js` + `src/assets/plans/*.webp` التصاميم التعريفية الرسمية للباقات الخمس ونموذجا المقارنة (`planPoster(tier)`، `COMPARE_ART`). الباقات خمس: أساسية، فضية، ذهبية، ماسية، و«خصصناها لك» (`tier='custom'`، `customPlans()`).
 - `src/qudurat_views.js` شريط الباقات، وصفحة الباقة، وصفحة الإدارة `#admin-qudurat`. `src/marquee.js` الشريط المنزلق العام.
 - `supabase/migrations/` ترحيلات مرقّمة بالتاريخ. `supabase/seed.sql` البرامج الـ 73 والباقات وقالب الجداول. `supabase/seed_site.sql` السياسات الست والشركاء، مولَّد من `src/policy_texts.js` و`src/site_partners.js` بـ `npm run seed:site` (لا يُعدَّل يدويًا). `supabase/tests/` اختبارات SQL (`npm run test:sql`، يحتاج PostgreSQL محليًا).
 - `docs/` الخطة، والحالة، وبيانات الباقات.
@@ -26,7 +27,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` و`registration` و`guardian_link` و`cohort_trainer` و`pwa` و`center_links` و`compat` (التوافقية: `BROWSER=firefox|webkit` في CI) في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` و`registration` و`guardian_link` و`cohort_trainer` و`pwa` و`center_links` و`plan_posters` و`compat` (التوافقية: `BROWSER=firefox|webkit` في CI) في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)

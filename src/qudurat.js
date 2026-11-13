@@ -6,7 +6,7 @@
 import { addDays, dowOf, toMin, riyadhNow, uid, fmtNum } from './utils.js';
 
 /* ---------- الباقات ---------- */
-export const TIERS = { basic:'الأساسية', silver:'الفضية', gold:'الذهبية', diamond:'الماسية', custom:'المخصصة' };
+export const TIERS = { basic:'الأساسية', silver:'الفضية', gold:'الذهبية', diamond:'الماسية', custom:'خصصناها لك' };
 export const TIER_ORDER = ['basic', 'silver', 'gold', 'diamond', 'custom'];
 export const MODES = { in_person:'حضوري', remote:'عن بُعد' };
 /* المدة: وحدة وعدد. الأساسية 5 أسابيع، الفضية 3 أشهر، الذهبية والماسية سنة من أول حضور (D-09) */
@@ -30,7 +30,15 @@ export function defaultPlans(){
     P.push(mk('diamond', mode, { unit:'year', value:1, hours:256, reg, n:6, amt, program:'qudurat_tahsili', audience:'مخصصة لطلاب الصف الثالث الثانوي',
       summary:'أقوى باقاتنا: القدرات بقسميه مع التهيئة للاختبار التحصيلي.', features:[...ADV_FEATURES.slice(0, 1), 'تتضمن برنامج التهيئة للاختبار التحصيلي', ...ADV_FEATURES.slice(1)], subjects:['كمي', 'لفظي', 'تحصيلي'] }));
   }
+  P.push(...customPlans(mk));
   return P;
+}
+/* باقة «خصصناها لك» (من مطوية المركز): 8 أسابيع، 3 حصص أسبوعيًا، 125 قسمًا؛ حضوري 800 على دفعتين، وعن بُعد 600 على دفعتين */
+const CUSTOM_FEATURES = ['تأسيس وتدريب محاكٍ تمامًا لاختبار قياس', '125 قسمًا', '3 حصص أسبوعيًا لمدة 8 أسابيع', 'شهادة معتمدة', 'برنامج استراتيجيات الحل', 'الاختبار القبلي', 'المساعدة في اختيار الموعد المناسب', 'تقارير دورية'];
+export function customPlans(mk){
+  mk = mk || ((tier, mode, o) => ({ id:uid(), tier, mode, program:'qudurat', name:TIERS[tier], status: mode === 'remote' ? 'coming_soon' : 'open', duration_unit:o.unit, duration_value:o.value, hours:o.hours,
+    reg_fee:o.reg, installments:o.n || 0, installment_amount:o.amt || 0, summary:o.summary, features:o.features, audience:'', subjects:['كمي', 'لفظي'], image:'', sort: TIER_ORDER.indexOf(tier) + (mode === 'remote' ? 10 : 0), active:true }));
+  return [['in_person', 400], ['remote', 300]].map(([mode, half]) => mk('custom', mode, { unit:'week', value:8, hours:48, reg:half, n:1, amt:half, summary:'للاستعداد لاختبار القدرات: تأسيس وتدريب محاكٍ تمامًا لاختبار قياس.', features:CUSTOM_FEATURES }));
 }
 export const planOpen = p => p && p.active !== false && p.mode !== 'remote' && p.status === 'open';
 

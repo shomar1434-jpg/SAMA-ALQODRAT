@@ -3,7 +3,7 @@ import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './po
 import { catalogPrograms, computeEnd } from './catalog.js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
-import { defaultPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
+import { defaultPlans, customPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
@@ -288,6 +288,7 @@ export const LocalStore = {
     this.data.certificates = this.data.certificates || []; if(this.data.settings.cert_threshold==null) this.data.settings.cert_threshold=75;
     if(!this.data.partners || (this.data.partners.length<=2 && this.data.partners.every(x=>x.type==='جهة اعتماد'))) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
+    if(!D.plans.some(p=>p.tier==='custom')) D.plans.push(...customPlans());       // باقة «خصصناها لك» للبيانات المحفوظة قبل إضافتها
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
     if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
     this.autoArchive(); this.save();
