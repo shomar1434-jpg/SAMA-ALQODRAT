@@ -22,13 +22,33 @@ export const teacherTeaches = (D, t, trainee_id) => liveSubsOf(D, trainee_id).so
 /* ---------- الواجبات ---------- */
 export function assignmentsFor(D, trainee_id, n = riyadhNow()){
   const subs = liveSubsOf(D, trainee_id), mine = (D.submissions || []).filter(x => x.trainee_id === trainee_id);
-  return (D.assignments || []).filter(a => a.publish_date <= n.date && subs.some(s => inScope(s, a.section, a.subject)))
+  return (D.assignments || []).filter(a => a.publish_date <= n.date && subs.some(s => inScope(s, a.section, a.subject)) && isTargeted(a, trainee_id))
     .map(a => { const sb = mine.find(x => x.assignment_id === a.id);
       const state = sb ? sb.status : a.due_date < n.date ? 'late' : 'new';
       return { ...a, submission:sb || null, state }; })
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 }
+/* ---------- محرر الواجبات: النوع، سياسة إظهار الإجابات، والاستهداف بقائمة ثابتة ---------- */
+export const HW_TYPES = { homework:'واجب', practice:'تدريب', exam:'اختبار رسمي' };
+export const REVEAL = { after_submit:'بعد التسليم مباشرة', after_due:'بعد موعد الاستحقاق', never:'لا تُعرض' };
+/* targets = null يعني كل متدربي القسم والمقرر؛ وإلا قائمة ثابتة وقت الإرسال */
+export const isTargeted = (a, trainee_id) => !Array.isArray(a.targets) || a.targets.includes(trainee_id);
+export const canReveal = (a, today) => (a.reveal || 'after_submit') === 'after_submit' || (a.reveal === 'after_due' && today > a.due_date);
+/* نسخة الواجب للمتدرب: بلا مفاتيح وبلا معرّفات زملائه في قائمة المستهدفين */
+export const assignmentPublic = (a, ids) => { const x = quizPublic(a); return Array.isArray(x.targets) ? { ...x, targets:x.targets.filter(t => (ids || []).includes(t)) } : x; };   // يبقى من القائمة أبناء هذا الحساب فقط
+/* تسليم المتدرب: تُحجب المراجعة (الإجابات الصحيحة) حتى تسمح سياسة الواجب */
+export const submissionPublic = (s, a, today) => !a || a.kind !== 'quiz' || canReveal(a, today) ? s : (({ review, ...x }) => ({ ...x, review_hidden:true }))(s);
+/* التحقق من المستهدفين: كلهم ضمن نطاق المدرب (قسمه ومقرر الواجب باشتراك قائم) */
+export function checkTargets(D, teacher, subject, targets){
+  if(targets == null) return null; if(!Array.isArray(targets) || !targets.length) throw new Error('اختر متدربًا واحدًا على الأقل'); const ids = [...new Set(targets)];
+  if(ids.length > 500) throw new Error('الحد 500 متدرب'); if(ids.some(id => !studentHasScope(D, id, teacher.section, subject))) throw new Error('أحد المستهدفين ليس ضمن متدربي هذا المقرر');
+  return ids;
+}
+/* الاختبار الرسمي لا يُنشر إلا بمفاتيح معتمدة (أسئلة البنك المشترك) */
+export function checkExamKeys(D, quiz){ const bad = (quiz || []).filter(q => { const x = (D.questions || []).find(y => y.id === q.id); return x?.shared && x.key_status !== 'approved'; });
+  if(bad.length) throw new Error(`الاختبار الرسمي يحتاج مفاتيح معتمدة: ${bad.length} سؤالًا مفتاحه غير معتمد. اطلب اعتماد المفاتيح من الإدارة أو اختر «واجب» أو «تدريب».`); }
 export function validateAssignment(a){
+  if(a.type && !HW_TYPES[a.type]) throw new Error('نوع غير صالح'); if(a.reveal && !REVEAL[a.reveal]) throw new Error('سياسة إظهار الإجابات غير صالحة');
   if(!a.title || a.title.trim().length < 3) throw new Error('اكتب عنوان الواجب');
   if(!SUBJECTS.includes(a.subject)) throw new Error('اختر المقرر');
   if(!a.publish_date || !a.due_date || a.due_date < a.publish_date) throw new Error('تاريخ الاستحقاق يجب أن يكون بعد تاريخ النشر');
