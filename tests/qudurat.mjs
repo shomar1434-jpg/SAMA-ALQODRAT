@@ -18,7 +18,7 @@ ok(await p.$$eval('#plMq .pl-card:not([aria-hidden])', x => x.length) === 5, 'ا
 ok(await p.$('#plMq [data-mq=toggle]'), 'زر إيقاف الحركة موجود');
 await p.click('.pl-filter [data-mode=remote]'); await p.waitForTimeout(500);
 const soon = await p.$$eval('#plMq .pl-card:not([aria-hidden])', x => x.map(c => c.classList.contains('soon') && c.getAttribute('aria-disabled') === 'true'));
-ok(soon.length === 4 && soon.every(Boolean), 'باقات عن بُعد: 4 بطاقات «قريبًا» معطّلة');
+ok(soon.length === 5 && soon.every(Boolean), 'باقات عن بُعد: 5 بطاقات «قريبًا» معطّلة');
 await p.focus('#plMq .pl-card:not([aria-hidden])'); await p.keyboard.press('Enter'); await p.waitForTimeout(400);
 ok(!p.url().includes('#plan-'), 'النقر على باقة عن بُعد لا يفتح التسجيل');
 

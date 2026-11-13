@@ -1,6 +1,7 @@
 /* =====================================================================
    واجهات باقات القدرات والتحصيلي: الشريط العام، صفحة الباقة، ولوحة الإدارة.
    ===================================================================== */
+import { planPoster, COMPARE_ART } from './plan_art.js';
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, addDays, validSaudiId, DAYS } from './utils.js';
 import { ic, emptyBox, ringSvg, toast, countUp } from './views2_head.js';
 import { Store } from './data2.js';
@@ -16,7 +17,7 @@ import { shrinkImage } from './partners.js';
 import { exportCSV } from './print.js';
 
 const TIER_TONE = { basic:'basic', silver:'silver', gold:'gold', diamond:'diamond', custom:'custom' };
-const priceLine = p => p.installments ? `${fmtNum(p.reg_fee)} تسجيل + ${fmtNum(p.installments)} ${p.installments === 2 ? 'قسطان' : 'أقساط'} × ${fmtNum(p.installment_amount)}` : `${fmtNum(p.reg_fee)} ريال`;
+const priceLine = p => p.tier === 'custom' && p.installments === 1 ? `على دفعتين: ${fmtNum(p.reg_fee)} ريال كل شهر` : p.installments ? `${fmtNum(p.reg_fee)} تسجيل + ${fmtNum(p.installments)} ${p.installments === 2 ? 'قسطان' : 'أقساط'} × ${fmtNum(p.installment_amount)}` : `${fmtNum(p.reg_fee)} ريال`;
 const planHref = p => `#plan-${p.id}`;
 
 /* =====================================================================
@@ -26,7 +27,8 @@ export function plansSectionHtml(plans){
   if(!plans?.length) return '';
   return `<section class="plans" aria-labelledby="plTitle" id="plans">
     <div class="sec-head" data-reveal><span class="kicker">القدرات والتحصيلي</span><h2 id="plTitle">باقات <em>القدرات والتحصيلي</em></h2>
-      <p class="hint" style="margin:8px 0 0">اسحب الشريط أو استخدم الأزرار. الاشتراك يبدأ من أول يوم تحضر فيه.</p></div>
+      <p class="hint" style="margin:8px 0 0">اسحب الشريط أو استخدم الأزرار. الاشتراك يبدأ من أول يوم تحضر فيه.</p>
+      <p style="margin:12px 0 0"><button class="btn sm" id="plCompare">${ic('grid')} قارن بين الباقات</button></p></div>
     <div class="pl-filter" role="group" aria-label="نوع الحضور" data-reveal>
       <button class="chip on" data-mode="in_person" aria-pressed="true">${ic('users')} حضوري</button>
       <button class="chip" data-mode="remote" aria-pressed="false">${ic('tv')} عن بُعد <span class="soon-tag">قريبًا</span></button></div>
@@ -41,9 +43,9 @@ const PAUSE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColo
 const PLAY = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
 
 export function planCard(p, clone){
-  const soon = p.mode === 'remote' || p.status === 'coming_soon', closed = !soon && !planOpen(p) && p.tier !== 'custom';
+  const soon = p.mode === 'remote' || p.status === 'coming_soon', closed = !soon && !planOpen(p) && p.id !== 'custom';
   const hide = clone ? 'aria-hidden="true" tabindex="-1"' : '';
-  if(p.tier === 'custom') return `<button class="pl-card t-custom" data-mq-id="${p.id}" ${hide} aria-label="الباقة المخصصة: اطلب عرضًا">
+  if(p.id === 'custom') return `<button class="pl-card t-custom" data-mq-id="${p.id}" ${hide} aria-label="الباقة المخصصة: اطلب عرضًا">
     <span class="pl-tier">${ic('spark')} المخصصة</span><b class="pl-name">باقة مخصصة</b><p class="pl-sum">حدد احتياجك: البرنامج والمستوى والمقررات والأوقات، ونرسل لك عرضًا من إدارة المعهد.</p>
     <span class="pl-cta">اطلب عرضًا ${ic('next')}</span></button>`;
   return `<button class="pl-card t-${TIER_TONE[p.tier]}${soon ? ' soon' : ''}" data-mq-id="${p.id}" ${hide} ${soon ? 'aria-disabled="true"' : ''} aria-label="${esc(planName(p))}${soon ? '، قريبًا' : ''}">
@@ -60,12 +62,13 @@ export function planCard(p, clone){
 export function initPlansMarquee(plans){
   if(!$('#plMq')) return;
   const custom = { id:'custom', tier:'custom', name:'المخصصة' };
+  if($('#plCompare')) $('#plCompare').onclick = () => compareModal($('.pl-filter .chip.on')?.dataset.mode || 'in_person');
   const render = mode => {
-    const list = plans.filter(p => p.mode === mode && p.active !== false).sort((a, b) => a.sort - b.sort).concat(mode === 'in_person' ? [custom] : []);
+    const list = plans.filter(p => p.mode === mode && p.active !== false).sort((a, b) => a.sort - b.sort).concat(mode === 'in_person' && !plans.some(p => p.tier === 'custom' && p.mode === mode && p.active !== false) ? [custom] : []);
     const old = $('#plMq'), fresh = old.cloneNode(true); old.replaceWith(fresh);      // تصفير مستمعي الشريط السابق
     initMarquee(fresh, list, planCard, (p, el) => {
       if(!p) return;
-      if(p.tier === 'custom') return customRequestModal();
+      if(p.id === 'custom') return customRequestModal();
       if(p.mode === 'remote' || p.status === 'coming_soon'){ toast('هذه الباقة تُتاح قريبًا'); el?.animate?.([{ transform:'translateX(0)' }, { transform:'translateX(-6px)' }, { transform:'translateX(6px)' }, { transform:'translateX(0)' }], { duration:300 }); return; }
       location.hash = planHref(p);
     });
@@ -75,6 +78,21 @@ export function initPlansMarquee(plans){
 }
 
 /* طلب باقة مخصصة: يُرسل للمراجعة ولا يُعتمد سعر أو موعد قبل موافقة الإدارة */
+/* التصاميم التعريفية للباقات ونموذجا المقارنة (من مطويات المركز): تكبير في نافذة */
+export function posterModal(src, title){
+  modal(`<h3>${esc(title)}</h3><div class="pl-zoom"><img src="${src}" alt="${esc(title)}"></div><div style="text-align:end;margin-top:12px"><a class="btn sm" href="${src}" target="_blank" rel="noopener">${ic('search')} فتح بالحجم الكامل</a> <button class="btn" id="pzX">إغلاق</button></div>`);
+  $('#pzX').onclick = closeModal;
+}
+export function compareModal(mode = 'in_person'){
+  const tab = m => `<button class="tab" role="tab" data-cm="${m}" aria-selected="${m === mode}">${ic(m === 'remote' ? 'tv' : 'users')}${m === 'remote' ? 'عن بُعد' : 'حضوري'}</button>`;
+  modal(`<h3>مقارنة بين الباقات</h3><p class="hint" style="margin:-4px 0 10px">نموذج توضيحي من مركز سما القدرات لما تشمله كل باقة ورسومها. باقة «خصصناها لك» لها تصميمها المستقل.</p>
+    <div class="tabs" role="tablist" style="margin-bottom:10px">${tab('in_person')}${tab('remote')}</div>
+    <div class="pl-zoom"><img id="cmImg" src="${COMPARE_ART[mode]}" alt="جدول مقارنة الباقات الأساسية والفضية والذهبية والماسية (${mode === 'remote' ? 'عن بُعد' : 'حضوري'})"></div>
+    <div style="text-align:end;margin-top:12px"><button class="btn" id="pzX">إغلاق</button></div>`);
+  $('#pzX').onclick = closeModal;
+  $$('[data-cm]').forEach(b => b.onclick = () => { $$('[data-cm]').forEach(x => x.setAttribute('aria-selected', x === b)); $('#cmImg').src = COMPARE_ART[b.dataset.cm]; });
+}
+
 export function customRequestModal(){
   modal(`<h3>طلب باقة مخصصة</h3><p class="hint" style="margin:-4px 0 14px">نراجع طلبك ونتواصل معك بعرض مناسب. لا يُعتمد السعر أو الموعد قبل موافقة إدارة المعهد.</p>
     <form id="crF" class="grid g2" novalidate>
@@ -115,11 +133,16 @@ export async function viewPlanPage(id){
         <li>${ic('wallet')}<b>${fmtNum(planTotal(p))}</b><span>${priceLine(p)}</span></li>
         <li>${ic('grid')}<b style="font-size:20px">${fmtNum(3)} أيام</b><span>أسبوعيًا · ساعتان للجلسة</span></li></ul></div>
       ${p.image ? `<div class="pl-hero-img"><img src="${p.image}" alt="${esc(p.name)}"></div>` : ''}</section>
+    ${planPoster(p.tier) ? `<div class="card pad rv pl-art" style="margin-top:18px"><div><h3 class="ctitle">${ic('award')}تعريف الباقة</h3>
+        <p class="hint" style="margin:0 0 12px">التصميم التعريفي للباقة من مركز سما القدرات: المدة والرسوم والأقساط وما تشمله. اضغط الصورة لتكبيرها.</p>
+        <p style="margin:0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="plZoom">${ic('search')} تكبير التصميم</button><button class="btn sm" id="plCompare">${ic('grid')} قارن بين الباقات</button></p></div>
+      <button class="pl-poster" id="plPoster" aria-label="تكبير التصميم التعريفي لباقة ${esc(p.name)}"><img src="${planPoster(p.tier)}" alt="التصميم التعريفي لباقة ${esc(p.name)}: ${esc(DURATION_TXT(p))}، ${fmtNum(planTotal(p))} ريال ${esc(priceLine(p))}" loading="lazy" width="1024" height="1536"></button></div>` : ''}
     <div class="grid g2" style="margin-top:18px;align-items:start">
       <div class="card pad rv" style="--i:1"><h3 class="ctitle">${ic('check')}مزايا الباقة</h3><ul class="pl-feats">${(p.features || []).map(f => `<li>${ic('check')}${esc(f)}</li>`).join('')}</ul></div>
       <div class="card pad rv" style="--i:2"><h3 class="ctitle">${ic('clock')}المواعيد</h3>${sched('girls')}${sched('boys')}
         <p class="hint" style="margin:10px 0 0">تُحدَّد مواعيدك حسب القسم (بنين أو بنات) من بيانات تسجيلك. يبدأ اشتراكك من أول يوم تحضر فيه بالباركود، وأيام الغياب تُحتسب من مدة الباقة.</p></div></div>
     <div id="plReg" style="margin-top:18px"></div></div>${siteFooter()}`;
+  if($('#plPoster')){ const z = () => posterModal(planPoster(p.tier), 'باقة ' + p.name); $('#plPoster').onclick = z; $('#plZoom').onclick = z; $('#plCompare').onclick = () => compareModal(p.mode); }
   const box = $('#plReg');
   if(soon){ box.innerHTML = `<div class="card pad rv" style="text-align:center">${emptyBox('تُتاح قريبًا', 'التسجيل في باقات الحضور عن بُعد سيُفتح قريبًا. يمكنك التسجيل الآن في الباقة الحضورية المماثلة.')}</div>`; return; }
   if(!planOpen(p)){ box.innerHTML = emptyBox('التسجيل مغلق حاليًا', 'تواصل مع المركز لمعرفة موعد فتح التسجيل.'); return; }

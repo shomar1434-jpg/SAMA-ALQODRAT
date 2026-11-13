@@ -6,8 +6,9 @@ declare r jsonb; v_sub subscriptions%rowtype; d date := riyadh_now()::date; m in
   fmt text;
 begin
   -- 1) البيانات الأولية
-  assert (select count(*) from plans) = 8, 'ثماني باقات';
-  assert (select count(*) from plans where mode = 'remote' and status = 'coming_soon') = 4, 'باقات عن بُعد = قريبًا';
+  assert (select count(*) from plans) = 10 and (select count(*) from plans where tier = 'custom') = 2, 'عشر باقات: أربع مستويات وباقة «خصصناها لك»، حضوري وعن بُعد';
+  assert (select reg_fee + installments * installment_amount from plans where tier = 'custom' and mode = 'in_person') = 800 and plan_label((select p from plans p where tier = 'custom' and mode = 'in_person')) = 'خصصناها لك', 'خصصناها لك: 800 حضوري على دفعتين';
+  assert (select count(*) from plans where mode = 'remote' and status = 'coming_soon') = 5, 'باقات عن بُعد = قريبًا';
   assert (select count(*) from schedule_templates) = 6, 'ستة أيام في القالب';
   begin update plans set status = 'open' where mode = 'remote'; ok := false; exception when check_violation then ok := true; end;
   assert ok, 'لا تُفتح باقة عن بُعد';
