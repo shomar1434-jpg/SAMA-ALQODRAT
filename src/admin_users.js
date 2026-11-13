@@ -50,7 +50,8 @@ export function pageUsers(){
 function teacherModal(t){
   modal(`<h3>${t ? 'تعديل المدرب' : 'مدرب جديد'}</h3><form id="tf" class="grid g2" novalidate>
     <div class="field" style="grid-column:1/-1"><label for="tf-name">الاسم <i>*</i></label><input class="inp" id="tf-name" name="full_name" value="${esc(t?.full_name || '')}" maxlength="80"></div>
-    <div class="field"><label for="tf-phone">الجوال (للدخول) <i>*</i></label><input class="inp num" id="tf-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" value="${esc(t?.phone || '')}" placeholder="05XXXXXXXX"></div>
+    <div class="field"><label for="tf-nid">رقم الهوية (للدخول)</label><input class="inp num" id="tf-nid" name="national_id" inputmode="numeric" maxlength="10" dir="ltr" value="${esc(t?.national_id || '')}"></div>
+    <div class="field"><label for="tf-phone">الجوال <i>*</i></label><input class="inp num" id="tf-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" value="${esc(t?.phone || '')}" placeholder="05XXXXXXXX"></div>
     <div class="field"><label for="tf-sec">القسم</label><select class="inp" id="tf-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${t?.section === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
     <fieldset class="field" style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">مقررات باقات القدرات والتحصيلي</legend><div style="display:flex;gap:14px;flex-wrap:wrap">
       ${SUBJECTS.map(s => `<label class="chk"><input type="checkbox" name="subjects" value="${s}" ${(t?.subjects || []).includes(s) ? 'checked' : ''}> ${s}</label>`).join('')}</div></fieldset>
@@ -61,7 +62,7 @@ function teacherModal(t){
   $('#tfC').onclick = closeModal;
   $('#tf-phone').addEventListener('input', e => e.target.value = toLatin(e.target.value).replace(/\D/g, ''));
   $('#tf').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target);
-    const o = { id:t?.id, full_name:fd.get('full_name').trim(), phone:fd.get('phone'), section:fd.get('section'), subjects:fd.getAll('subjects'), active: t ? !!fd.get('active') : true };
+    const o = { id:t?.id, full_name:fd.get('full_name').trim(), phone:fd.get('phone'), national_id:toLatin(fd.get('national_id') || '').replace(/\D/g, ''), section:fd.get('section'), subjects:fd.getAll('subjects'), active: t ? !!fd.get('active') : true };
     if(o.full_name.split(/\s+/).length < 2) return $('#tfE').textContent = 'اكتب الاسم الثنائي على الأقل.';
     const b = $('#tfS'); setBusy(b, true, 'جارٍ الحفظ');
     try { await Store.saveTeacher(o); await reloadAD(); closeModal(); toast('حُفظ المدرب'); pageUsers(); } catch(x){ setBusy(b, false); $('#tfE').textContent = x.message; } };

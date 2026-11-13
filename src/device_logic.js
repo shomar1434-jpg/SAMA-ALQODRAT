@@ -14,5 +14,14 @@ export function checkActivation(D, phone, role, code, now = Date.now()){
   return a ? { ok:true, activation:a } : { ok:false, error:ACT_FAIL };
 }
 export const actStatus = (a, now = Date.now()) => a.used_at ? 'used' : a.revoked ? 'revoked' : Date.parse(a.expires_at) <= now ? 'expired' : 'active';
+/* الدخول برقم الهوية: يُحوَّل داخليًا إلى جوال الحساب حسب الدور (المتدرب: هويته؛ ولي الأمر: هوية ابنه؛ المدرب: هويته). يبقى الجوال مقبولًا للتوافق */
+export const REQ_TTL_MIN = 15, REQ_MAX_HOUR = 5;
+export function resolveIdent(D, ident, role){
+  const v = String(ident || '').replace(/\D/g, ''); if(/^05\d{8}$/.test(v)) return v; if(!/^[12]\d{9}$/.test(v)) return null;
+  if(role === 'teacher') return (D.teachers || []).find(t => t.active !== false && t.national_id === v)?.phone || null;
+  const t = (D.trainees || []).find(x => x.national_id === v); return !t ? null : role === 'guardian' ? (t.guardian_phone || null) : (t.phone || null);
+}
+export const deviceShort = id => String(id || '').replace(/-/g, '').slice(0, 4).toUpperCase();
+export const reqLive = (r, now = Date.now()) => !r.used_at && Date.parse(r.expires_at) > now;
 export const ACT_ST = { active:'بانتظار الاستخدام', used:'استُخدم', expired:'انتهى', revoked:'أُلغي' };
 export const actMessage = (name, code, url) => `السلام عليكم ${name}،\nرمز تفعيل حسابك في منصة مركز سما القدرات: ${code}\nادخل من: ${url}\nاكتب رقم جوالك ثم الرمز مرة واحدة ويبقى جهازك معتمدًا. الرمز صالح ${ACT_TTL_DAYS} أيام ولا تشاركه مع أحد.`;

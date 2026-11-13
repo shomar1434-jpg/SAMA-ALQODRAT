@@ -483,8 +483,12 @@ export function viewLogin(){
       <div class="field"><label>${cloud?'كلمة المرور':'رمز الدخول'}</label><input class="inp" name="p" type="password" ${cloud?'':'inputmode="numeric"'} required></div>
       <div class="errtxt" id="lErr"></div>
       <button class="btn pri">${ic('lock')} دخول</button>
+      ${cloud?`<button type="button" class="btn" id="lfNew">إنشاء حساب مسؤول مدعوّ</button><p class="hint" style="margin:0">للمسؤول الجديد الذي أضافه مدير النظام ببريده: اكتب بريدك وكلمة مرور تختارها (8 أحرف على الأقل) ثم اضغط «إنشاء حساب».</p>`:''}
       ${cloud?'':`<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>البيانات تجريبية. رمز الدخول الافتراضي <b>1234</b>، وتغيّره من الإعدادات.</span></div>`}
     </form></div></div>`;
   $('#lf').onsubmit = async e=>{ e.preventDefault(); const F=Object.fromEntries(new FormData(e.target)), b=$('#lf button');
     setBusy(b,true,'جارٍ الدخول'); try{ await Store.login(F.u, F.p); route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } };
+  if($('#lfNew')) $('#lfNew').onclick = async e=>{ const f=$('#lf'), b=e.currentTarget; $('#lErr').textContent='';
+    if(!/^\S+@\S+\.\S+$/.test(f.u.value) || f.p.value.length<8){ $('#lErr').textContent='اكتب بريدك وكلمة مرور من 8 أحرف على الأقل'; return; }
+    setBusy(b,true,'جارٍ الإنشاء'); try{ const r=await Store.adminSignup(f.u.value.trim().toLowerCase(), f.p.value); if(r.confirm){ setBusy(b,false); $('#lErr').textContent='أُرسلت رسالة تأكيد إلى بريدك. افتح الرابط فيها ثم ادخل هنا ببريدك وكلمة مرورك.'; return; } route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } };
 }

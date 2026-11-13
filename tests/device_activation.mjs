@@ -52,7 +52,7 @@ await ctx2.close();
 
 // الإلغاء من الإدارة يخرج الجهاز
 await admin(); await p.fill('#ac-q', st.phone); await p.waitForTimeout(600);
-ok(/جهاز مفعَّل/.test(await text('#acBody tbody')), 'الإدارة ترى الجهاز المفعَّل');
+ok(/\d جهاز مفعَّل|١ جهاز مفعَّل/.test(await text('#acBody')), 'الإدارة ترى الجهاز المفعَّل');
 await p.click(`[data-av="${st.phone}"]`); await p.waitForTimeout(300); await p.click('.modal .btn.danger, .modal .btn.pri'); await p.waitForTimeout(700);
 D = await data();
 ok(D.devices.every(d => d.phone !== st.phone || d.revoked_at), 'إلغاء الأجهزة من الإدارة');
