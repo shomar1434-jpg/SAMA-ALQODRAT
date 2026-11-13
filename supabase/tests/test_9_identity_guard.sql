@@ -68,3 +68,15 @@ begin
   -- بالغ بلا ولي أمر مسجّل سابقًا: لا يُكمَّل الحقل الفارغ تلقائيًا
   assert (select guardian_phone from trainees where national_id = '1999999995') is null, 'البالغ بلا جوال ولي أمر';
 end $$;
+
+-- برامج الأطفال: يُقبل عمر 3 سنوات، وجوال التواصل هو جوال ولي الأمر؛ ودون 3 يُرفض
+do $$
+declare d date := riyadh_now()::date; ok boolean;
+begin
+  assert reg_guardian(jsonb_build_object('birth_date', (d - interval '4 years')::date, 'phone', '0552220001')) = '0552220001', 'الطفل: جوال التواصل هو جوال ولي الأمر';
+  assert reg_guardian(jsonb_build_object('birth_date', (d - interval '4 years')::date, 'phone', '0552220001', 'guardian_phone', '0552220002')) = '0552220002', 'جوال ولي أمر مستقل يُعتمد';
+  begin perform reg_guardian(jsonb_build_object('birth_date', (d - interval '2 years')::date, 'phone', '0552220001')); ok := false; exception when others then ok := sqlerrm like '%غير صحيح%'; end;
+  assert ok, 'دون 3 سنوات يُرفض';
+  begin perform reg_guardian(jsonb_build_object('birth_date', (d - interval '15 years')::date, 'phone', '0552220001')); ok := false; exception when others then ok := sqlerrm like '%جوال ولي الأمر مطلوب%'; end;
+  assert ok, 'من 13 إلى 18: جوال ولي الأمر يُكتب صراحة';
+end $$;
