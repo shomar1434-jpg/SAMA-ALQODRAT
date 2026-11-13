@@ -32,7 +32,7 @@ for (const [name, w, h, touch] of SIZES) {
   const check = async label => { await p.waitForTimeout(180); const r = await audit(p, touch);
     if (r.over > 1) bad.push(`${label}: تمرير أفقي ${r.over}px [${r.wide.join(', ')}]`); if (r.small.length) bad.push(`${label}: أهداف لمس صغيرة [${r.small.join(', ')}]`); if (r.tiny.length) bad.push(`${label}: خط مدخلات دون 16 [${r.tiny.join(', ')}]`); };
   await p.goto(U); await p.waitForSelector('#ctaEnroll'); await check('الرئيسية');
-  for (const [hash, sel, label] of [['#register', '#choices', 'دليل البرامج'], ['#enroll', '#en-item', 'التسجيل الموحّد'], ['#checkin', '#nid', 'التحضير'], ['#portals', '.wrap', 'البوابات'], ['#policies', '.wrap', 'السياسات'], ['#verify', '.wrap', 'التحقق من الشهادة'], ['#contact', '.ct-card', 'تواصل معنا']]) {
+  for (const [hash, sel, label] of [['#register', '#choices', 'دليل البرامج'], ['#enroll', '#en-item', 'التسجيل الموحّد'], ['#checkin', '#nid', 'التحضير'], ['#portals', '.wrap', 'البوابات'], ['#policies', '.wrap', 'السياسات'], ['#verify', '.wrap', 'التحقق من إفادة الحضور'], ['#contact', '.ct-card', 'تواصل معنا']]) {
     await p.goto(U + hash); await p.waitForSelector(sel); await check(label); }
   await p.fill('[name=birth_date]', '2012-01-01').catch(() => {});
   await login(p, 'student', '0550000001'); await check('بوابة المتدرب');
@@ -44,7 +44,7 @@ for (const [name, w, h, touch] of SIZES) {
   for (const t of ['hw', 'bank', 'msg', 'rate']) { await p.click(`[data-tt="${t}"]`); await check('المدرب/' + t); }
   await p.goto(U + 'admin/'); await p.waitForSelector('[name=p]'); await check('دخول الإدارة');
   await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForSelector('#main');
-  for (const r of ['admin', 'admin-attendance', 'admin-cohorts', 'admin-qudurat', 'admin-users', 'admin-bank', 'admin-notify', 'admin-trainees', 'admin-settings']) { await p.goto(U + 'admin/#' + r); await p.waitForSelector('#main'); await check('الإدارة/' + r); }
+  for (const r of ['admin', 'admin-attendance', 'admin-cohorts', 'admin-qudurat', 'admin-users', 'admin-bank', 'admin-orders', 'admin-notify', 'admin-trainees', 'admin-settings']) { await p.goto(U + 'admin/#' + r); await p.waitForSelector('#main'); await check('الإدارة/' + r); }
   ok(!bad.length && !errs.length, `${engine} · ${name} (${w}×${h})` + (bad.length ? '\n   - ' + bad.slice(0, 14).join('\n   - ') : '') + (errs.length ? '\n   أخطاء: ' + errs.slice(0, 3).join(' | ') : ''));
   await ctx.close();
 }

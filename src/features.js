@@ -64,7 +64,7 @@ export function certificateHtml(cert){
     <div class="cz-logos"><span><img src="${LOGOS.tvtc}" alt=""></span><span><img src="${LOGOS.nelc}" alt=""></span><span class="m"><img src="${LOGOS.sama}" alt=""></span></div>
     <div class="cz-body">
       <div class="cz-kick">برنامج تدريبي معتمد${p.accreditation_no?` · رقم الاعتماد ${esc(p.accreditation_no)}`:''}</div>
-      <div class="cz-title">شهادة إتمام</div>
+      <div class="cz-title">إفادة حضور</div><div class="cz-note" style="font-size:11px;opacity:.8;margin-top:2px">إفادة صادرة من المركز · الشهادة المعتمدة تصدر عبر منصة منار mnar.sa</div>
       <div class="cz-lead">يشهد ${CENTER.name} بأن ${fem?'المتدربة':'المتدرب'}</div>
       <div class="cz-name">${esc(t.full_name)}</div><div class="cz-gold"></div>
       <div class="cz-lead2">${fem?'أتمّت':'أتمّ'} بنجاح متطلبات البرنامج التدريبي</div>
@@ -74,28 +74,28 @@ export function certificateHtml(cert){
     <div class="cz-foot">
       <div class="cz-seal"><svg viewBox="0 0 100 100">${certSealSvg(att, days.length)}</svg></div>
       <div class="cz-sign"><i></i><span>مدير المركز</span><small>التوقيع والختم</small></div>
-      <div class="cz-qr"><div><small>للتحقق من الشهادة</small><b>${esc(cert.serial)}</b><small>صدرت ${fmtGreg(cert.issued_at.slice(0,10))}</small></div><div class="cz-q" data-qr="${esc(url)}"></div></div>
+      <div class="cz-qr"><div><small>للتحقق من الإفادة</small><b>${esc(cert.serial)}</b><small>صدرت ${fmtGreg(cert.issued_at.slice(0,10))}</small></div><div class="cz-q" data-qr="${esc(url)}"></div></div>
     </div>
     <div class="cz-note">${CENTER.name} · ${CENTER.address} · ${CENTER.phones.join(' · ')}</div>
   </div></div></div>`;
 }
 export function printCertificates(certs, title){
-  if(!certs.length) return toast('لا توجد شهادات صادرة للطباعة');
+  if(!certs.length) return toast('لا توجد إفادات صادرة للطباعة');
   printDocs(certs.map(certificateHtml), title);
   $$('#printRoot [data-qr]').forEach(el=>makeQR(el, el.dataset.qr, 240));
 }
 
 /* =====================================================================
-   صفحة التحقق من الشهادة (عامة)
+   صفحة التحقق من إفادة الحضور (عامة)
    ===================================================================== */
 export async function viewVerify(serial){
   const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
   let r=null; if(serial){ try{ r=await Store.verifyCertificate(serial); }catch(e){ r={error:e.message}; } }
   const ok = r && !r.error && !r.revoked;
   app.innerHTML = `<div class="wrap"><div class="card verify rv">
-      <div class="checkin"><div class="head" style="padding-bottom:26px"><img src="${LOGO}" alt="شعار مركز سما القدرات"><h2>التحقق من شهادة</h2><div class="hint">شهادات إتمام البرامج المعتمدة في ${CENTER.name}</div></div></div>
+      <div class="checkin"><div class="head" style="padding-bottom:26px"><img src="${LOGO}" alt="شعار مركز سما القدرات"><h2>التحقق من إفادة حضور</h2><p class="hint" style="margin:6px 0 0">إفادة الحضور يصدرها المركز. الشهادة المعتمدة تصدر عبر <a href="https://mnar.sa" target="_blank" rel="noopener" style="color:var(--brand)">منصة منار</a>.</p><div class="hint">إفادات حضور البرامج المعتمدة في ${CENTER.name}</div></div></div>
       <div class="pad">
-        ${serial ? (ok ? `<div style="text-align:center" class="rv"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:22px;font-weight:700">شهادة صحيحة وصادرة من المركز</h2></div>
+        ${serial ? (ok ? `<div style="text-align:center" class="rv"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:22px;font-weight:700">إفادة حضور صحيحة وصادرة من المركز</h2></div>
             <div class="result-card rv" style="--i:2">
               <div class="r"><span>${ic('id')}الرقم التسلسلي</span><b dir="ltr">${esc(r.serial)}</b></div>
               <div class="r"><span>${ic('user')}${r.gender==='أنثى'?'المتدربة':'المتدرب'}</span><b>${esc(r.name_masked)}</b></div>
@@ -107,9 +107,9 @@ export async function viewVerify(serial){
               <div class="r"><span>${ic('activity')}نسبة الحضور</span><b>${fmtNum(r.rate)}٪</b></div>
               <div class="r"><span>${ic('form')}تاريخ الإصدار</span><b>${fmtGreg(String(r.issued_at).slice(0,10))}</b></div>
             </div><p class="hint" style="text-align:center;margin-top:12px">يظهر الاسم مختصرًا حفاظًا على خصوصية المتدرب. طابِقه مع الاسم المكتوب في الشهادة.</p>`
-          : `<div style="text-align:center" class="rv"><div class="bigcheck bad">${ic('x')}</div><h2 style="font-size:21px;font-weight:700">${r&&r.revoked?'هذه الشهادة ملغاة':'لم نعثر على شهادة بهذا الرقم'}</h2>
-             <p class="hint">${r&&r.revoked?'ألغى المركز هذه الشهادة ولم تعد معتمدة. للاستفسار تواصل مع المركز.':'تأكد من الرقم التسلسلي المكتوب على الشهادة وأعد المحاولة، أو تواصل مع المركز.'}</p></div>`) : ''}
-        <form id="vf" class="grid" style="margin-top:${serial?'18px':'0'}" novalidate><div class="field"><label for="vs">الرقم التسلسلي للشهادة</label><input class="inp num" id="vs" dir="ltr" placeholder="SQ-25157-2-014" value="${esc(serial||'')}" autocomplete="off"></div>
+          : `<div style="text-align:center" class="rv"><div class="bigcheck bad">${ic('x')}</div><h2 style="font-size:21px;font-weight:700">${r&&r.revoked?'هذه الإفادة ملغاة':'لم نعثر على إفادة بهذا الرقم'}</h2>
+             <p class="hint">${r&&r.revoked?'ألغى المركز هذه الإفادة ولم تعد معتمدة. للاستفسار تواصل مع المركز.':'تأكد من الرقم التسلسلي المكتوب على الإفادة وأعد المحاولة، أو تواصل مع المركز.'}</p></div>`) : ''}
+        <form id="vf" class="grid" style="margin-top:${serial?'18px':'0'}" novalidate><div class="field"><label for="vs">الرقم التسلسلي للإفادة</label><input class="inp num" id="vs" dir="ltr" placeholder="SQ-25157-2-014" value="${esc(serial||'')}" autocomplete="off"></div>
           <button class="btn pri">${ic('search')} تحقّق</button></form>
       </div></div></div>${siteFooter()}`;
   $('#vf').onsubmit=e=>{ e.preventDefault(); const v=$('#vs').value.trim().toUpperCase().replace(/[^A-Z0-9-]/g,''); if(!v) return; location.hash='#v-'+v; };
@@ -207,7 +207,7 @@ export function traineeDetailHtml(r){
         <div class="hint" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>المحتسب ${fmtNum(+x.score.toFixed(2))} من ${fmtNum(x.total)} محاضرة</span><span>حد الشهادة ${fmtNum(x.required)} (${fmtNum(thr)}٪) · يلزمه ${fmtNum(x.needed)}</span></div>`:''}
       <div class="me-alert ${tone}" style="margin-top:10px">${ic('tv')}<p><span class="hint" style="display:block">الرسالة الظاهرة للمتدرب:</span>${esc(x.message)}</p></div>
       ${x.next?`<div class="me-next">${ic('calendar')}المحاضرة القادمة: ${fmtDate(x.next)} الساعة ${t12(x.start_time)}</div>`:''}
-      ${x.cert?`<a class="btn sm" href="#v-${esc(x.cert)}" style="margin-top:8px">${ic('award')} الشهادة ${esc(x.cert)}</a>`:''}</div>`; }).join('') : emptyBox('لا توجد تسجيلات',''));
+      ${x.cert?`<a class="btn sm" href="#v-${esc(x.cert)}" style="margin-top:8px">${ic('award')} إفادة الحضور ${esc(x.cert)}</a>`:''}</div>`; }).join('') : emptyBox('لا توجد تسجيلات',''));
 }
 
 /* =====================================================================
@@ -250,13 +250,13 @@ export function pageFollowup(){
 }
 
 /* =====================================================================
-   الشهادات داخل كشف الدفعة
+   الإفادات داخل كشف الدفعة
    ===================================================================== */
 export function certSectionHtml(c){
   const certs=(AD.certificates||[]).filter(x=>x.cohort_id===c.id), thr=AD.settings.cert_threshold ?? 75, arch=cohortArchived(c);
   const elig=enrollsOf(AD,c.id).filter(e=>enrollmentStats(AD,e,c).finalRate>=thr).length;
   return `<div class="card pad rv" style="--i:6;margin-top:16px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="kic-lg t-gold">${ic('award')}</span>
-    <div style="flex:1;min-width:220px"><h3 class="ctitle">شهادات الإتمام</h3><div class="hint">${arch?`صدرت ${fmtNum(certs.filter(x=>!x.revoked).length)} شهادة لمن بلغت نسبة حضوره ${fmtNum(thr)}٪ فأكثر من أيام الدفعة كاملة.`:`تُصدر تلقائيًا عند أرشفة الدفعة لمن يبلغ ${fmtNum(thr)}٪ من أيامها. يستحقها حاليًا ${fmtNum(elig)} متدربًا.`}</div></div>
+    <div style="flex:1;min-width:220px"><h3 class="ctitle">إفادات الحضور</h3><div class="hint">${arch?`صدرت ${fmtNum(certs.filter(x=>!x.revoked).length)} إفادة لمن بلغت نسبة حضوره ${fmtNum(thr)}٪ فأكثر من أيام الدفعة كاملة.`:`تُصدر تلقائيًا عند أرشفة الدفعة لمن يبلغ ${fmtNum(thr)}٪ من أيامها. يستحقها حاليًا ${fmtNum(elig)} متدربًا.`}</div></div>
     ${arch?`<button class="btn sm" id="ciss">${ic('refresh')} إصدار المستحقة</button><button class="btn pri sm" id="cprt" ${certs.some(x=>!x.revoked)?'':'disabled'}>${ic('form')} طباعة الشهادات</button>`:''}</div>
     ${certs.length?`<div style="overflow:auto;margin-top:12px"><table class="tb"><thead><tr><th>الرقم التسلسلي</th><th>المتدرب</th><th>نسبة الحضور</th><th>الحالة</th><th></th></tr></thead><tbody>${certs.map(x=>{ const t=AD.trainees.find(y=>y.id===x.trainee_id); return `<tr><td dir="ltr" style="text-align:right" class="num">${esc(x.serial)}</td><td>${esc(t?.full_name||'')}</td><td>${fmtNum(x.rate)}٪</td><td><span class="pill dot ${x.revoked?'bad':'ok'}">${x.revoked?'ملغاة':'صالحة'}</span></td>
       <td style="white-space:nowrap"><button class="btn sm" data-c1="${x.id}" ${x.revoked?'disabled':''}>${ic('form')} طباعة</button> <a class="btn sm" href="#v-${esc(x.serial)}">${ic('search')} التحقق</a> <button class="btn sm ${x.revoked?'':'danger soft'}" data-rv="${x.id}">${x.revoked?'إعادة تفعيل':'إلغاء'}</button></td></tr>`; }).join('')}</tbody></table></div>`:''}
@@ -264,7 +264,7 @@ export function certSectionHtml(c){
 }
 export function bindCertSection(c, back){
   const certs=()=>(AD.certificates||[]).filter(x=>x.cohort_id===c.id&&!x.revoked), t=`شهادات ${progName(c.program_id)} · ${cohortLabel(c)}`;
-  if($('#ciss')) $('#ciss').onclick=async e=>{ const b=e.currentTarget; setBusy(b,true,'جارٍ الإصدار'); try{ const n=await Store.issueCertificates(c.id); await reloadAD(); toast(n?`صدرت ${fmtNum(n)} شهادة جديدة`:'لا توجد شهادات جديدة مستحقة'); back(); }catch(x){ setBusy(b,false); toast(x.message); } };
+  if($('#ciss')) $('#ciss').onclick=async e=>{ const b=e.currentTarget; setBusy(b,true,'جارٍ الإصدار'); try{ const n=await Store.issueCertificates(c.id); await reloadAD(); toast(n?`صدرت ${fmtNum(n)} إفادة جديدة`:'لا توجد إفادات جديدة مستحقة'); back(); }catch(x){ setBusy(b,false); toast(x.message); } };
   if($('#cprt')) $('#cprt').onclick=()=>printCertificates(certs(), t);
   $$('[data-c1]').forEach(b=>b.onclick=()=>printCertificates([(AD.certificates||[]).find(x=>x.id===b.dataset.c1)], t));
   $$('[data-rv]').forEach(b=>b.onclick=async()=>{ const x=AD.certificates.find(y=>y.id===b.dataset.rv); setBusy(b,true,'جارٍ الحفظ'); await Store.revokeCertificate(x.id,!x.revoked); await reloadAD(); toast(x.revoked?'أُعيد تفعيل الشهادة':'أُلغيت الشهادة'); back(); });

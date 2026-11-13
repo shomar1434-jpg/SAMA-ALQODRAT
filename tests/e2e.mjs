@@ -93,8 +93,8 @@ ok(await S(() => window.__SAMA__.LocalStore.data.settings.late_weight) === 0.5, 
 await go('admin-partners', 300); ok(await p.waitForSelector('#ptAdd', {timeout:5000}).catch(() => null), 'صفحة النبذة والشركاء');
 
 // الشهادة والتحقق والتحضير بعد الأرشفة (من الصفحة العامة)
-if (arch.cert) { await go('v-' + arch.cert, 1200); ok(p.url().startsWith(U + '#v-') && /سارية|صالحة|شهادة/.test(await text('#app')), 'التحقق من شهادة صادرة'); }
-else ok(true, 'لا شهادة مستحقة في هذه الدفعة (لا يلزم التحقق)');
+if (arch.cert) { await go('v-' + arch.cert, 1200); ok(p.url().startsWith(U + '#v-') && /سارية|صالحة|شهادة/.test(await text('#app')), 'التحقق من إفادة حضور صادرة'); }
+else ok(true, 'لا إفادة مستحقة في هذه الدفعة (لا يلزم التحقق)');
 const r4 = await ck(info.nid); ok(!/تم تسجيل حضورك/.test(r4), 'لا تحضير بعد أرشفة الدفعة');
 
 // الشريط والجوال
