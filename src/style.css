@@ -1159,3 +1159,12 @@ img,svg,video,canvas{max-width:100%}
 .pdoc.inv-rc{display:flex;flex-direction:column;gap:6mm;align-items:center}
 .pdoc.inv-rc h2{font-size:14px;margin:0;align-self:stretch}
 .pdoc.inv-rc img{max-width:100%;max-height:250mm;object-fit:contain;border:1px solid #b9cfcc}
+
+/* ---------- مراجعة البيانات والاستيراد ---------- */
+.iss{margin:0;padding-inline-start:18px;font-size:13.5px;line-height:1.7}
+.iss li.n{color:var(--info)}.iss li.e{color:var(--danger);font-weight:600}
+.row-bad td{background:color-mix(in srgb,var(--danger) 7%,transparent)}
+.field.need label{color:var(--warning);font-weight:700}.field.need .inp{border-color:var(--warning)}
+.fx-o{border:1px solid var(--border);border-radius:12px;padding:8px 12px 2px;margin:12px 0 0;min-width:0}
+.fx-o legend{font-size:13px;font-weight:600;padding:0 6px}
+.fx-note{display:flex;gap:8px;align-items:flex-start;min-height:44px}
