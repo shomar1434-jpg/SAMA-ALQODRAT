@@ -7,7 +7,8 @@ import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, pl
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
-import { BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
+import { keepNote } from './import_logic.js';
+import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
@@ -291,7 +292,7 @@ export const LocalStore = {
     this.data.certificates = this.data.certificates || []; if(this.data.settings.cert_threshold==null) this.data.settings.cert_threshold=75;
     if(!this.data.partners || (this.data.partners.length<=2 && this.data.partners.every(x=>x.type==='جهة اعتماد'))) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
-    D.orders=D.orders||[]; D.invoices=D.invoices||[]; if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
+    D.orders=D.orders||[]; D.invoices=D.invoices||[]; (D.trainees||[]).forEach(t=>{ if(t.imported && !t.import_notes) t.import_notes=[]; }); if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
     if(!D.plans.some(p=>p.tier==='custom')) D.plans.push(...customPlans());       // باقة «خصصناها لك» للبيانات المحفوظة قبل إضافتها
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
     if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
@@ -493,18 +494,58 @@ export const LocalStore = {
     if(decision!=='approved' && String(reason||'').trim().length<3) throw new Error('اكتب سبب القرار');
     o.approval=decision; o.note=decision==='approved'?'':String(reason).trim().slice(0,300); if(decision==='rejected') o.provisional=false;
     this._orderEvent(o, decision, 'admin', reason); this.audit('order.review', o.id, {decision}); this.save(); return {ok:true}; },
-  async confirmOrderPayment(id, amount, confirmed=true, reason=''){ const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
+  async confirmOrderPayment(id, amount, confirmed=true, reason='', method='transfer'){ const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
     if(confirmed && o.payment==='confirmed') throw new Error('سبق تأكيد سداد هذا الطلب.');
     if(confirmed){ const a=Math.round(+amount*100)/100; if(!(a>0)) throw new Error('اكتب المبلغ الواصل فعليًا'); if(a<o.due_now) throw new Error(`المبلغ أقل من المطلوب الآن (${o.due_now} ريال)؛ لا يُعد السداد مستوفيًا`);
-      o.paid_amount=a; o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
-      const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date}), created_at:new Date().toISOString()}; D.invoices.push(inv);
+      if(!PAY_METHODS[method]) throw new Error('اختر طريقة السداد'); const prior=+o.paid_amount||0;
+      o.paid_amount=Math.round((prior+a)*100)/100; o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
+      const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date, prior, method:PAY_METHODS[method]}), created_at:new Date().toISOString()}; D.invoices.push(inv);
       this._orderEvent(o,'payment_confirmed','admin',`${a} ريال · فاتورة ${inv.number}`); }
-    else { if(o.payment!=='confirmed') throw new Error('السداد غير مؤكد'); if(String(reason||'').trim().length<3) throw new Error('اكتب سبب إلغاء تأكيد السداد');
+    else { const base=+(o.opening?.paid)||0; if(o.payment!=='confirmed' || !D.invoices.some(i=>i.order_id===o.id && i.status==='issued')) throw new Error('لا دفعات مؤكدة داخل النظام لإلغائها'); if(String(reason||'').trim().length<3) throw new Error('اكتب سبب إلغاء تأكيد السداد');
       D.invoices.filter(i=>i.order_id===o.id && i.status==='issued').forEach(i=>{ i.status='void'; i.void_reason=String(reason).trim().slice(0,300); i.voided_at=new Date().toISOString(); });
-      o.payment=o.claim?'claimed':'unpaid'; o.paid_amount=0; this._orderEvent(o,'payment_unconfirmed','admin',reason); }
+      o.payment=base>0?'confirmed':o.claim?'claimed':'unpaid'; o.paid_amount=base; this._orderEvent(o,'payment_unconfirmed','admin',reason); }
     this.audit('order.payment', o.id, {confirmed}); this.save(); return {ok:true}; },
   async setOrderProvisional(id, on, reason){ const o=(this.data.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); if(on && o.approval==='rejected') throw new Error('الطلب مرفوض');
     if(on && String(reason||'').trim().length<3) throw new Error('اكتب سبب القبول المؤقت'); o.provisional=!!on; this._orderEvent(o, on?'provisional_on':'provisional_off','admin',reason); this.audit('order.provisional', o.id, {on:!!on}); this.save(); return {ok:true}; },
+  /* دفعة إضافية على طلب مؤكد (قسط أو باقي الرسوم): تصدر لها فاتورة مستقلة */
+  async addOrderPayment(id, f){ const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
+    if(o.approval==='rejected') throw new Error('الطلب مرفوض'); if(o.payment!=='confirmed') throw new Error('أكّد الدفعة الأولى أولًا');
+    const a=Math.round(+f.amount*100)/100, prior=+o.paid_amount||0, date=f.date||riyadhNow().date; if(!(a>0)) throw new Error('اكتب مبلغ الدفعة'); if(!PAY_METHODS[f.method]) throw new Error('اختر طريقة السداد');
+    if(a>Math.round((o.total-prior)*100)/100) throw new Error(`المبلغ أكبر من المتبقي (${Math.max(0,o.total-prior)} ريال)`); if(date>riyadhNow().date) throw new Error('تاريخ الدفعة في المستقبل');
+    o.paid_amount=Math.round((prior+a)*100)/100; D.invoice_seq=(D.invoice_seq||0)+1;
+    const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date, prior, method:PAY_METHODS[f.method], transfer_date:date, transfer_ref:String(f.reference||'').trim().slice(0,60)}), created_at:new Date().toISOString()}; D.invoices.push(inv);
+    this._orderEvent(o,'payment_added','admin',`${a} ريال · ${PAY_METHODS[f.method]} · فاتورة ${inv.number}`); this.audit('order.payment_added', o.id); this.save(); return {ok:true, invoice:inv.number}; },
+  /* تصحيح رسوم الطلب وسبب الخصم (مراجعة البيانات) */
+  async saveOrderMeta(id, f){ const o=(this.data.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); const total=Math.round(+f.total*100)/100;
+    if(!(total>0)) throw new Error('اكتب إجمالي الرسوم'); if(total<(+o.paid_amount||0)) throw new Error('الإجمالي أقل من المدفوع');
+    o.total=total; o.due_now=Math.min(o.due_now,total); o.discount_note=String(f.discount_note||'').trim().slice(0,200); this._orderEvent(o,'edited','admin',`${total} ريال${o.discount_note?' · '+o.discount_note:''}`); this.save(); return {ok:true}; },
+  /* تعديل بيانات المتدرب من الإدارة (استكمال الناقص) */
+  async saveTrainee(id, f){ const D=this.data, t=D.trainees.find(x=>x.id===id); if(!t) throw new Error('المتدرب غير موجود'); const p={};
+    if('full_name' in f){ if(String(f.full_name).trim().length<3) throw new Error('اكتب الاسم'); p.full_name=String(f.full_name).trim().replace(/\s+/g,' '); }
+    if('national_id' in f){ if(!/^[12]\d{9}$/.test(f.national_id)) throw new Error('رقم الهوية 10 أرقام'); if(D.trainees.some(x=>x.id!==id&&x.national_id===f.national_id)) throw new Error('رقم الهوية مسجّل لمتدرب آخر'); p.national_id=f.national_id; }
+    if('phone' in f){ if(!/^05\d{8}$/.test(f.phone)) throw new Error('رقم الجوال غير صحيح'); p.phone=f.phone; }
+    if('guardian_phone' in f){ if(f.guardian_phone && !/^05\d{8}$/.test(f.guardian_phone)) throw new Error('جوال ولي الأمر غير صحيح'); p.guardian_phone=f.guardian_phone||''; }
+    if('email' in f){ if(f.email && !/^\S+@\S+\.\S+$/.test(f.email)) throw new Error('البريد غير صحيح'); p.email=f.email||''; }
+    if('birth_date' in f){ if(f.birth_date && (f.birth_date>riyadhNow().date || !/^\d{4}-\d{2}-\d{2}$/.test(f.birth_date))) throw new Error('تاريخ الميلاد غير صحيح'); p.birth_date=f.birth_date||''; }
+    for(const k of ['city','education','gender']) if(k in f) p[k]=f[k]||'';
+    Object.assign(t,p); this.audit('trainee.update', id, {fields:Object.keys(p)}); this.save(); return {ok:true}; },
+  async resolveImportNote(id, idx, done=true){ const t=this.data.trainees.find(x=>x.id===id); if(!t?.import_notes?.[idx]) throw new Error('الملاحظة غير موجودة'); t.import_notes[idx].done=!!done; this.save(); return {ok:true}; },
+  /* استيراد المسجّلين سابقًا: ملف المتدرب، اشتراكه بتاريخه الفعلي، وطلب شراء بدفعاته السابقة رصيدًا مرحَّلًا (بلا فواتير) */
+  async importLegacy(rows){ const D=this.data, today=riyadhNow().date, res={added:0, skipped:[]}; D.orders=D.orders||[];
+    for(const r of rows){ if(r.errors?.length){ res.skipped.push({name:r.full_name, why:r.errors[0]}); continue; }
+      const plan=D.plans.find(p=>p.id===r.plan_id); if(!plan){ res.skipped.push({name:r.full_name, why:'الباقة غير معروفة'}); continue; }
+      let t=D.trainees.find(x=>x.national_id===r.national_id);
+      if(t && D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && s.status!=='cancelled')){ res.skipped.push({name:r.full_name, why:'مسجّل مسبقًا في الباقة نفسها'}); continue; }
+      const notes=(r.notes||[]).filter(keepNote).map(text=>({text, done:false}));
+      if(!t){ t={id:uid(), national_id:r.national_id, full_name:r.full_name, phone:r.phone, email:r.email||'', gender:r.gender, birth_date:r.birth_date||'', city:'', education:'', employer:'', guardian_phone:r.guardian_phone||'', imported:true, import_notes:notes, created_at:new Date().toISOString()}; D.trainees.push(t); }
+      else { t.import_notes=[...(t.import_notes||[]), ...notes]; if(!t.guardian_phone && r.guardian_phone) t.guardian_phone=r.guardian_phone; }
+      const end=subEnd(plan, r.start_date), s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:end<today?'ended':'active', start_date:r.start_date, end_date:end, start_manual:true, track_from:today, imported:true, created_at:r.start_date+'T09:00:00.000Z'};
+      D.subscriptions.push(s);
+      const pub=this._newOrder({trainee_id:t.id, kind:'plan', subscription_id:s.id, title:'باقة '+planName(plan), total:r.total, due_now:Math.min(+plan.reg_fee||0, r.total)}), o=D.orders.find(x=>x.id===pub.id);
+      Object.assign(o, {approval:'approved', payment:r.paid>0?'confirmed':'unpaid', paid_amount:r.paid, discount_note:r.discount_note||'', created_at:r.start_date+'T09:00:00.000Z',
+        opening:{paid:r.paid, payments:(r.payments||[]).map(p=>({amount:p.amount, method:p.method, label:p.label, note:p.note||''}))}});
+      this._orderEvent(o,'imported','admin',`مدفوع سابقًا ${r.paid} من ${r.total} ريال`); res.added++; }
+    this.audit('import.legacy','trainees',{added:res.added, skipped:res.skipped.length}); this.save(); return res; },
   /* صورة الإيصال يرفقها المسؤول بالفاتورة (تصله عبر واتساب)؛ لا يُستنتج منها السداد */
   async attachReceipt(id, image){ const D=this.data, i=(D.invoices||[]).find(x=>x.id===id); if(!i) throw new Error('الفاتورة غير موجودة'); if(!validReceipt(image)) throw new Error('صورة الإيصال غير صالحة أو كبيرة');
     D.invoice_receipts=D.invoice_receipts||{}; D.invoice_receipts[id]=image; i.has_receipt=true; this.audit('invoice.receipt', id); this.save(); return {ok:true}; },
@@ -686,7 +727,12 @@ export const CloudStore = {
   async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
   async orderReportTransfer(f){ return this._e(await this.sb.rpc('order_report_transfer',{p:f})); },
   async reviewOrder(id, decision, reason, expected_version){ return this._e(await this.sb.rpc('admin_review_order',{p_id:id, p_decision:decision, p_reason:reason||'', p_version:expected_version??null})); },
-  async confirmOrderPayment(id, amount, confirmed=true, reason=''){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed, p_reason:reason||''})); },
+  async confirmOrderPayment(id, amount, confirmed=true, reason='', method='transfer'){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed, p_reason:reason||'', p_method:method})); },
+  async addOrderPayment(id, f){ return this._e(await this.sb.rpc('admin_add_payment',{p_id:id, p:f})); },
+  async saveOrderMeta(id, f){ return this._e(await this.sb.rpc('admin_save_order_meta',{p_id:id, p:f})); },
+  async saveTrainee(id, f){ return this._e(await this.sb.rpc('admin_save_trainee',{p_id:id, p:f})); },
+  async resolveImportNote(id, idx, done=true){ return this._e(await this.sb.rpc('admin_resolve_import_note',{p_id:id, p_idx:idx, p_done:done})); },
+  async importLegacy(rows){ return this._e(await this.sb.rpc('admin_import_legacy',{p:rows})); },
   async attachReceipt(id, image){ return this._e(await this.sb.rpc('admin_attach_receipt',{p_id:id, p_image:image})); },
   async invoiceReceipt(id){ return this._e(await this.sb.rpc('admin_invoice_receipt',{p_id:id})); },
   async setOrderProvisional(id, on, reason){ return this._e(await this.sb.rpc('admin_order_provisional',{p_id:id, p_on:!!on, p_reason:reason||''})); },

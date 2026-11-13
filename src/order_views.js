@@ -8,7 +8,7 @@ import { titleBar } from './views2_main.js';
 import { modal, closeModal } from './views2_programs.js';
 import { AD, reloadAD } from './views2_admin.js';
 import { setBusy, toLatin } from './features.js';
-import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, EV_TXT, orderReady } from './order_logic.js';
+import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, EV_TXT, PAY_METHODS, orderReady, orderRemaining } from './order_logic.js';
 import { sar, pills } from './order_panel.js';
 
 /* ---------- الإدارة: طلبات الشراء ---------- */
@@ -23,9 +23,10 @@ export function pageOrders(){
     `<div class="grid g4" style="margin-bottom:14px">${[['بانتظار المراجعة', n(o => o.approval === 'pending_review'), 'warn'], ['تحويلات قيد المطابقة', n(o => o.payment === 'claimed'), 'info'], ['مستوفية (موافقة + سداد)', n(o => orderReady(o) && !o.provisional), 'ok'], ['قبول مؤقت', n(o => o.provisional), 'g']].map(([t, v, c]) => `<div class="card pad ostat"><span class="hint"><span class="pill dot ${c}" aria-hidden="true" style="padding:0 0 0 6px"></span>${t}</span><b class="num">${fmtNum(v)}</b></div>`).join('')}</div>
     <div class="filters"><label class="sr-only" for="of-st">الحالة</label><select class="inp" id="of-st">${[['open', 'تحتاج إجراء'], ['pending_review', 'بانتظار المراجعة'], ['claimed', 'تحويل قيد المطابقة'], ['needs_information', 'مطلوب استكمال'], ['approved', 'موافق عليها'], ['ready', 'مستوفية'], ['rejected', 'مرفوضة'], ['all', 'الكل']].map(([k, v]) => `<option value="${k}" ${oF.st === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <label class="sr-only" for="of-q">بحث</label><input class="inp" id="of-q" type="search" placeholder="رقم الطلب أو الاسم أو الجوال" value="${esc(oF.q)}" style="flex:1;min-width:200px"></div>
-    ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>المتدرب</th><th>البند</th><th>المطلوب الآن</th><th>المراجعة</th><th>السداد</th><th></th></tr></thead><tbody>${list.map(o => { const t = tr(o.trainee_id);
+    ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>المتدرب</th><th>البند</th><th>المطلوب الآن</th><th>المتبقي</th><th>المراجعة</th><th>السداد</th><th></th></tr></thead><tbody>${list.map(o => { const t = tr(o.trainee_id);
         return `<tr><td class="num" dir="ltr"><b>${esc(o.number)}</b></td><td>${fmtShort(o.created_at.slice(0, 10))}</td><td>${esc(t?.full_name || '—')}<div class="hint num" dir="ltr">${esc(t?.phone || '')}</div></td><td style="max-width:240px">${esc(o.title)}</td>
           <td class="num">${o.due_now > 0 ? fmtNum(o.due_now) : '—'}${o.total > o.due_now ? `<div class="hint">من ${fmtNum(o.total)}</div>` : ''}</td>
+          <td class="num">${fmtNum(orderRemaining(o))}</td>
           <td><span class="pill dot ${AP_TONE[o.approval]}">${AP_TXT[o.approval]}</span>${o.provisional ? '<div class="hint">قبول مؤقت</div>' : ''}</td>
           <td><span class="pill dot ${PAY_TONE[o.payment]}">${PAY_TXT[o.payment]}</span>${o.claim && o.payment !== 'confirmed' ? `<div class="hint num">${fmtNum(o.claim.amount)} · ${fmtShort(o.claim.date)}</div>` : ''}</td>
           <td><button class="btn sm pri" data-oo="${o.id}">فتح</button></td></tr>`; }).join('')}</tbody></table></div></div>` : emptyBox(all.length ? 'لا طلبات بهذه التصفية' : 'لا توجد طلبات بعد', all.length ? '' : 'يُنشأ طلب برقم فريد مع كل تسجيل جديد في برنامج أو باقة.')}
@@ -49,18 +50,24 @@ export function pageOrders(){
 
 function orderModal(o){
   const t = (AD.trainees || []).find(x => x.id === o.trainee_id), dup = (AD.orders || []).filter(x => x.trainee_id === o.trainee_id && x.id !== o.id && x.approval !== 'rejected').length;
+  const methOpts = Object.entries(PAY_METHODS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
   modal(`<h3>طلب <span dir="ltr">${esc(o.number)}</span></h3><div class="ord-st" style="margin:-4px 0 10px">${pills(o)}</div>
     <dl class="ord-dl"><dt>المتدرب</dt><dd>${esc(t?.full_name || '—')} · <span dir="ltr" class="num">${esc(t?.phone || '')}</span>${t?.guardian_phone ? ` · ولي الأمر <span dir="ltr" class="num">${esc(t.guardian_phone)}</span>` : ''}</dd>
       <dt>البند</dt><dd>${esc(o.title)}</dd><dt>المطلوب الآن</dt><dd>${o.due_now > 0 ? sar(o.due_now) : 'غير محدد السعر'}${o.total > o.due_now ? ` من إجمالي ${sar(o.total)}` : ''}</dd>
       <dt>التحويل المُبلَّغ</dt><dd>${o.claim ? `${sar(o.claim.amount)} بتاريخ ${fmtShort(o.claim.date)}${o.claim.reference ? ` · مرجع <span dir="ltr">${esc(o.claim.reference)}</span>` : ''}` : 'لم يُبلَّغ بتحويل'}</dd>
-      ${o.paid_amount ? `<dt>المؤكَّد وصوله</dt><dd>${sar(o.paid_amount)}</dd>` : ''}</dl>
+      ${o.paid_amount ? `<dt>المدفوع</dt><dd>${sar(o.paid_amount)}${o.opening ? ` (منها ${sar(o.opening.paid)} مرحَّلة من قبل النظام)` : ''} · المتبقي <b>${sar(orderRemaining(o))}</b></dd>` : ''}
+      ${o.discount_note ? `<dt>سبب الخصم</dt><dd>${esc(o.discount_note)}</dd>` : ''}
+      ${o.opening?.payments?.length ? `<dt>دفعات سابقة</dt><dd>${o.opening.payments.map(p => `${esc(p.label)} ${fmtNum(p.amount)} (${PAY_METHODS[p.method] || ''})`).join(' · ')}</dd>` : ''}</dl>
     ${dup ? `<p class="alert t-info" style="margin:10px 0 0"><span class="aic">${ic('alert')}</span><span>للمتدرب ${fmtNum(dup)} طلبًا آخر. تأكد أن التحويل نفسه لا يُعتمد لطلبين.</span></p>` : ''}
     <h4 class="ord-sec">1. مراجعة الطلب</h4>
     <div class="field"><label for="om-r">السبب أو المطلوب استكماله (إلزامي عند الرفض أو طلب الاستكمال)</label><input class="inp" id="om-r" maxlength="300" value="${esc(o.note || '')}"></div>
     <div class="ord-acts"><button class="btn pri sm" data-od="approved">${ic('check')} موافقة</button><button class="btn sm" data-od="needs_information">طلب استكمال معلومات</button><button class="btn sm danger soft" data-od="rejected">رفض مع السبب</button></div>
     <h4 class="ord-sec">2. تأكيد السداد (بعد مطابقة كشف البنك)</h4>
-    ${o.payment === 'confirmed' ? `<div class="ord-acts"><span class="pill ok">${ic('check')} مؤكَّد ${sar(o.paid_amount)}</span><button class="btn sm" id="om-un">إلغاء التأكيد (بسبب في الخانة أعلاه)</button><a class="btn sm" href="#admin-invoices">الفواتير</a></div>`
-      : `<div class="ord-acts"><div class="field" style="flex:1;min-width:140px;margin:0"><label for="om-a">المبلغ الواصل فعليًا (ريال)</label><input class="inp num" id="om-a" inputmode="decimal" value="${o.claim?.amount ?? ''}"></div><button class="btn pri sm" id="om-pay">${ic('wallet')} تأكيد وصول المبلغ</button></div>`}
+    ${o.payment === 'confirmed' ? `${orderRemaining(o) > 0 ? `<div class="ord-acts"><div class="field" style="flex:1;min-width:110px;margin:0"><label for="om-a2">دفعة جديدة (ريال)</label><input class="inp num" id="om-a2" inputmode="decimal"></div>
+        <div class="field" style="min-width:120px;margin:0"><label for="om-m2">طريقة السداد</label><select class="inp" id="om-m2">${methOpts}</select></div><div class="field" style="flex:1;min-width:110px;margin:0"><label for="om-f2">مرجع العملية (اختياري)</label><input class="inp num" id="om-f2" dir="ltr" maxlength="60"></div>
+        <button class="btn pri sm" id="om-add">${ic('plus')} تسجيل الدفعة وإصدار فاتورتها</button></div>` : ''}
+      <div class="ord-acts"><span class="pill ok">${ic('check')} مؤكَّد ${sar(o.paid_amount)}</span><button class="btn sm" id="om-un">إلغاء التأكيد (بسبب في الخانة أعلاه)</button><a class="btn sm" href="#admin-invoices">الفواتير</a></div>`
+      : `<div class="ord-acts"><div class="field" style="flex:1;min-width:140px;margin:0"><label for="om-a">المبلغ الواصل فعليًا (ريال)</label><input class="inp num" id="om-a" inputmode="decimal" value="${o.claim?.amount ?? ''}"></div><div class="field" style="min-width:130px;margin:0"><label for="om-m">طريقة السداد</label><select class="inp" id="om-m">${methOpts}</select></div><button class="btn pri sm" id="om-pay">${ic('wallet')} تأكيد وصول المبلغ</button></div>`}
     <h4 class="ord-sec">3. قبول مؤقت</h4>
     <div class="ord-acts"><span class="hint" style="flex:1;min-width:200px">يسمح بالحضور قبل اكتمال السداد أو المراجعة (لمن وعد بالسداد). يحتاج سببًا في الخانة أعلاه.</span><button class="btn sm" id="om-prov">${o.provisional ? 'إلغاء القبول المؤقت' : 'منح قبول مؤقت'}</button></div>
     <div class="errtxt" id="omE" role="alert"></div>
@@ -69,7 +76,8 @@ function orderModal(o){
   const E = x => { $('#omE').textContent = x; }, run = async (btn, fn, msg) => { E(''); setBusy(btn, true, 'جارٍ الحفظ'); try { await fn(); await reloadAD(); closeModal(); toast(msg); pageOrders(); } catch(x){ setBusy(btn, false); E(x.message); } };
   $('#om-x').onclick = closeModal;
   $$('[data-od]').forEach(b => b.onclick = () => run(b, () => Store.reviewOrder(o.id, b.dataset.od, $('#om-r').value, o.version), { approved:'وُوفق على الطلب', needs_information:'طُلب استكمال المعلومات', rejected:'رُفض الطلب' }[b.dataset.od]));
-  if($('#om-pay')) $('#om-pay').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, toLatin($('#om-a').value), true), 'تأكد السداد وصدرت الفاتورة');
+  if($('#om-pay')) $('#om-pay').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, toLatin($('#om-a').value), true, '', $('#om-m').value), 'تأكد السداد وصدرت الفاتورة');
   if($('#om-un')) $('#om-un').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, 0, false, $('#om-r').value), 'أُلغي تأكيد السداد وأُلغيت فاتورته');
+  if($('#om-add')) $('#om-add').onclick = e => run(e.currentTarget, () => Store.addOrderPayment(o.id, { amount:toLatin($('#om-a2').value), method:$('#om-m2').value, reference:$('#om-f2').value }), 'سُجّلت الدفعة وصدرت فاتورتها');
   $('#om-prov').onclick = e => run(e.currentTarget, () => Store.setOrderProvisional(o.id, !o.provisional, $('#om-r').value), o.provisional ? 'أُلغي القبول المؤقت' : 'مُنح قبول مؤقت');
 }

@@ -93,7 +93,7 @@ export function subStats(D, s, n = riyadhNow()){
   const st = subStatus(s, n.date);
   if (!s.start_date) return { status:st, plan, total:0, held:0, attended:0, late:0, score:0, absent:0, remaining:0, rate:null, finalRate:0, required:0, needed:0, reachable:true, consec:0, lastAtt:null, timePct:0, daysLeft:null, next:null, att };
   const end = s.end_date || subEnd(plan, s.start_date);
-  const all = sessionsBetween(D, s.section, s.start_date, end);
+  const all = sessionsBetween(D, s.section, s.track_from && s.track_from > s.start_date ? s.track_from : s.start_date, end);   // المسجّلون سابقًا: المتابعة من تاريخ إدخالهم
   const held = all.filter(x => sessionDone(x, n) || att.some(a => a.att_date === x.date));
   const days = new Set(att.map(a => a.att_date));
   const attended = days.size, late = att.filter(a => a.status === 'متأخر').length;
