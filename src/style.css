@@ -1179,3 +1179,4 @@ img,svg,video,canvas{max-width:100%}
 .qp:hover{background:var(--brand-tint)}
 .qp input{margin-top:6px;flex:none;width:20px;height:20px}
 .qp span{min-width:0;flex:1}.qp b{font-size:12px;color:var(--ink-subtle);display:block}
+.ac-code{font-size:18px;letter-spacing:3px;font-variant-numeric:tabular-nums}

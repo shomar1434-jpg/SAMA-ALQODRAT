@@ -44,7 +44,7 @@ for (const [name, w, h, touch] of SIZES) {
   for (const t of ['hw', 'bank', 'msg', 'rate']) { await p.click(`[data-tt="${t}"]`); await check('المدرب/' + t); }
   await p.goto(U + 'admin/'); await p.waitForSelector('[name=p]'); await check('دخول الإدارة');
   await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForSelector('#main');
-  for (const r of ['admin', 'admin-attendance', 'admin-cohorts', 'admin-qudurat', 'admin-users', 'admin-bank', 'admin-orders', 'admin-invoices', 'admin-data', 'admin-notify', 'admin-trainees', 'admin-settings']) { await p.goto(U + 'admin/#' + r); await p.waitForSelector('#main'); await check('الإدارة/' + r); }
+  for (const r of ['admin', 'admin-attendance', 'admin-cohorts', 'admin-qudurat', 'admin-users', 'admin-bank', 'admin-orders', 'admin-invoices', 'admin-data', 'admin-access', 'admin-notify', 'admin-trainees', 'admin-settings']) { await p.goto(U + 'admin/#' + r); await p.waitForSelector('#main'); await check('الإدارة/' + r); }
   ok(!bad.length && !errs.length, `${engine} · ${name} (${w}×${h})` + (bad.length ? '\n   - ' + bad.slice(0, 14).join('\n   - ') : '') + (errs.length ? '\n   أخطاء: ' + errs.slice(0, 3).join(' | ') : ''));
   await ctx.close();
 }

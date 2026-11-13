@@ -61,7 +61,7 @@ function viewLogin(){
     <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">ادخل برقم جوالك المسجّل في المعهد</div></div></div>
     <form id="pl" class="grid pad" novalidate>
       <div class="field"><label for="pl-phone">رقم الجوال</label><input class="inp num" id="pl-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="05XXXXXXXX" autocomplete="tel-national"></div>
-      <div class="field" id="otpF" hidden><label for="pl-code">رمز التحقق المرسل إلى جوالك</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
+      <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق المرسل إلى جوالك</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
       <div class="errtxt" id="plE" role="alert"></div>
       <button class="btn pri" id="plB">${ic('lock')} إرسال رمز التحقق</button>
       ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b> (باقات)، أو <b dir="ltr">0550000003</b> (برنامج تدريبي).'}</span></div>` : ''}
@@ -72,7 +72,9 @@ function viewLogin(){
   $('#pl').onsubmit = async e => { e.preventDefault(); const b = $('#plB'); $('#plE').textContent = '';
     try {
       if(step === 1){ if(!/^05\d{8}$/.test(normPhone(ph.value))) throw new Error('رقم الجوال 10 أرقام يبدأ بـ 05');
-        setBusy(b, true, 'جارٍ الإرسال'); await Store.requestOtp(ph.value); setBusy(b, false);
+        setBusy(b, true, 'جارٍ الإرسال'); const rq = await Store.requestOtp(ph.value); setBusy(b, false);
+        $('#plCodeL').textContent = rq?.activation ? 'رمز التفعيل (من إدارة المركز)' : 'رمز التحقق أو رمز التفعيل من إدارة المركز';
+        if(!$('#plActH')) $('#otpF').insertAdjacentHTML('beforeend', '<p class="hint" id="plActH" style="margin:6px 0 0">رمز التفعيل تصدره إدارة المركز لرقم جوالك. تكتبه مرة واحدة فيُعتمد هذا الجهاز وتبقى داخلًا.</p>');
         step = 2; $('#otpF').hidden = false; ph.readOnly = true; b.innerHTML = `${ic('check')} دخول`; code.focus(); liveSay('أُرسل رمز التحقق'); return; }
       if(!/^\d{4,6}$/.test(code.value)) throw new Error('اكتب رمز التحقق');
       setBusy(b, true, 'جارٍ التحقق'); await Store.portalLogin(ph.value, code.value, ROLE); render();
