@@ -66,6 +66,7 @@ const { quizPublic } = await import('../src/learning_logic.js'); const pd = JSON
 ok(pd.includes('KT-03') && pd.includes('"image"') && !/"correct"/.test(pd), 'نسخة الواجب المرسلة للمتدربة فيها صور الأسئلة دون المفاتيح');
 await tab('data-st', 'hw');
 const form = `.hw-quiz[data-qz="${qa.id}"]`;
+await p.click(`[data-qs="${qa.id}"]`); await p.click('#qsGo'); await p.waitForSelector(`.hw-quiz[data-qz="${qa.id}"]`);   // الاختبار يُفتح مرة واحدة
 ok((await p.$$(`${form} .qimg img`)).length === 2 && (await p.$$(`${form} .q.qi`)).length === 2 && /عرض صفحة القطعة/.test(await text(form)), 'الواجب يعرض صور الأسئلة وخيارات أ ب ج د ورابط صفحة القطعة');
 const radios = await p.$$(`${form} input[type=radio]`);
 await radios[0].check(); await radios[4 + 3].check();   // السؤال الأول (KT-03) أ = صحيح، الثاني (KT-01) د = صحيح

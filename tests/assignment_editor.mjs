@@ -52,7 +52,9 @@ await login('student', B.phone); await tab('data-st', 'hw');
 ok(!(await text('#sBody')).includes('تدريب علاجي'), 'غير المستهدَف لا يرى الواجب');
 await login('student', A.phone); await tab('data-st', 'hw');
 const form = `.hw-quiz[data-qz="${hw.id}"]`;
-ok(!!(await p.$(form)) && /تدريب/.test(await text('#sBody')), 'المستهدَف يرى الواجب ونوعه');
+ok(!!(await p.$(`[data-qs="${hw.id}"]`)) && !(await p.$(form)) && /تدريب/.test(await text('#sBody')), 'المستهدَف يرى الواجب ونوعه، وأسئلته لا تظهر قبل البدء');
+await p.click(`[data-qs="${hw.id}"]`); await p.click('#qsGo'); await p.waitForSelector(`.hw-quiz[data-qz="${hw.id}"]`);   // الاختبار يُفتح مرة واحدة
+
 const radios = await p.$$(`${form} input[type=radio]`); for (const i of [0, 4, 8]) await radios[i].check();
 await p.click(`${form} button.pri`); await p.waitForTimeout(900);
 D = await data(); const sb = D.submissions.find(x => x.assignment_id === hw.id && x.trainee_id === A.id);

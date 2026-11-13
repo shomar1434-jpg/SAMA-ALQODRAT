@@ -8,7 +8,7 @@ import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy } from './features.js';
 import { SECTIONS, subStatus, planName } from './qudurat.js';
-import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL } from './learning_logic.js';
+import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen } from './learning_logic.js';
 
 const STATE_TXT = { new:'جديد', draft:'قيد الحل', submitted:'مُرسل', needs_revision:'يحتاج تعديلًا', graded:'مصحح', late:'متأخر' };
 const STATE_TONE = { new:'info', draft:'o', submitted:'ok', needs_revision:'warn', graded:'ok', late:'bad' };
@@ -27,7 +27,15 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
       ${a.kind !== 'quiz' && a.submission?.status !== 'graded' ? `<form class="hw-f" data-hw="${a.id}"><label class="sr-only" for="hw-${a.id}">إجابتك</label><textarea class="inp" id="hw-${a.id}" rows="3" maxlength="6000" placeholder="اكتب إجابتك هنا" style="padding:10px 14px;line-height:1.8">${esc(a.submission?.answer || '')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn sm" data-draft>حفظ مسودة</button><button class="btn pri sm">${ic('check')} إرسال</button></div></form>` : ''}
     </article>`).join('')}</div>` : emptyBox('لا توجد واجبات منشورة لك بعد')}</div>`,
-  bind(){ $$('[data-qz]').forEach(f => f.onsubmit = async e => { e.preventDefault(); const a = list.find(x => x.id === f.dataset.qz), ans = {};
+  bind(){ clearInterval(QZ_TICK);
+    $$('[data-qs]').forEach(b => b.onclick = () => confirmStart(async () => { try { await Store.startQuiz({ trainee_id:tr.id, assignment_id:b.dataset.qs }); } catch(x){ toast(x.message); } reload(); }));
+    if($('[data-qexp]')) setTimeout(async () => { for(const el of $$('[data-qexp]')){ try { await Store.submitAssignment({ trainee_id:tr.id, assignment_id:el.dataset.qexp, answers:{} }); } catch(_){} } reload(); }, 600);
+    const forms = $$('[data-qz]'); forms.forEach(f => $$('input[type=radio]', f).forEach(r => r.onchange = () => Store.saveQuizAnswer({ trainee_id:tr.id, assignment_id:f.dataset.qz, question_id:r.dataset.q, value:+r.value }).catch(() => {})));
+    if(forms.length){ const tick = () => { for(const f of forms){ if(!f.isConnected){ clearInterval(QZ_TICK); return; } const left = Math.max(0, Math.round((Date.parse(f.dataset.deadline) - Date.now()) / 1000)), el = $('[data-qt]', f);
+          el.textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`; f.classList.toggle('low', left <= 60);
+          if(left <= 0 && !f.dataset.auto){ f.dataset.auto = '1'; f.dataset.warned = '1'; clearInterval(QZ_TICK); toast('انتهى الوقت؛ يُسلَّم الاختبار الآن'); f.requestSubmit(); } } };
+      tick(); QZ_TICK = setInterval(tick, 1000); }
+    $$('[data-qz]').forEach(f => f.onsubmit = async e => { e.preventDefault(); const a = list.find(x => x.id === f.dataset.qz), ans = {};
       $$('input[type=radio]:checked', f).forEach(r => ans[r.dataset.q] = +r.value);
       const miss = a.quiz.length - Object.keys(ans).length, b = $('button.pri', f);
       const go = async () => { setBusy(b, true, 'جارٍ التصحيح'); try { const r = await Store.submitAssignment({ trainee_id:tr.id, assignment_id:a.id, answers:ans });
@@ -41,7 +49,9 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
 
 /* واجب اختبار من بنك المدرب: قبل التسليم أسئلة بلا إجابات، وبعده مراجعة بالإجابة الصحيحة والتفسير */
 /* تجهيز واجب علاجي من مجموعة ذكية: يفتح نموذج الواجب بقائمة مستهدفين جاهزة، والنشر بيد المدرب */
-let HW_PRESET = null;
+let HW_PRESET = null, QZ_TICK = null;
+function confirmStart(fn){ modal(`<h3>بدء الاختبار</h3><p>يُفتح الاختبار مرة واحدة ويبدأ الوقت الآن ولا يتوقف. هل أنت مستعد؟</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="qsNo">ليس الآن</button><button class="btn pri" id="qsGo">${ic('timer')} ابدأ</button></div>`);
+  $('#qsNo').onclick = closeModal; $('#qsGo').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ البدء'); closeModal(); await fn(); }; }
 export const setHwPreset = p => { HW_PRESET = p; };
 /* نص السؤال أو صورته (البنك المشترك مصوَّر)، ورابط صفحة القطعة عند وجودها. base يضبطه setBankAssets عند تحميل البوابة */
 let ASSETS = '';
@@ -56,8 +66,12 @@ function quizHtml(a){
   if(done){ const rv = Object.fromEntries((sb.review || []).map(x => [x.id, x]));
     return `<ol class="qres">${a.quiz.map(q => { const c = rv[q.id]?.correct, mine = sb.answers?.[q.id];
       return `<li class="${mine === c ? 'ok' : 'bad'}">${qStem(q)}<p><b>الصحيح:</b> ${esc(q.options[c] ?? '')}${mine != null && mine !== c ? ` · <b>إجابتك:</b> ${esc(q.options[mine])}` : mine == null ? ' · <b>لم تُجب</b>' : ''}</p>${rv[q.id]?.explanation ? `<p class="hint">${esc(rv[q.id].explanation)}</p>` : ''}</li>`; }).join('')}</ol>`; }
-  return `<form class="hw-quiz" data-qz="${a.id}"><p class="hint" style="margin:0 0 6px">${fmtNum(a.quiz.length)} أسئلة من بنك المدرب · يُصحَّح فورًا عند التسليم</p>
-    ${a.quiz.map((q, i) => `<fieldset class="q ${q.image ? 'qi' : ''}"><legend><b>${fmtNum(i + 1)}.</b> ${q.image ? '' : esc(q.text)}</legend>${q.image ? qStem(q) : ''}${q.options.map((o, j) => `<label class="opt"><input type="radio" name="${a.id}-${i}" value="${j}" data-q="${q.id}"> ${esc(o)}</label>`).join('')}</fieldset>`).join('')}
+  if(!sb) return `<div class="qz-start" data-qsb="${a.id}"><p><b>${fmtNum(a.quiz_count || 0)} سؤالًا · المدة ${fmtNum(a.quiz_minutes || 0)} دقيقة</b> (دقيقتان لكل سؤال)</p>
+      <p class="hint" style="margin:4px 0 10px">يُفتح مرة واحدة فقط: يبدأ الوقت عند الضغط ولا يتوقف إن أغلقت الصفحة، وعند انتهائه يُسلَّم ما أجبت عنه تلقائيًا ولا تُعاد المحاولة.</p>
+      <button type="button" class="btn pri sm" data-qs="${a.id}">${ic('timer')} ابدأ الآن</button></div>`;
+  if(!quizOpen(sb) || !a.quiz) return `<p class="alert t-info" data-qexp="${a.id}" style="margin:8px 0 0"><span class="aic">${ic('timer')}</span><span>انتهى وقت الاختبار، وجارٍ تصحيح ما أجبت عنه…</span></p>`;
+  return `<form class="hw-quiz" data-qz="${a.id}" data-deadline="${esc(sb.deadline)}"><p class="qz-timer" role="timer" aria-live="off">الوقت المتبقي <b data-qt>—</b></p><p class="hint" style="margin:0 0 6px">${fmtNum(a.quiz.length)} أسئلة من بنك المدرب · تُحفظ إجاباتك أولًا بأول · يُصحَّح فورًا عند التسليم</p>
+    ${a.quiz.map((q, i) => `<fieldset class="q ${q.image ? 'qi' : ''}"><legend><b>${fmtNum(i + 1)}.</b> ${q.image ? '' : esc(q.text)}</legend>${q.image ? qStem(q) : ''}${q.options.map((o, j) => `<label class="opt"><input type="radio" name="${a.id}-${i}" value="${j}" data-q="${q.id}" ${sb.answers?.[q.id] === j ? 'checked' : ''}> ${esc(o)}</label>`).join('')}</fieldset>`).join('')}
     <div class="errtxt qz-w" aria-live="polite"></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn pri sm">${ic('check')} تسليم الاختبار</button></div></form>`;
 }
 
