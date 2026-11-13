@@ -1116,3 +1116,28 @@ img,svg,video,canvas{max-width:100%}
 @media(max-width:640px){.pl-art{grid-template-columns:1fr}.pl-poster{max-width:340px;margin:0 auto;order:-1}}
 .pl-zoom{max-height:72vh;overflow:auto;border-radius:12px;border:1px solid var(--border);background:#fff;-webkit-overflow-scrolling:touch}
 .pl-zoom img{width:100%;height:auto;display:block}
+
+/* ---------- طلبات الشراء ---------- */
+.ord{border:1px solid var(--border);border-radius:14px;padding:14px;background:var(--surface-card);min-width:0}
+.ord+.ord{margin-top:12px}
+.ord-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ord-h small{display:block;color:var(--ink-subtle);font-size:12px}
+.ord-no{font-size:19px;letter-spacing:.5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ord-t{margin:8px 0 6px;font-weight:600;overflow-wrap:anywhere}
+.ord-st{display:flex;gap:6px;flex-wrap:wrap}
+.ord-amt{display:flex;gap:8px 18px;flex-wrap:wrap;margin-top:10px;font-size:14px;color:var(--ink-subtle)}
+.ord-amt b{color:var(--ink);font-size:16px;margin-inline-start:4px}
+.ord-bank{margin-top:12px;padding:12px;border-radius:12px;background:var(--brand-tint)}
+.ord-bank dl,.ord-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:8px 0 0;font-size:14px}
+.ord-bank dt,.ord-dl dt{color:var(--ink-subtle)}
+.ord-bank dd,.ord-dl dd{margin:0;overflow-wrap:anywhere;min-width:0}
+.ord-claim{margin-top:12px}
+.ord-claim summary,.ord-log summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.ord-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;margin-top:6px}
+.ord-f .errtxt{grid-column:1/-1}
+.ord-sec{margin:16px 0 8px;font-size:15px}
+.ord-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px}
+.ord-log{margin-top:14px}
+.ord-log ol{margin:6px 0 0;padding-inline-start:20px;font-size:13.5px;color:var(--ink-subtle)}
+.linkbtn{background:none;border:0;color:var(--brand);font:inherit;cursor:pointer;padding:6px 8px;min-height:32px}
+.ostat{display:flex;flex-direction:column;gap:4px;min-width:0}.ostat b{font-size:26px}

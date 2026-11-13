@@ -16,6 +16,7 @@ import { studentHomework, studentLevel, studentMessages, studentRating, teacherH
 import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
 import { initPwa } from './pwa.js';
+import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
 const T_TABS = [['today','calendar','كشف اليوم'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
@@ -174,7 +175,7 @@ export function programPanelHtml(x, threshold = 75){
         ${x.held ? `<div class="ind-ring">${ringSvg(rate ?? 0, 92, 9, tone)}</div><div class="ind-nums"><span><b>${fmtNum(x.attended)}</b>حضور</span><span><b>${fmtNum(x.late)}</b>تأخر</span><span><b>${fmtNum(x.absent)}</b>غياب</span></div>
           <p class="hint">من ${fmtNum(x.held)} محاضرة منعقدة، ويتبقى ${fmtNum(x.remaining)} محاضرة.</p>` : `<p class="ind-empty">${x.state === 'upcoming' ? 'تبدأ الدفعة ' + fmtShort(x.start_date) : 'لا توجد محاضرات منعقدة بعد'}</p>`}</div>
       <div class="card pad ind rv" style="--i:2"><div class="ind-h">${ic('award')}<b>الشهادة</b></div>
-        ${x.cert ? `<div class="ind-big"><b>${ic('check')}</b> صدرت شهادتك</div><p class="hint">الرقم التسلسلي <b dir="ltr">${esc(x.cert)}</b></p><a class="btn sm" href="${publicBase()}#v-${encodeURIComponent(x.cert)}" target="_blank" rel="noopener">${ic('expand')} التحقق من الشهادة</a>`
+        ${x.cert ? `<div class="ind-big"><b>${ic('check')}</b> صدرت إفادة حضورك</div><p class="hint">الرقم التسلسلي <b dir="ltr">${esc(x.cert)}</b></p><a class="btn sm" href="${publicBase()}#v-${encodeURIComponent(x.cert)}" target="_blank" rel="noopener">${ic('expand')} التحقق من إفادة الحضور</a>`
           : x.state === 'archived' ? `<p class="ind-empty">انتهت الدفعة دون بلوغ حد الشهادة ${fmtNum(threshold)}٪</p>`
           : `<p class="ind-big"><b>${fmtNum(threshold)}٪</b> حد الشهادة</p><p class="hint">الشهادة المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:500">منصة منار</a>؛ أنشئ حسابك فيها.</p><p class="hint">${x.needed ? `يلزمك حضور ${fmtNum(x.needed)} من ${fmtNum(x.remaining)} محاضرة متبقية.` : 'بلغت حد الشهادة، وتصدر عند انتهاء الدفعة.'}</p>`}</div>
       <div class="card pad ind rv" style="--i:3"><div class="ind-h">${ic('hourglass')}<b>مدة البرنامج</b></div>
@@ -198,6 +199,7 @@ function viewStudent(D){
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
   if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
+  if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name)); bindOrdersCard($('#sBody'), mo, reload); }
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
   $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
@@ -216,7 +218,8 @@ function viewGuardian(D, s){
       <p>${esc(ch.relation || '')}${it ? ' · ' + esc(it.plan) + ' · قسم ' + esc(it.section) : px ? ' · ' + esc(px.program) : ''}</p></div>
       <div><button class="btn sm ghost-t" id="gLink">${ic('plus')} ربط ابن أو ابنة</button></div></section>
     ${g.children.length > 1 ? `<div class="tabs" style="margin:14px 0">${g.children.map((c, i) => `<button class="tab" data-gi="${i}" aria-selected="${i === gIdx}">${ic('user')}${esc(c.trainee.first_name)}</button>`).join('')}</div>` : ''}
-    ${!u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75))}</div>`;
+    ${!u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75))}${ordersCardHtml((D.orders || []).filter(o => o.trainee_id === ch.trainee.id), ch.trainee.first_name)}</div>`;
+  bindOrdersCard($('#app'), (D.orders || []).filter(o => o.trainee_id === ch.trainee.id), async () => viewGuardian(await Store.portalData('guardian'), s));
   $('#gLink').onclick = () => { modal(linkFormHtml(false)); bindLinkForm(); };
   $$('[data-gi]').forEach(b => b.onclick = () => { gIdx = +b.dataset.gi; sIdx = 0; viewGuardian(D, s); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewGuardian(D, s); });

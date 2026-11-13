@@ -13,6 +13,7 @@ import { viewPlanPage } from './qudurat_views.js';
 import { planOpen } from './qudurat.js';
 import { ageOn, isMinor, isChild, MIN_AGE } from './identity_logic.js';
 import { waLink, WA_LOGO, viewContact } from './landing.js';
+import { orderPanelHtml, bindOrderPanel } from './order_panel.js';
 import { viewPolicies, viewPolicy, bindPolicyConsent } from './policy_views.js';
 
 /* =====================================================================
@@ -48,7 +49,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
@@ -258,19 +259,21 @@ export function bindRegForm(target, cohortsFn){
       if(tg.plan_id){
         const r = await Store.registerSubscription({...F, ...tg});
         $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل اشتراكك</h2>
-          <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
+          <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم تسجيلك:</p><div class="refbox">${esc(r.ref)}</div>
           <div class="grid" style="gap:6px;max-width:480px;margin:0 auto 12px"><div class="pill info" style="justify-content:center;padding:6px 12px">${esc(r.plan)} · ${esc(r.section)}</div>
             <div class="pill g" style="justify-content:center;padding:6px 12px;white-space:normal">مواعيدك: ${esc(r.schedule)}</div></div>
-          <p class="hint" style="max-width:480px;margin:0 auto">يبدأ اشتراكك من أول يوم تحضر فيه: امسح باركود الحضور في المعهد وأدخل رقم سجلك المدني.</p>${gNote}${manarNote}${waBtn(r.ref, 'باقة '+r.plan)}</div>`;
-        liveSay('اكتمل اشتراكك. رقم طلبك '+r.ref); return;
+          <p class="hint" style="max-width:480px;margin:0 auto">يبدأ اشتراكك من أول يوم تحضر فيه: امسح باركود الحضور في المعهد وأدخل رقم سجلك المدني.</p>${gNote}${manarNote}${r.order?'':waBtn(r.ref, 'باقة '+r.plan)}<div id="ordBox" style="text-align:start;max-width:520px;margin:16px auto 0">${orderPanelHtml(r.order, F.full_name)}</div></div>`;
+        { const rebind=o=>{ $('#ordBox').innerHTML=orderPanelHtml(o, F.full_name); bindOrderPanel($('#ordBox'), o, {national_id:F.national_id}, rebind); }; if(r.order) bindOrderPanel($('#ordBox'), r.order, {national_id:F.national_id}, rebind); }
+        liveSay('اكتمل اشتراكك. رقم تسجيلك '+r.ref+(r.order?'، ورقم طلب الشراء '+r.order.number:'')); return;
       }
       const r = await Store.register({...F, ...tg});
       const cs = r.cohorts || cohortsFn().map(c=>({number:c.number, start:c.start_date}));
       $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك</h2>
-        <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
+        <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم تسجيلك:</p><div class="refbox">${esc(r.ref)}</div>
         <div class="grid" style="gap:6px;max-width:460px;margin:0 auto 12px">${cs.map(c=>`<div class="pill info" style="justify-content:center;padding:6px 12px">${c.program?esc(c.program)+' · ':''}${cohortLabel(c)} · تبدأ ${fmtShort(c.start)}</div>`).join('')}</div>
-        <p class="hint" style="max-width:480px;margin:0 auto">في أيام البرنامج امسح باركود البرنامج المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p>${gNote}${manarNote}${waBtn(r.ref, 'برنامج '+((r.cohorts||[]).map(x=>x.program).join('، ')))}</div>`;
-      liveSay('اكتمل تسجيلك. رقم طلبك '+r.ref);
+        <p class="hint" style="max-width:480px;margin:0 auto">في أيام البرنامج امسح باركود البرنامج المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p>${gNote}${manarNote}${r.order?'':waBtn(r.ref, 'برنامج '+((r.cohorts||[]).map(x=>x.program).join('، ')))}<div id="ordBox" style="text-align:start;max-width:520px;margin:16px auto 0">${orderPanelHtml(r.order, F.full_name)}</div></div>`;
+      { const rebind=o=>{ $('#ordBox').innerHTML=orderPanelHtml(o, F.full_name); bindOrderPanel($('#ordBox'), o, {national_id:F.national_id}, rebind); }; if(r.order) bindOrderPanel($('#ordBox'), r.order, {national_id:F.national_id}, rebind); }
+      liveSay('اكتمل تسجيلك. رقم تسجيلك '+r.ref+(r.order?'، ورقم طلب الشراء '+r.order.number:''));
     }catch(er){ setBusy(b,false); showErrorSummary($('#rfSum'), [{id:'rf-full_name',label:'تعذّر التسجيل',msg:er.message}]); $('#rfE').textContent=er.message; }
   };
 }
@@ -342,6 +345,7 @@ export function showCheckinResult(r, onBack){
       not_found:['السجل المدني غير موجود في كشف الدفعة', `لا يوجد تسجيل بهذا الرقم${r.program?` في ${cohortLabel(r)} من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
       not_in_cohort:['السجل المدني غير موجود في كشف الدفعة', `هذا الرقم غير مسجّل في ${r.number?cohortLabel(r):'الدفعات المنعقدة اليوم'}${r.program?` من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
       no_cohort:['لا توجد دفعة منعقدة', r.upcoming?`تبدأ ${cohortLabel(r.upcoming)} من «${esc(r.program)}» في ${fmtShort(r.upcoming.start)}.`:`لا توجد دفعة منعقدة حاليًا${r.program?` في «${esc(r.program)}»`:''}.`,'warn','calendar'],
+      order_pending:['طلبك لم يُعتمد بعد','لا يُسجَّل الحضور قبل اعتماد طلب التسجيل وتأكيد السداد. راجع إدارة المعهد أو تابع طلبك من بوابتك.','warn','timer'],
       no_program:['البرنامج غير موجود','الباركود لا يطابق أي برنامج. راجع الاستقبال.','bad','x'],
       no_session:['لا توجد محاضرة الآن', `${first}${r.next?`المحاضرة القادمة ${fmtDate(r.next.date)} الساعة ${t12(r.next.time)}.`:'لا توجد محاضرات قادمة في دفعتك.'}`,'warn','timer'],
       error:['تعذّر الاتصال', esc(r.msg||'')+' حاول مرة أخرى بعد قليل.','bad','alert'] }[r.reason] || ['تعذّر التسجيل','','bad','alert'];

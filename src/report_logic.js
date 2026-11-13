@@ -8,7 +8,7 @@ import { sessionOn, subStatus, planName, SECTIONS } from './qudurat.js';
 import { isSessionDay } from './data2.js';
 
 export const REPORT_TIME = '20:30';
-const FAIL_TXT = { not_in_cohort:'رقم غير مسجّل', no_session:'خارج وقت الجلسة', bad_code:'رمز يوم خاطئ', no_program:'باركود غير معروف', no_cohort:'لا دفعة منعقدة', error:'خطأ اتصال' };
+const FAIL_TXT = { not_in_cohort:'رقم غير مسجّل', no_session:'خارج وقت الجلسة', bad_code:'رمز يوم خاطئ', no_program:'باركود غير معروف', order_pending:'طلب غير معتمد', no_cohort:'لا دفعة منعقدة', error:'خطأ اتصال' };
 
 /* يبني محتوى التقرير لتاريخ معيّن من مصدر البيانات الواحد */
 export function buildDailyReport(D, date, n = riyadhNow()){

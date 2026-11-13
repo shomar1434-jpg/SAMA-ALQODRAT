@@ -27,7 +27,7 @@ npm install
 npm run dev      # خادم تطوير
 npm run check    # فحص ثابت + بناء + اختبارات (شغّله قبل كل تسليم)
 ```
-الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` و`registration` و`guardian_link` و`cohort_trainer` و`pwa` و`center_links` و`plan_posters` و`compat` (التوافقية: `BROWSER=firefox|webkit` في CI) في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
+الاختبارات تعمل على `dist/` بعد البناء: `smoke` و`e2e` و`qudurat` و`portals` و`daily` و`learning` و`policies` و`gauge` و`program_portal` و`identity` و`inbox` و`question_banks` و`registration` و`guardian_link` و`cohort_trainer` و`pwa` و`center_links` و`plan_posters` و`orders` و`compat` (التوافقية: `BROWSER=firefox|webkit` في CI) في `tests/`، واختبارات SQL في `supabase/tests/` (`npm run test:sql`).
 في الوضع التجريبي فقط تُتاح `window.__SAMA__` للاختبارات.
 
 ## طبقة البيانات (`src/data2.js`)
@@ -53,6 +53,7 @@ npm run check    # فحص ثابت + بناء + اختبارات (شغّله ق�
 التطبيق (PWA): `src/pwa.js` (`initPwa` من `boot`/`bootPortal`: تسجيل عامل الخدمة، زر التثبيت `#installBtn` وإرشاده، `#pwaUpdate`، `deviceNotify`). `dist/sw.js` يولّده `swPlugin` في `vite.config.js` من `scripts/sw.template.js` (لا يُعدَّل في dist). ملفات التعريف والأيقونات في `public/` (واحد لكل صفحة، روابط نسبية). لا تُحفظ طلبات البيانات ولا `/admin/`.
 قنوات المركز: كلها في `CENTER` (`src/catalog.js`: واتساب، الخريطة، المنصات، تيليجرام، منار) وتُعرض من `#contact` (`viewContact`) والتذييل؛ `waLink(text)` يفتح واتساب برسالة مجهزة يرسلها المستخدم (لا إرسال آلي). **منار (mnar.sa) هي المخوّلة بإصدار الشهادات المعتمدة**، ويُذكَّر المتدرب بإنشاء حسابه فيها. برامج الأطفال `KIDS_PROGRAMS` (اعتماد 25194): العمر من 3 سنوات (`MIN_AGE`)، ودون 13 (`CHILD_AGE`) جوال التواصل هو جوال ولي الأمر.
 المدفوعات: المرجع `docs/payments/SPEC_v1_4.md` (وثيقة المالك) ومراجعتها `docs/payments/REVIEW.md`؛ لا يُبنى شيء مالي خارجها، ولا مال حقيقي في الوضع التجريبي.
+طلبات الشراء (المرحلة 1): `src/order_logic.js` ↔ `…_orders.sql`. لكل تسجيل طلب برقم `SAMA-السنة-000001` (`register`/`registerSubscription` يعيدان `order`) ومحوران مستقلان: `approval` (مراجعة المسؤول) و`payment` (`unpaid`→`claimed` بإبلاغ العميل→`confirmed` بتأكيد الإدارة بعد مطابقة كشف البنك). الموافقة لا تثبت السداد، والإبلاغ لا يؤكده. الحساب البنكي في `settings.bank` ولا يُعرض حتى `enabled`. `settings.require_order_approval` (معطّل افتراضيًا) يمنع مسح الحضور لطلب غير مستوفٍ (`orderReady`) إلا بـ«قبول مؤقت». لوحة صاحب الطلب `src/order_panel.js` (بعد التسجيل وفي البوابات)، والإدارة `src/order_views.js` (`#admin-orders`). الطلبات وسجلها لا تُحذف. وثيقة المنصة «إفادة حضور»، والشهادة المعتمدة من منار.
 صندوق الوارد: `src/inbox_logic.js` ↔ `…_inbox.sql` (`sessionReminders` ↔ `run_session_reminders` كل دقيقة عبر pg_cron، `inboxOf` ↔ `portal_inbox`، `adminRecipients` ↔ `admin_notify`). كل إشعار تلقائي له `dedupe_key` فريد. الواجهة `src/inbox_ui.js`: جرس، لائحة، لافتة، صوت المعهد (Web Audio، يُفتح بعد أول لمسة)، إيقاف الصوت (`sama_sound`)، وما رُئي يُحفظ في الجهاز (`sama_seen_<role>_<phone>`) فلا يتكرر التنبيه.
 لا حذف لسجل تاريخي: الحذف يُرفض إن وُجد حضور أو شهادة (`on delete restrict`)، والبديل الإلغاء أو الأرشفة.
 

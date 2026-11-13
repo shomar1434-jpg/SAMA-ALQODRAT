@@ -188,8 +188,8 @@ export function pageReports(){
       `<button class="btn pri" id="r4">${ic('form')} معاينة الطباعة</button><button class="btn" id="r4s">ملخص نسب الحضور</button><button class="btn" id="r4x">${ic('copy')} Excel</button>`)}
     ${card(5,'book','info','دليل البرامج المعتمدة','قائمة البرامج حسب المجال بأرقام الاعتماد والساعات والأيام والرسوم والدفعة الحالية.','',
       `<button class="btn pri" id="r5">${ic('form')} معاينة الطباعة</button>`)}
-    ${card(7,'award','gold','شهادات الإتمام','الشهادات الصادرة للدفعات المؤرشفة، بخاتم الحضور وباركود التحقق.',
-      `<div class="field"><label>الدفعة</label><select class="inp" id="r7c">${AD.cohorts.filter(c=>(AD.certificates||[]).some(x=>x.cohort_id===c.id&&!x.revoked)).map(c=>`<option value="${c.id}">${esc(short(progName(c.program_id)))} · ${cohortLabel(c)} · ${fmtNum((AD.certificates||[]).filter(x=>x.cohort_id===c.id&&!x.revoked).length)} شهادة</option>`).join('')||'<option value="">لا توجد شهادات صادرة بعد</option>'}</select></div>`,
+    ${card(7,'award','gold','إفادات الحضور','الإفادات الصادرة للدفعات المؤرشفة، بخاتم الحضور وباركود التحقق.',
+      `<div class="field"><label>الدفعة</label><select class="inp" id="r7c">${AD.cohorts.filter(c=>(AD.certificates||[]).some(x=>x.cohort_id===c.id&&!x.revoked)).map(c=>`<option value="${c.id}">${esc(short(progName(c.program_id)))} · ${cohortLabel(c)} · ${fmtNum((AD.certificates||[]).filter(x=>x.cohort_id===c.id&&!x.revoked).length)} شهادة</option>`).join('')||'<option value="">لا توجد إفادات صادرة بعد</option>'}</select></div>`,
       `<button class="btn pri" id="r7">${ic('form')} طباعة الشهادات</button>`)}
     ${card(6,'database','warning','تصدير البيانات إلى Excel','ملفات CSV تفتح في Excel مباشرة بالعربية.',
       `<div class="field"><label>سجل الحضور من</label><div style="display:flex;gap:8px"><input type="date" class="inp" id="r6f" value="${addDays(today,-29)}"><input type="date" class="inp" id="r6t" value="${today}"></div></div>`,
@@ -212,7 +212,7 @@ export function pageReports(){
   $('#r4s').onclick=()=>{ const c=selC(); if(c) printDocs([summaryHtml(c,c.start_date,c.end_date,'cohort')], `${progName(c.program_id)} · ${cohortLabel(c)}`); };
   $('#r4x').onclick=()=>{ const c=selC(); if(c) exportCSV(`سجل-${progCode(progOf(c.program_id))}-الدفعة${c.number}`, cohortRows(c)); };
   $('#r5').onclick=()=>printDocs([catalogHtml()],'دليل البرامج المعتمدة');
-  $('#r7').onclick=()=>{ const id=$('#r7c').value; if(!id) return toast('لا توجد شهادات صادرة بعد'); const c=AD.cohorts.find(x=>x.id===id); printCertificates((AD.certificates||[]).filter(x=>x.cohort_id===id&&!x.revoked), `شهادات ${progName(c.program_id)} · ${cohortLabel(c)}`); };
+  $('#r7').onclick=()=>{ const id=$('#r7c').value; if(!id) return toast('لا توجد إفادات صادرة بعد'); const c=AD.cohorts.find(x=>x.id===id); printCertificates((AD.certificates||[]).filter(x=>x.cohort_id===id&&!x.revoked), `شهادات ${progName(c.program_id)} · ${cohortLabel(c)}`); };
   $('#r6a').onclick=()=>exportCSV(`سجل-الحضور-${$('#r6f').value}-${$('#r6t').value}`, attendanceRows($('#r6f').value,$('#r6t').value));
   $('#r6b').onclick=()=>exportCSV('المتدربون-وتسجيلاتهم', traineesRows());
 }

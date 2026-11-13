@@ -35,7 +35,7 @@ await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=e
 let D = await data(); const kid = D.trainees.find(t => t.national_id === '1000000511');
 ok(kid && kid.guardian_phone === '0556660011' && kid.phone === '0556660011', 'جوال التواصل للطفل هو جوال ولي الأمر');
 const card = await text('#regCard'), wa = await p.getAttribute('#regCard a[href*="wa.me"]', 'href');
-ok(/منصة منار/.test(card) && wa && decodeURIComponent(wa).includes('رقم المرجع'), 'رسالة النجاح: خطوة منار وزر واتساب برسالة مجهزة فيها رقم المرجع');
+ok(/منصة منار/.test(card) && wa && /طلب الشراء رقم SAMA-\d{4}-\d{6}/.test(decodeURIComponent(wa)), 'رسالة النجاح: خطوة منار وزر واتساب برسالة مجهزة فيها رقم طلب الشراء');
 await p.fill('[name=birth_date]', years(2)).catch(() => {});
 
 // دون 3 سنوات يُرفض
