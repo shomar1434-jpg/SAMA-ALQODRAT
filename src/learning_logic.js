@@ -35,7 +35,14 @@ export const REVEAL = { after_submit:'بعد التسليم مباشرة', after
 export const isTargeted = (a, trainee_id) => !Array.isArray(a.targets) || a.targets.includes(trainee_id);
 export const canReveal = (a, today) => (a.reveal || 'after_submit') === 'after_submit' || (a.reveal === 'after_due' && today > a.due_date);
 /* نسخة الواجب للمتدرب: بلا مفاتيح وبلا معرّفات زملائه في قائمة المستهدفين */
-export const assignmentPublic = (a, ids) => { const x = quizPublic(a); return Array.isArray(x.targets) ? { ...x, targets:x.targets.filter(t => (ids || []).includes(t)) } : x; };   // يبقى من القائمة أبناء هذا الحساب فقط
+export const assignmentPublic = (a, ids, started) => { let x = quizPublic(a); if(Array.isArray(x.targets)) x = { ...x, targets:x.targets.filter(t => (ids || []).includes(t)) };
+  return x.kind === 'quiz' && !started ? { ...x, quiz:null, quiz_count:(a.quiz || []).length, quiz_minutes:quizMinutes(a) } : x.kind === 'quiz' ? { ...x, quiz_count:(a.quiz || []).length, quiz_minutes:quizMinutes(a) } : x; };
+/* الاختبار يُفتح مرة واحدة: أسئلته لا تُرسل للمتدرب قبل أن يبدأ؛ ومدته دقيقتان لكل سؤال من لحظة البدء؛ تُحفظ إجاباته أولًا بأول ويُصحَّح ما حُفظ عند انتهاء الوقت */
+export const QUIZ_MIN_PER_Q = 2, QUIZ_GRACE_SEC = 20;
+export const quizMinutes = a => (a.quiz || []).length * QUIZ_MIN_PER_Q || a.quiz_minutes || 0;
+export const quizDeadline = (started_at, a) => new Date(Date.parse(started_at) + quizMinutes(a) * 60000).toISOString();
+export const quizOpen = (sb, now = Date.now()) => !!sb && sb.status === 'draft' && !!sb.deadline && now <= Date.parse(sb.deadline) + QUIZ_GRACE_SEC * 1000;
+export const quizExpired = (sb, now = Date.now()) => !!sb && sb.status === 'draft' && !!sb.deadline && now > Date.parse(sb.deadline) + QUIZ_GRACE_SEC * 1000;   // يبقى من القائمة أبناء هذا الحساب فقط
 /* تسليم المتدرب: تُحجب المراجعة (الإجابات الصحيحة) حتى تسمح سياسة الواجب */
 export const submissionPublic = (s, a, today) => !a || a.kind !== 'quiz' || canReveal(a, today) ? s : (({ review, ...x }) => ({ ...x, review_hidden:true }))(s);
 /* التحقق من المستهدفين: كلهم ضمن نطاق المدرب (قسمه ومقرر الواجب باشتراك قائم) */

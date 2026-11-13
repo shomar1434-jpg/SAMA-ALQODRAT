@@ -17,9 +17,10 @@ import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
 import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
+import { teacherGroups, teacherProfile, daySummaryHtml, trainersCardHtml } from './trainer_views.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
-const T_TABS = [['today','calendar','كشف اليوم'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي']];
+const T_TABS = [['today','calendar','كشف اليوم'],['groups','users','المجموعات الذكية'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
 let sTab = 'dash', tTab = 'today';
 const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
@@ -201,7 +202,7 @@ function viewStudent(D){
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
   if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
-  if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name)); bindOrdersCard($('#sBody'), mo, reload); }
+  if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name) + trainersCardHtml(D, pr.trainee.id)); bindOrdersCard($('#sBody'), mo, reload); }
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
   $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
@@ -270,13 +271,13 @@ function bindLinkForm(){
 /* مساعدة: واتساب المركز واتصال — في أسفل لوحات البوابات */
 const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي على منصة مركز سما القدرات.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
 /* تبويبات المدرب حسب ما أُسند إليه: مقررات الباقات، أو دفعات البرامج، أو كلاهما */
-const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
+const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'profile' ? true : x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
 function viewTeacher(D, quiet){
   { const TT = tTabsOf(D); if(!TT.some(x => x[0] === tTab)) tTab = TT[0][0]; }
   if(tTab !== 'today'){ if(quiet) return; const t = teacherDashboard(D, D.me), reload = async () => viewTeacher(await Store.portalData('teacher'));
     $('#app').innerHTML = `<div class="wrap"><section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1><p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))}</p></div></section>
       ${tabBar(tTabsOf(D), tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}<div id="tBody"></div></div>`;
-    const v = ({ cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings })[tTab](D, reload); $('#tBody').innerHTML = v.html; v.bind();
+    const v = ({ cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings, groups:teacherGroups, profile:teacherProfile })[tTab](D, reload, k => { tTab = k; viewTeacher(D); }); $('#tBody').innerHTML = v.html; v.bind();
     $$('[data-tt]').forEach(b => b.onclick = () => { tTab = b.dataset.tt; viewTeacher(D); }); return; }
   const t = teacherDashboard(D, D.me), n = riyadhNow();
   const PH = { none:'لا توجد جلسة اليوم', before:'الجلسة لم تبدأ', live:'الجلسة جارية', after:'انتهت جلسة اليوم' };
@@ -288,6 +289,7 @@ function viewTeacher(D, quiet){
     ${t.reminder ? `<div class="alert t-warning rv" role="alert" style="margin-top:14px"><span class="aic">${ic('timer')}</span><div style="flex:1"><b style="font-weight:600">باقي أقل من ${fmtNum(t.remind)} دقيقة على نهاية الجلسة، و${fmtNum(t.missing.length)} متدرب لم يُسجَّل حضوره</b>
       <p style="margin:4px 0 8px">${t.missing.map(m => esc(m.name.split(' ').slice(0, 2).join(' '))).join('، ')}</p>
       <button class="btn sm pri" id="tRemind">${ic('alert')} إرسال تذكير لهم</button> <span class="hint">التذكير يطلب المسح إن كانوا حاضرين، أو إبلاغك بالعذر.</span></div></div>` : ''}
+    ${daySummaryHtml(D, t)}
     <div class="card pad rv" style="margin-top:16px" id="tSheet"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       <h3 class="ctitle">${ic('calendar')}كشف اليوم · ${fmtDate(n.date)}</h3>
       <div class="hint">${fmtNum(t.rows.filter(r => ['حاضر', 'متأخر'].includes(r.today)).length)} حاضر · ${fmtNum(t.missing.length)} لم يسجل · تحديث تلقائي كل 30 ثانية</div></div>

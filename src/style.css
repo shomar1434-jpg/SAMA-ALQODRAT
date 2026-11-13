@@ -1180,3 +1180,9 @@ img,svg,video,canvas{max-width:100%}
 .qp input{margin-top:6px;flex:none;width:20px;height:20px}
 .qp span{min-width:0;flex:1}.qp b{font-size:12px;color:var(--ink-subtle);display:block}
 .ac-code{font-size:18px;letter-spacing:3px;font-variant-numeric:tabular-nums}
+.trn{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border)}
+.trn:first-of-type{border-top:0}.trn p{margin:4px 0 0;color:var(--ink-subtle);font-size:14px;line-height:1.8;overflow-wrap:anywhere}.trn>div{min-width:0;flex:1}
+.qz-start{border:1px dashed var(--border);border-radius:12px;padding:12px;margin-top:8px}.qz-start p{margin:0}
+.qz-timer{position:sticky;top:8px;z-index:3;display:inline-flex;gap:8px;align-items:center;background:var(--surface-card);border:1px solid var(--border);border-radius:999px;padding:6px 14px;margin:0 0 8px;font-variant-numeric:tabular-nums}
+.hw-quiz.low .qz-timer{border-color:var(--danger);color:var(--danger)}
+@media(max-width:640px){.ptabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}.ptabs .tab{flex:1 0 auto;min-width:48px}}

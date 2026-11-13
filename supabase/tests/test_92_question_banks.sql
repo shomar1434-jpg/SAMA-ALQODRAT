@@ -61,6 +61,7 @@ begin
   -- يجيب صحيحًا على الثلاثة الأولى فقط
   select coalesce(jsonb_object_agg(x->>'id', case when n <= 3 then (x->>'correct')::int else ((x->>'correct')::int + 1) % 4 end), '{}') into ans
     from (select x, row_number() over () n from assignments a, jsonb_array_elements(a.quiz) x where a.id = v_a) z;
+  perform student_start_quiz(jsonb_build_object('trainee_id',v_tr,'assignment_id',v_a));   -- الاختبار يُفتح مرة واحدة ثم يُسلَّم
   r := student_submit(jsonb_build_object('trainee_id',v_tr,'assignment_id',v_a,'answers',ans));
   assert (r->>'right')::int = 3 and (r->>'score')::numeric = 6, 'تصحيح آلي: 3 من 5 = 6 من 10';
   assert (select status from submissions where assignment_id = v_a and trainee_id = v_tr) = 'graded' and (select jsonb_array_length(review) from submissions where assignment_id = v_a) = 5, 'مصحح ومعه المراجعة';

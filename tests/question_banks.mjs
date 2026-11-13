@@ -66,6 +66,7 @@ ok(qa && qa.kind === 'quiz' && qa.quiz.length === 3 && qa.quiz.every(q => imp.so
 const sub = D.subscriptions.find(s => s.section === 'boys' && s.subjects.includes('كمي') && ['pending', 'active'].includes(s.status) && D.trainees.filter(t => t.phone === D.trainees.find(x => x.id === s.trainee_id).phone).length === 1);
 const st = D.trainees.find(t => t.id === sub.trainee_id);
 await login('student', st.phone); await tab('data-st', 'hw');
+await p.click(`[data-qs="${qa.id}"]`); await p.click('#qsGo'); await p.waitForSelector(`.hw-quiz[data-qz="${qa.id}"]`);   // الاختبار يُفتح مرة واحدة
 const leak = await p.evaluate(id => { const f = document.querySelector(`[data-qz="${id}"]`); return f ? /2×2×2|3×3/.test(f.textContent) : null; }, qa.id);
 ok(leak === false, 'الاختبار يظهر للمتدرب بلا تفسير ولا إجابة');
 // يجيب صحيحًا على أول سؤال فقط

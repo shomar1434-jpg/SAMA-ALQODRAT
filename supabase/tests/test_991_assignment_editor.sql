@@ -28,6 +28,7 @@ begin
   -- التسليم: المراجعة محجوبة حتى بعد الاستحقاق
   perform set_config('app.phone', p1, true);
   select jsonb_object_agg(y->>'id', 0) into q from jsonb_array_elements(a.quiz) y;
+  perform student_start_quiz(jsonb_build_object('trainee_id', s1, 'assignment_id', a.id));
   r := student_submit(jsonb_build_object('trainee_id', s1, 'assignment_id', a.id, 'answers', q));
   pd := portal_data('student');
   select y into x from jsonb_array_elements(pd->'submissions') y where y->>'assignment_id' = a.id::text;

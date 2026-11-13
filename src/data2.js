@@ -9,9 +9,10 @@ import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { keepNote } from './import_logic.js';
 import { ACT_TTL_DAYS, newActCode, checkActivation } from './device_logic.js';
+import { checkProfile } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
-import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys } from './learning_logic.js';
+import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -200,11 +201,12 @@ export function scopeData(D, role, phone){
     settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes',...Object.keys(CALC_DEFAULTS).filter(k=>k.startsWith('msg_'))]) };
   const tSafe=t=>({id:t.id, full_name:t.full_name, gender:t.gender});
   const ordersFor=ids=>(D.orders||[]).filter(o=>ids.includes(o.trainee_id)).map(o=>orderPublic(o, D.settings.bank));
-  const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true}));
+  const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true, bio:t.bio||'', avatar:t.avatar||''}));
   const forTrainees=ids=>{ const subs=(D.subscriptions||[]).filter(s=>ids.includes(s.trainee_id)), sid=subs.map(s=>s.id);
     const scopes=subs.flatMap(s=>(s.subjects||[]).map(x=>s.section+':'+x));
     return { trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs, sub_attendance:(D.sub_attendance||[]).filter(a=>sid.includes(a.subscription_id)),
-      assignments:(D.assignments||[]).filter(a=>scopes.includes(a.section+':'+a.subject)&&ids.some(id=>isTargeted(a,id))).map(a=>assignmentPublic(a,ids)), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)).map(x=>submissionPublic(x,(D.assignments||[]).find(a=>a.id===x.assignment_id),riyadhNow().date)), teachers:teachersPub,
+      assignments:(D.assignments||[]).filter(a=>scopes.includes(a.section+':'+a.subject)&&ids.some(id=>isTargeted(a,id))).map(a=>assignmentPublic(a,ids,(D.submissions||[]).some(x=>x.assignment_id===a.id&&ids.includes(x.trainee_id)))), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)).map(x=>submissionPublic(x,(D.assignments||[]).find(a=>a.id===x.assignment_id),riyadhNow().date)),
+      teachers:teachersPub.map(t=>{ const full=(D.teachers||[]).find(y=>y.id===t.id); return full?.telegram && ids.some(id=>teacherTeaches(D, full, id)) ? {...t, telegram:full.telegram} : t; }),   // رابط قناة المدرب لمتدربيه فقط
       bank_units:bankUnitsOf(D, subs, D.teachers),
       // البرامج: دفعات المتدرب وحضورها وشهاداتها (للبوابة بدل «حضوري»)
       ...(()=>{ const en=(D.enrollments||[]).filter(e=>ids.includes(e.trainee_id)), cids=en.map(e=>e.cohort_id), pids=en.map(e=>e.program_id), eids=en.map(e=>e.id);
@@ -465,7 +467,7 @@ export const LocalStore = {
       if(!ph){ const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); this.load(); if(d && (this.data.devices||[]).some(x=>x.id===d.id && x.phone===d.phone && x.role===role && !x.revoked_at)) ph=d.phone; else if(d) localStorage.removeItem(this.key+'_dev_'+role); } }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); localStorage.removeItem(this.key+'_dev_'+role);
       if(d){ const x=(this.data.devices||[]).find(y=>y.id===d.id); if(x && !x.revoked_at){ x.revoked_at=new Date().toISOString(); this.save(); } } }catch(e){} },
-  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; return out; },
+  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; return out; },
   /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
   runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
     const add=sessionReminders(D, riyadhNow()).filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },
@@ -597,13 +599,27 @@ export const LocalStore = {
   async submitAssignment({trainee_id, assignment_id, answer, answers, draft}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
     if(!a||!studentHasScope(D,trainee_id,a.section,a.subject)||a.publish_date>riyadhNow().date||(Array.isArray(a.targets)&&!a.targets.includes(trainee_id))) throw new Error('الواجب غير متاح لك');
     let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s&&s.status==='graded') throw new Error('صُحّح الواجب ولا يمكن تعديله');
-    if(a.kind==='quiz'){ // اختبار من البنك: يُصحَّح فورًا ولا يُعاد
-      const g=gradeQuiz(a, answers||{}), now=new Date().toISOString();
-      const row={answer:'', answers:g.answers, review:g.review, status:'graded', score:g.score, feedback:`أجبت ${g.right} من ${g.total} إجابة صحيحة`, submitted_at:now, graded_at:now, late:riyadhNow().date>a.due_date};
-      if(s) Object.assign(s,row); else D.submissions.push({id:uid(), assignment_id:a.id, trainee_id, ...row}); this.save(); return {ok:true, right:g.right, total:g.total, score:g.score}; }
+    if(a.kind==='quiz'){ // اختبار من البنك: يُفتح مرة واحدة، ويُصحَّح ما حُفظ داخل الوقت ولا يُعاد
+      if(!s) throw new Error('ابدأ الاختبار أولًا');
+      const g=this._gradeStarted(a, s, quizOpen(s)?answers:null); return {ok:true, right:g.right, total:g.total, score:g.score}; }
     const txt=String(answer||'').trim(); if(!draft&&!txt) throw new Error('اكتب إجابتك قبل الإرسال');
     const row={answer:txt.slice(0,6000), status:draft?'draft':'submitted', submitted_at:draft?null:new Date().toISOString(), late:!draft&&riyadhNow().date>a.due_date};
     if(s) Object.assign(s,row); else D.submissions.push({id:uid(), assignment_id:a.id, trainee_id, ...row}); this.save(); return {ok:true}; },
+  _gradeStarted(a, s, extra){ const g=gradeQuiz(a, {...(s.answers||{}), ...(extra||{})}), now=new Date().toISOString();
+    Object.assign(s, {answer:'', answers:g.answers, review:g.review, status:'graded', score:g.score, feedback:`أجبت ${g.right} من ${g.total} إجابة صحيحة`, submitted_at:now, graded_at:now, late:riyadhNow().date>a.due_date}); this.save(); return g; },
+  /* بدء الاختبار: مرة واحدة فقط؛ يبدأ العدّ من لحظة البدء (دقيقتان لكل سؤال) */
+  async startQuiz({trainee_id, assignment_id}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
+    if(!a||a.kind!=='quiz'||!studentHasScope(D,trainee_id,a.section,a.subject)||a.publish_date>riyadhNow().date||(Array.isArray(a.targets)&&!a.targets.includes(trainee_id))) throw new Error('الواجب غير متاح لك');
+    let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s) return {started_at:s.started_at, deadline:s.deadline, status:s.status, again:true};
+    const at=new Date().toISOString(); s={id:uid(), assignment_id:a.id, trainee_id, answer:'', answers:{}, status:'draft', started_at:at, deadline:quizDeadline(at, a), late:false}; D.submissions.push(s); this.save();
+    return {started_at:s.started_at, deadline:s.deadline, status:'draft'}; },
+  async saveQuizAnswer({trainee_id, assignment_id, question_id, value}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id), s=D.submissions.find(x=>x.assignment_id===assignment_id&&x.trainee_id===trainee_id);
+    if(!a||!s||!quizOpen(s)) throw new Error('انتهى وقت الاختبار'); if(!a.quiz.some(q=>q.id===question_id)||![0,1,2,3].includes(+value)) throw new Error('إجابة غير صالحة');
+    s.answers={...(s.answers||{}), [question_id]:+value}; this.save(); return {ok:true}; },
+  /* تصحيح ما انتهى وقته ولم يُسلَّم (في السحابة: مهمة مجدولة كل دقيقة) */
+  finalizeExpiredQuizzes(){ const D=this.data, now=Date.now(); let n=0; (D.submissions||[]).forEach(s=>{ if(s.status==='draft'&&s.deadline&&now>Date.parse(s.deadline)+20000){ const a=(D.assignments||[]).find(x=>x.id===s.assignment_id); if(a?.kind==='quiz'){ this._gradeStarted(a, s, null); n++; } } }); return n; },
+  /* ملف المدرب: يعدّل نبذته ورابط قناته وصورته فقط */
+  async saveMyProfile(p){ const me=await this._me(), x=checkProfile(p); Object.assign(me, x); this.audit('teacher.profile', me.id); this.save(); return {ok:true}; },
   async saveQuestion(q){ const me=await this._me(); validateQuestion(q); if(!teacherCovers(me, me.section, q.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.questions, row={subject:q.subject, section:me.section, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
     if(q.id){ const x=L.find(y=>y.id===q.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row,{version:(x.version||1)+1}); }
@@ -745,6 +761,9 @@ export const CloudStore = {
   async saveAssignment(a){ return this._e(await this.sb.rpc('teacher_save_assignment',{p:a})); },
   async gradeSubmission(id, g){ return this._e(await this.sb.rpc('teacher_grade',{p_id:id, p:g})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
+  async saveMyProfile(p){ return this._e(await this.sb.rpc('teacher_save_profile',{p:checkProfile(p)})); },
+  async startQuiz(f){ return this._e(await this.sb.rpc('student_start_quiz',{p:f})); },
+  async saveQuizAnswer(f){ return this._e(await this.sb.rpc('student_save_quiz_answer',{p:f})); },
   async saveQuestion(q){ return this._e(await this.sb.rpc('teacher_save_question',{p:q})); },
   async adminSaveQuestion(q){ return this._e(await this.sb.rpc('admin_save_question',{p:q})); },
   async adminQuestionStatus(id, status){ this._e(await this.sb.rpc('admin_question_status',{p_id:id, p_status:status})); return {ok:true}; },
