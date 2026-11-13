@@ -1,7 +1,6 @@
 import { CENTER } from './catalog.js';
 import { STATE_TXT, activeCohortOf, cohortState, enrollsOf, isSessionDay, progCode, sessionDays } from './data2.js';
 import { printCertificates } from './features.js';
-import { X_LOGO } from './landing.js';
 import { LOGOS } from './logos.js';
 import { $, DAYS, addDays, dowOf, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin } from './utils.js';
 import { AD, cohortSummary, progName, progOf } from './views2_admin.js';
@@ -28,7 +27,7 @@ export function docShell({docNo, title, sub, info, stats, body, note, land}){
     </td></tr></thead>
     <tfoot><tr><td><div class="pf">
       <div class="pf-main"><b>${CENTER.name}</b><span>سجل تجاري ${CENTER.cr} · معتمد من ${CENTER.accreditor}</span></div>
-      <div class="pf-items"><span>${ic('pin')}${CENTER.address} · ص.ب ${CENTER.pobox}</span><span dir="ltr">${ic('activity')}${CENTER.phones.join(' · ')}</span><span dir="ltr">${ic('form')}${CENTER.email}</span><span dir="ltr">${X_LOGO}@${CENTER.x}</span></div>
+      <div class="pf-items"><span>${ic('pin')}${CENTER.address} · ص.ب ${CENTER.pobox}</span><span dir="ltr">${ic('activity')}${CENTER.phones.join(' · ')}</span><span dir="ltr">${ic('form')}${CENTER.email}</span></div>
     </div></td></tr></tfoot>
     <tbody><tr><td>
       ${info?`<div class="pinfo">${info.map(([k,v,w])=>`<div class="${w||''}"><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>`:''}
