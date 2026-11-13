@@ -44,7 +44,7 @@ begin
   perform admin_confirm_payment(o.id, pl.reg_fee);
   select * into o from orders where id = o.id;
   assert o.payment = 'confirmed' and order_ready(o), 'موافقة + سداد مؤكد = مستوفٍ';
-  perform admin_confirm_payment(o.id, 0, false);
+  perform admin_confirm_payment(o.id, 0, false, 'خطأ في المطابقة');
   assert (select payment from orders where id = o.id) = 'claimed', 'إلغاء التأكيد يعيد حالة التحويل';
 
   -- الحساب البنكي

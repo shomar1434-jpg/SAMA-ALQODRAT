@@ -6,6 +6,7 @@ import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
+import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz } from './learning_logic.js';
@@ -290,7 +291,7 @@ export const LocalStore = {
     this.data.certificates = this.data.certificates || []; if(this.data.settings.cert_threshold==null) this.data.settings.cert_threshold=75;
     if(!this.data.partners || (this.data.partners.length<=2 && this.data.partners.every(x=>x.type==='جهة اعتماد'))) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
-    D.orders=D.orders||[]; if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
+    D.orders=D.orders||[]; D.invoices=D.invoices||[]; if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
     if(!D.plans.some(p=>p.tier==='custom')) D.plans.push(...customPlans());       // باقة «خصصناها لك» للبيانات المحفوظة قبل إضافتها
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
     if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
@@ -492,13 +493,22 @@ export const LocalStore = {
     if(decision!=='approved' && String(reason||'').trim().length<3) throw new Error('اكتب سبب القرار');
     o.approval=decision; o.note=decision==='approved'?'':String(reason).trim().slice(0,300); if(decision==='rejected') o.provisional=false;
     this._orderEvent(o, decision, 'admin', reason); this.audit('order.review', o.id, {decision}); this.save(); return {ok:true}; },
-  async confirmOrderPayment(id, amount, confirmed=true){ const o=(this.data.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود');
+  async confirmOrderPayment(id, amount, confirmed=true, reason=''){ const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
+    if(confirmed && o.payment==='confirmed') throw new Error('سبق تأكيد سداد هذا الطلب.');
     if(confirmed){ const a=Math.round(+amount*100)/100; if(!(a>0)) throw new Error('اكتب المبلغ الواصل فعليًا'); if(a<o.due_now) throw new Error(`المبلغ أقل من المطلوب الآن (${o.due_now} ريال)؛ لا يُعد السداد مستوفيًا`);
-      o.paid_amount=a; o.payment='confirmed'; this._orderEvent(o,'payment_confirmed','admin',`${a} ريال`); }
-    else { o.payment=o.claim?'claimed':'unpaid'; o.paid_amount=0; this._orderEvent(o,'payment_unconfirmed','admin',''); }
+      o.paid_amount=a; o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
+      const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date}), created_at:new Date().toISOString()}; D.invoices.push(inv);
+      this._orderEvent(o,'payment_confirmed','admin',`${a} ريال · فاتورة ${inv.number}`); }
+    else { if(o.payment!=='confirmed') throw new Error('السداد غير مؤكد'); if(String(reason||'').trim().length<3) throw new Error('اكتب سبب إلغاء تأكيد السداد');
+      D.invoices.filter(i=>i.order_id===o.id && i.status==='issued').forEach(i=>{ i.status='void'; i.void_reason=String(reason).trim().slice(0,300); i.voided_at=new Date().toISOString(); });
+      o.payment=o.claim?'claimed':'unpaid'; o.paid_amount=0; this._orderEvent(o,'payment_unconfirmed','admin',reason); }
     this.audit('order.payment', o.id, {confirmed}); this.save(); return {ok:true}; },
   async setOrderProvisional(id, on, reason){ const o=(this.data.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); if(on && o.approval==='rejected') throw new Error('الطلب مرفوض');
     if(on && String(reason||'').trim().length<3) throw new Error('اكتب سبب القبول المؤقت'); o.provisional=!!on; this._orderEvent(o, on?'provisional_on':'provisional_off','admin',reason); this.audit('order.provisional', o.id, {on:!!on}); this.save(); return {ok:true}; },
+  /* صورة الإيصال يرفقها المسؤول بالفاتورة (تصله عبر واتساب)؛ لا يُستنتج منها السداد */
+  async attachReceipt(id, image){ const D=this.data, i=(D.invoices||[]).find(x=>x.id===id); if(!i) throw new Error('الفاتورة غير موجودة'); if(!validReceipt(image)) throw new Error('صورة الإيصال غير صالحة أو كبيرة');
+    D.invoice_receipts=D.invoice_receipts||{}; D.invoice_receipts[id]=image; i.has_receipt=true; this.audit('invoice.receipt', id); this.save(); return {ok:true}; },
+  async invoiceReceipt(id){ return (this.data.invoice_receipts||{})[id]||null; },
   async saveBank(b){ if(!validIban(b.iban)) throw new Error('رقم الآيبان غير صحيح'); if(!String(b.beneficiary||'').trim()||!String(b.bank||'').trim()) throw new Error('اكتب اسم البنك واسم المستفيد');
     this.data.settings.bank={enabled:!!b.enabled, bank:b.bank.trim(), beneficiary:b.beneficiary.trim(), iban:String(b.iban).replace(/\s/g,'').toUpperCase(), account:String(b.account||'').trim()}; this.audit('settings.bank','bank',{enabled:!!b.enabled}); this.save(); return {ok:true}; },
   /* ربط ولي الأمر الذاتي بالسجل المدني للابن (بعد دخوله برمز التحقق) */
@@ -593,17 +603,17 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa,pcr,qs,ord,oev] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa,pcr,qs,ord,oev,inv] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
       q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
       q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
       q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500)),
-      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000)), q('profile_change_requests',x=>x.order('created_at',{ascending:false}).limit(500)), q('questions',x=>x.neq('status','deleted').limit(20000)), q('orders',x=>x.order('created_at',{ascending:false}).limit(5000)), q('order_events',x=>x.order('at').limit(50000))]);
+      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000)), q('profile_change_requests',x=>x.order('created_at',{ascending:false}).limit(500)), q('questions',x=>x.neq('status','deleted').limit(20000)), q('orders',x=>x.order('created_at',{ascending:false}).limit(5000)), q('order_events',x=>x.order('at').limit(50000)), q('invoices',x=>x.order('created_at',{ascending:false}).limit(20000))]);
     const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs), orders:this._e(ord).map(o=>({...o, events:this._e(oev).filter(e=>e.order_id===o.id)}))};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs), orders:this._e(ord).map(o=>({...o, events:this._e(oev).filter(e=>e.order_id===o.id)})), invoices:this._e(inv).map(i=>({...i, total:+i.total, paid:+i.paid, remaining:+i.remaining}))};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -676,7 +686,9 @@ export const CloudStore = {
   async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
   async orderReportTransfer(f){ return this._e(await this.sb.rpc('order_report_transfer',{p:f})); },
   async reviewOrder(id, decision, reason, expected_version){ return this._e(await this.sb.rpc('admin_review_order',{p_id:id, p_decision:decision, p_reason:reason||'', p_version:expected_version??null})); },
-  async confirmOrderPayment(id, amount, confirmed=true){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed})); },
+  async confirmOrderPayment(id, amount, confirmed=true, reason=''){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed, p_reason:reason||''})); },
+  async attachReceipt(id, image){ return this._e(await this.sb.rpc('admin_attach_receipt',{p_id:id, p_image:image})); },
+  async invoiceReceipt(id){ return this._e(await this.sb.rpc('admin_invoice_receipt',{p_id:id})); },
   async setOrderProvisional(id, on, reason){ return this._e(await this.sb.rpc('admin_order_provisional',{p_id:id, p_on:!!on, p_reason:reason||''})); },
   async saveBank(b){ return this._e(await this.sb.rpc('admin_save_bank',{p:b})); },
   async guardianSelfLink(national_id){ const r=this._e(await this.sb.rpc('guardian_self_link',{p_nid:String(national_id||'').trim()})); if(!r?.ok) throw new Error(LINK_FAIL); return r; },

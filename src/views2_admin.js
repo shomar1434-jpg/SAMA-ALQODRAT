@@ -16,6 +16,7 @@ import { pagePolicies } from './policy_views.js';
 import { pageNotify } from './admin_notify.js';
 import { pageBank } from './admin_bank.js';
 import { pageOrders, openOrdersCount } from './order_views.js';
+import { pageInvoices } from './invoice_views.js';
 
 /* =====================================================================
    5) لوحة الإدارة
@@ -27,7 +28,7 @@ export const progName = id => progOf(id)?.name || '—';
 export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
 export async function viewAdmin(r){
   const app=$('#app');
-  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-orders','wallet','طلبات الشراء'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-notify','alert','الإشعارات والرسائل'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
+  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-orders','wallet','طلبات الشراء'],['admin-invoices','form','الفواتير'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-notify','alert','الإشعارات والرسائل'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
   app.innerHTML = `<div class="admin"><aside class="side">
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة</span></b></div>
       <div class="sec">الصفحات</div>
@@ -42,7 +43,7 @@ export async function viewAdmin(r){
   if(!flt.to){ flt.to=riyadhNow().date; flt.from=addDays(flt.to,-29); }
   const fu=$('.side a[href="#admin-followup"]'); if(fu){ const n=followupRows().filter(x=>x.level==='bad').length; if(n) fu.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} حالة حرجة">${fmtNum(n)}</span>`); }
   { const oa=$('.side a[href="#admin-orders"]'), n=openOrdersCount(AD); if(oa && n) oa.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} طلبًا يحتاج إجراء">${fmtNum(n)}</span>`); }
-  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin-notify':pageNotify, 'admin-bank':pageBank, 'admin-orders':pageOrders, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
+  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin-notify':pageNotify, 'admin-bank':pageBank, 'admin-orders':pageOrders, 'admin-invoices':pageInvoices, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
 }
 export async function reloadAD(){ AD = await Store.adminData(); }
 
