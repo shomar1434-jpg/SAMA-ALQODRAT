@@ -1,0 +1,25 @@
+name: deploy-db
+# يطبّق ترحيلات قاعدة البيانات والبذور على مشروع Supabase عبر المحمّل المؤقت (_bootstrap_exec)،
+# الذي لا ينفّذ إلا ملفات بصمتها في قائمة السماح. المفتاح أدناه هو المفتاح العام (anon) وليس سرًّا.
+on:
+  push:
+    branches: [deploy-db]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: apply migrations and seeds
+        env:
+          SB_URL: https://rivemywlarsfeeffylao.supabase.co
+          SB_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdmVteXdsYXJzZmVlZmZ5bGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODQ3NjMsImV4cCI6MjExMDE2MDc2M30.5ts3rFDsEaw7XOgDrV6ywF5JQ0oKVswi2lEIyRLthMc
+        run: |
+          set -euo pipefail
+          for f in $(ls supabase/migrations/*.sql | sort) supabase/seed.sql supabase/seed_site.sql; do
+            name=$(basename "$f" .sql)
+            out=$(jq -n --arg n "$name" --rawfile s "$f" '{p_name:$n,p_sql:$s}' | curl -sS -m 300 -X POST "$SB_URL/rest/v1/rpc/_bootstrap_exec" \
+              -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" -H "Content-Type: application/json" --data-binary @-)
+            echo "$name => $out"
+            echo "$out" | jq -e '.ok == true' > /dev/null || { echo "::error::failed at $name"; exit 1; }
+          done
