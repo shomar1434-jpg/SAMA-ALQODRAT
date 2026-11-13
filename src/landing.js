@@ -10,7 +10,6 @@ import { plansSectionHtml, initPlansMarquee } from './qudurat_views.js';
 /* =====================================================================
    الصفحات الافتتاحية — مستوحاة من صفحتي الغلاف والرؤية في دليل برامج المركز
    ===================================================================== */
-export const X_URL = 'https://x.com/' + CENTER.x;
 export const MAP_URL = CENTER.map;
 /* رابط واتساب المركز: برسالة مجهزة يرسلها المستخدم بنفسه (لا إرسال آلي) */
 export const waLink = text => text ? `https://wa.me/${CENTER.whatsapp}?text=${encodeURIComponent(text)}` : CENTER.whatsappLink;
@@ -21,7 +20,7 @@ const SOC = [
   ['tiktok', 'تيك توك', svg('<path d="M16.5 2c.3 2.300 1.600 3.800 3.900 4v3c-1.400.1-2.700-.3-3.900-1v6.200c0 3.200-2.300 5.800-5.600 5.800S5.500 17.600 5.500 14.600c0-3.300 2.800-5.800 6.300-5.300v3.100c-1.600-.4-3.200.5-3.200 2.200 0 1.400 1 2.400 2.400 2.400 1.500 0 2.400-1 2.400-2.800V2z"/>')],
   ['instagram', 'إنستقرام', `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>`],
 ];
-export const socialHtml = () => `<div class="soc">${SOC.map(([k, t, i]) => `<a href="${CENTER.social[k]}" target="_blank" rel="noopener" aria-label="${t}" title="${t}">${i}</a>`).join('')}<a href="${X_URL}" target="_blank" rel="noopener" aria-label="منصة إكس" title="إكس">${X_LOGO}</a></div>`;
+export const socialHtml = () => `<div class="soc">${SOC.map(([k, t, i]) => `<a href="${CENTER.social[k]}" target="_blank" rel="noopener" aria-label="${t}" title="${t}">${i}</a>`).join('')}<a href="${CENTER.telegram}" target="_blank" rel="noopener" aria-label="قناة تيليجرام" title="تيليجرام">${TG_LOGO}</a></div>`;
 /* المصباح المضيء بعلامة الصح (من غلاف الدليل) مرسومًا بالمتجهات ومتحركًا */
 export const BULB_SVG = `<svg class="bulb-art" viewBox="0 0 320 340" aria-hidden="true">
   <defs><radialGradient id="bg1" cx="42%" cy="38%" r="70%"><stop offset="0" stop-color="#FFE27A"/><stop offset=".55" stop-color="#FCC23E"/><stop offset="1" stop-color="#E17D32"/></radialGradient>
@@ -64,7 +63,7 @@ export function siteFooter(){
     <div class="sfoot-bar"><span>© ${new Date().getFullYear()} ${CENTER.name}. جميع الحقوق محفوظة.</span><span dir="ltr">${ph.join(' · ')} · ${CENTER.email}</span></div>
   </footer>`;
 }
-export const X_LOGO = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.8-6.3L5.4 21H2.3l7.2-8.3L2 3h6.3l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg>`;
+export const TG_LOGO = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 18.800 19c-.2 1-.9 1.3-1.7.8l-4.700-3.500-2.300 2.200c-.3.300-.5.500-1 .5l.3-4.800L18.200 6.300c.4-.3-.1-.5-.6-.2L6.800 12.900l-4.700-1.500c-1-.3-1-1 .2-1.500L20.600 2.900c.9-.3 1.6.2 1.3 1.4z"/></svg>`;
 
 /* برامج الأطفال: قسم مستقل في الرئيسية، والتسجيل من صفحة البرنامج المعتمد */
 function kidsSectionHtml(P){
@@ -87,8 +86,7 @@ export function viewContact(){
       ${card('mailto:' + CENTER.email, ic('form'), 'البريد الإلكتروني', CENTER.email, false)}
       ${card(CENTER.map, ic('pin'), 'موقعنا على الخريطة', 'خرائط قوقل')}</div>
     <h3 class="ct-h">منصات التواصل الاجتماعي</h3><div class="ct-grid">
-      ${card(CENTER.social.snapchat, SOC[0][2], 'سناب شات', 'samagodrat.sa')}${card(CENTER.social.tiktok, SOC[1][2], 'تيك توك', '@samagodrat.sa')}${card(CENTER.social.instagram, SOC[2][2], 'إنستقرام', 'samagodrat.sa')}${card(X_URL, X_LOGO, 'إكس', '@' + CENTER.x)}
-      ${card(CENTER.telegram, ic('book'), 'قناة تيليجرام', 'مواد علمية خاصة بالقدرات')}</div>
+      ${card(CENTER.social.snapchat, SOC[0][2], 'سناب شات', 'samagodrat.sa')}${card(CENTER.social.tiktok, SOC[1][2], 'تيك توك', '@samagodrat.sa')}${card(CENTER.social.instagram, SOC[2][2], 'إنستقرام', 'samagodrat.sa')}${card(CENTER.telegram, TG_LOGO, 'قناة تيليجرام', 'مواد علمية خاصة بالقدرات')}</div>
     <h3 class="ct-h">البرامج والخدمات</h3><div class="ct-grid">
       ${card('#register', ic('book'), 'البرامج التدريبية', 'دليل البرامج المعتمدة والتسجيل', false)}${card('#home', ic('award'), 'باقات القدرات والتحصيلي', 'الباقات والأسعار والتسجيل', false)}${card('#enroll', ic('form'), 'سجّل الآن', 'نموذج التسجيل الموحّد', false)}
       ${card(CENTER.manar, ic('award'), 'منصة منار', 'إصدار الشهادات المعتمدة من المؤسسة العامة للتدريب التقني والمهني')}</div></div>${siteFooter()}`;

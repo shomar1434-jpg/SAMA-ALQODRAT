@@ -6,7 +6,7 @@ import { addDays, dowOf, uid } from './utils.js';
    ===================================================================== */
 export const CENTER = {
   name:'مركز سما القدرات للتدريب', cr:'5900112617',
-  phones:['0508957822','0561606878'], email:'samaalgodrat@gmail.com', x:'smagodrat',
+  phones:['0508957822','0561606878'], email:'samaalgodrat@gmail.com',
   address:'جازان - حي الصفا - شارع الملك فيصل (الستين) - جوار مطعم طحينة', pobox:'313',
   accreditor:'المؤسسة العامة للتدريب التقني والمهني',
   // قنوات المركز الرسمية (من صفحة روابط المركز linktr.ee/Samagodrat.sa)

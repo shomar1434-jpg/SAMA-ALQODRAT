@@ -16,6 +16,7 @@ let L = await hrefs('.ct-card');
 ok(['wa.me/966561606878', 'share.google/PhsXYhqsEzgXpO8Rf', 'snapchat.com/add/samagodrat.sa', 'tiktok.com/@samagodrat.sa', 'instagram.com/samagodrat.sa', 't.me/+PSnecqWQioc3M2Vk', 'mnar.sa', 'tel:0561606878'].every(x => L.some(h => h.includes(x))), 'صفحة «تواصل معنا» تجمع كل قنوات المركز');
 L = await hrefs('.sfoot a');
 ok(L.some(h => h.includes('wa.me')) && L.some(h => h.includes('mnar.sa')) && L.some(h => h.includes('snapchat')) && L.some(h => h.endsWith('#contact')), 'التذييل: واتساب ومنصات التواصل ومنار ورابط تواصل معنا');
+ok(!(await p.content()).includes('x.com/') && !/إكس/.test(await text('#app')) && L.some(h => h.includes('t.me/')), 'لا رابط لمنصة إكس، وقناة تيليجرام بين منصات التواصل في التذييل');
 ok((await p.$$eval('.ct-card[target=_blank]', a => a.every(x => x.rel.includes('noopener')))), 'الروابط الخارجية تفتح بأمان');
 
 // برامج الأطفال في الرئيسية
