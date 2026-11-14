@@ -550,6 +550,10 @@ export const LocalStore = {
       if(!ph){ const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); this.load(); if(d && (this.data.devices||[]).some(x=>x.id===d.id && x.phone===d.phone && x.role===role && !x.revoked_at)) ph=d.phone; else if(d) localStorage.removeItem(this.key+'_dev_'+role); } }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); localStorage.removeItem(this.key+'_dev_'+role);
       if(d){ const x=(this.data.devices||[]).find(y=>y.id===d.id); if(x && !x.revoked_at){ x.revoked_at=new Date().toISOString(); this.save(); } } }catch(e){} },
+  /* تسجيل الحضور من داخل البوابة (شاشة الترحيب): ملف هذا الجوال فقط، بمسار التحضير نفسه ↔ portal_checkin */
+  async portalCheckin(traineeId, code, opts={}){ const se=await this.portalSession('student'); if(!se) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا');
+    const t=this.data.trainees.find(x=>x.id===traineeId && normPhone(x.phone)===normPhone(se.phone)); if(!t) throw new Error('غير مصرح');
+    return this.checkin(t.national_id, code, null, {device:opts.device||'portal', choice:opts.choice}); },
   async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; return out; },
   /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
   runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
@@ -919,6 +923,7 @@ export const CloudStore = {
     if(!r.data.session) return {confirm:true}; const c=await this.sb.rpc('claim_admin'); if(c.error||!c.data) { await this.sb.auth.signOut(); throw new Error('هذا البريد غير مدعوّ كمسؤول. اطلب من مدير النظام إضافتك.'); } return {ok:true}; },
   async portalLogout(){ try{ await this.sb.rpc('device_logout'); }catch(e){} await this.sb.auth.signOut({scope:'local'}); },
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
+  async portalCheckin(traineeId, code, opts={}){ return this._e(await this.sb.rpc('portal_checkin',{p_trainee:traineeId, p_code:code||null, p_device:opts.device||'portal', p_choice:opts.choice||null})); },
   async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
   runReminders(){ return 0; },   // في السحابة: run_session_reminders() عبر pg_cron كل دقيقة
   async inboxState(role){ return this._e(await this.sb.rpc('portal_inbox',{p_role:role})) || {items:[], unread:0}; },

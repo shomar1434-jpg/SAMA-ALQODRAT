@@ -336,6 +336,19 @@ export function showChoice(r, send, onBack){
   $$('[data-ch]').forEach(b=>b.onclick=async()=>{ setBusy(b,true,'جارٍ التسجيل'); await send(b.dataset.ch); });
   $('#cAgain').onclick = onBack; $('[data-ch]')?.focus();
 }
+/* عنوان رسالة رفض التحضير ونصها ونبرتها وأيقونتها (صفحة التحضير وشاشة الترحيب في البوابة) */
+export function checkinMsg(r){
+    const first = r.name ? `أهلًا ${esc(r.name.split(' ')[0])}. ` : '';
+    return {
+      bad_code:['رمز اليوم غير صحيح','اكتب الرمز الظاهر على شاشة القاعة.','bad','x'],
+      not_found:['السجل المدني غير موجود في كشف الدفعة', `لا يوجد تسجيل بهذا الرقم${r.program?` في ${cohortLabel(r)} من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
+      not_in_cohort:['السجل المدني غير موجود في كشف الدفعة', `هذا الرقم غير مسجّل في ${r.number?cohortLabel(r):'الدفعات المنعقدة اليوم'}${r.program?` من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
+      no_cohort:['لا توجد دفعة منعقدة', r.upcoming?`تبدأ ${cohortLabel(r.upcoming)} من «${esc(r.program)}» في ${fmtShort(r.upcoming.start)}.`:`لا توجد دفعة منعقدة حاليًا${r.program?` في «${esc(r.program)}»`:''}.`,'warn','calendar'],
+      order_pending:['طلبك لم يُعتمد بعد','لا يُسجَّل الحضور قبل اعتماد طلب التسجيل وتأكيد السداد. راجع إدارة المعهد أو تابع طلبك من بوابتك.','warn','timer'],
+      no_program:['البرنامج غير موجود','الباركود لا يطابق أي برنامج. راجع الاستقبال.','bad','x'],
+      no_session:['لا توجد محاضرة الآن', `${first}${r.next?`المحاضرة القادمة ${fmtDate(r.next.date)} الساعة ${t12(r.next.time)}.`:'لا توجد محاضرات قادمة في دفعتك.'}`,'warn','timer'],
+      error:['تعذّر الاتصال', esc(r.msg||'')+' حاول مرة أخرى بعد قليل.','bad','alert'] }[r.reason] || ['تعذّر التسجيل','','bad','alert'];
+}
 export function showCheckinResult(r, onBack){
   const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
   const again = `<button class="btn" style="width:100%;margin-top:16px" id="cAgain">${ic('prev')} رجوع</button>`;
@@ -354,16 +367,7 @@ export function showCheckinResult(r, onBack){
         <div class="r"><span>${ic('activity')}الحالة</span><b><span class="pill dot ${late?'warn':'ok'}">${late?'متأخر':'في الوقت'}</span></b></div>
       </div>${again}`;
   } else {
-    const first = r.name ? `أهلًا ${esc(r.name.split(' ')[0])}. ` : '';
-    const M = {
-      bad_code:['رمز اليوم غير صحيح','اكتب الرمز الظاهر على شاشة القاعة.','bad','x'],
-      not_found:['السجل المدني غير موجود في كشف الدفعة', `لا يوجد تسجيل بهذا الرقم${r.program?` في ${cohortLabel(r)} من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
-      not_in_cohort:['السجل المدني غير موجود في كشف الدفعة', `هذا الرقم غير مسجّل في ${r.number?cohortLabel(r):'الدفعات المنعقدة اليوم'}${r.program?` من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
-      no_cohort:['لا توجد دفعة منعقدة', r.upcoming?`تبدأ ${cohortLabel(r.upcoming)} من «${esc(r.program)}» في ${fmtShort(r.upcoming.start)}.`:`لا توجد دفعة منعقدة حاليًا${r.program?` في «${esc(r.program)}»`:''}.`,'warn','calendar'],
-      order_pending:['طلبك لم يُعتمد بعد','لا يُسجَّل الحضور قبل اعتماد طلب التسجيل وتأكيد السداد. راجع إدارة المعهد أو تابع طلبك من بوابتك.','warn','timer'],
-      no_program:['البرنامج غير موجود','الباركود لا يطابق أي برنامج. راجع الاستقبال.','bad','x'],
-      no_session:['لا توجد محاضرة الآن', `${first}${r.next?`المحاضرة القادمة ${fmtDate(r.next.date)} الساعة ${t12(r.next.time)}.`:'لا توجد محاضرات قادمة في دفعتك.'}`,'warn','timer'],
-      error:['تعذّر الاتصال', esc(r.msg||'')+' حاول مرة أخرى بعد قليل.','bad','alert'] }[r.reason] || ['تعذّر التسجيل','','bad','alert'];
+    const M = checkinMsg(r);
     box.innerHTML = `<div style="text-align:center" class="rv"><div class="bigcheck ${M[2]}">${ic(M[3])}</div>
       <h2 style="font-size:21px;font-weight:700">${M[0]}</h2><p class="hint" style="font-size:14px">${M[1]}</p></div>${again}`;
   }
