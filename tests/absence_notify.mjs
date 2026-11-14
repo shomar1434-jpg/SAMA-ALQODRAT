@@ -23,7 +23,7 @@ const btn = await p.$$eval('.modal tr', (rows, n) => { const r = rows.find(x => 
 await p.click(`[data-wa="${btn}"]`); await p.waitForTimeout(300);
 const opened = await p.evaluate(() => window.__opened);
 const u = decodeURIComponent(opened[0] || '');
-ok(/^https:\/\/wa\.me\/966551112222\?text=/.test(opened[0] || '') && u.includes('ولي أمر') && u.includes('نفيدكم بغياب') && u.includes('مركز سما القدرات'), 'يفتح واتساب لرقم ولي الأمر الدولي برسالة الغياب جاهزة');
+ok(/^https:\/\/wa\.me\/966551112222\?text=/.test(opened[0] || '') && u.includes('ولي أمر') && u.includes('نفيدكم بغياب') && u.includes('مركز سما القدرات') && u.includes('https://wa.me/message/5ZOKSPSQLWEBO1'), 'يفتح واتساب لرقم ولي الأمر الدولي برسالة الغياب جاهزة');
 ok(/أُرسل/.test(await p.textContent(`[data-wa="${btn}"]`)), 'يُعلَّم أنه أُرسل على هذا الجهاز');
 if (await p.$('#abNext')) { await p.click('#abNext'); await p.waitForTimeout(300); ok((await p.evaluate(() => window.__opened.length)) === 2, '«إرسال للتالي» يفتح الغائب التالي'); }
 await p.click('#abX');
