@@ -1,6 +1,7 @@
 /* =====================================================================
    الإدارة: «طلبات الشراء» (#admin-orders): مراجعة، تأكيد سداد، قبول مؤقت، وإعدادات الحساب البنكي.
    ===================================================================== */
+import { statementModal } from './statement_views.js';
 import { $, $$, esc, fmtNum, fmtShort, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
@@ -60,7 +61,7 @@ function remindHtml(o, t){
 }
 function orderModal(o){
   const t = (AD.trainees || []).find(x => x.id === o.trainee_id), dup = (AD.orders || []).filter(x => x.trainee_id === o.trainee_id && x.id !== o.id && x.approval !== 'rejected').length;
-  modal(`<h3>طلب <span dir="ltr">${esc(o.number)}</span></h3><div class="ord-st" style="margin:-4px 0 10px">${pills(o)}${o.cancelled_at ? ' <span class="pill bad">ملغى</span>' : ''}</div>
+  modal(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">طلب <span dir="ltr">${esc(o.number)}</span></h3><button type="button" class="btn sm" id="omST">${ic('receipt')} كشف حساب المتدرب</button></div><div class="ord-st" style="margin:-4px 0 10px">${pills(o)}${o.cancelled_at ? ' <span class="pill bad">ملغى</span>' : ''}</div>
     <dl class="ord-dl"><dt>المتدرب</dt><dd>${esc(t?.full_name || '—')} · <span dir="ltr" class="num">${esc(t?.phone || '')}</span>${t?.guardian_phone ? ` · ولي الأمر <span dir="ltr" class="num">${esc(t.guardian_phone)}</span>` : ''}</dd>
       <dt>البند</dt><dd>${esc(o.title)}</dd><dt>المطلوب الآن</dt><dd>${o.due_now > 0 ? sar(o.due_now) : 'غير محدد السعر'}${o.total > o.due_now ? ` من إجمالي ${sar(o.total)}` : ''}</dd>
       <dt>التحويل المُبلَّغ</dt><dd>${o.claim ? `${sar(o.claim.amount)} بتاريخ ${fmtShort(o.claim.date)}${o.claim.reference ? ` · مرجع <span dir="ltr">${esc(o.claim.reference)}</span>` : ''}` : 'لم يُبلَّغ بتحويل'}</dd>
@@ -85,6 +86,7 @@ function orderModal(o){
   $('#om-x').onclick = closeModal;
   $$('[data-od]').forEach(b => b.onclick = () => run(b, () => Store.reviewOrder(o.id, b.dataset.od, $('#om-r').value, o.version), { approved:'وُوفق على الطلب', needs_information:'طُلب استكمال المعلومات', rejected:'رُفض الطلب' }[b.dataset.od]));
   if($('#om-un')) $('#om-un').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, 0, false, $('#om-r').value), 'أُلغي تأكيد السداد وأُلغيت فاتورته');
+  $('#omST').onclick = () => statementModal(o.trainee_id);
   bindPay(o, run); bindOps(o, run);
   $('#om-prov').onclick = e => run(e.currentTarget, () => Store.setOrderProvisional(o.id, !o.provisional, $('#om-r').value), o.provisional ? 'أُلغي القبول المؤقت' : 'مُنح قبول مؤقت');
 }

@@ -12,6 +12,7 @@ import { setBusy, toLatin } from './features.js';
 import { exportCSV } from './print.js';
 import { TIERS } from './qudurat.js';
 import { parseLegacy, legacySummary, dataIssues } from './import_logic.js';
+import { statementModal } from './statement_views.js';
 
 let dTab = 'issues', dQ = '', dOnly = 'all', preview = null;
 const CITIES = ['جازان', 'صبيا', 'أبو عريش', 'صامطة', 'بيش', 'أحد المسارحة', 'الدرب', 'ضمد', 'العارضة', 'فرسان', 'أخرى'], EDU = ['ابتدائي', 'متوسط', 'ثانوي', 'دبلوم', 'جامعي', 'دراسات عليا'];
@@ -33,16 +34,21 @@ function issuesTab(all, n){
     <p class="hint" style="margin:0 0 10px">${fmtNum(all.length)} متدربًا عليهم ${fmtNum(n)} ملاحظة${list.length !== all.length ? ` · المعروض ${fmtNum(list.length)}` : ''}.</p>
     ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الملاحظات</th><th></th></tr></thead><tbody>${list.slice(0, 300).map(x => `<tr><td style="min-width:170px"><b style="font-weight:600">${esc(x.trainee.full_name)}</b><div class="hint num" dir="ltr">${esc(x.trainee.national_id)} · ${esc(x.trainee.phone || '')}</div>${x.trainee.imported ? '<span class="pill info">مسجّل سابقًا</span>' : ''}</td>
         <td><ul class="iss">${x.issues.filter(hit).map(i => `<li class="${i.note != null ? 'n' : ''}">${esc(i.text)}</li>`).join('')}</ul></td><td><button class="btn sm pri" data-de="${x.trainee.id}">${ic('edit')} استكمال</button></td></tr>`).join('')}</tbody></table></div></div>`
-      : emptyBox(all.length ? 'لا نتائج بهذه التصفية' : 'البيانات مكتملة', all.length ? '' : 'لا ملاحظات على بيانات المتدربين.')}`;
+      : emptyBox(all.length ? 'لا نتائج بهذه التصفية' : 'البيانات مكتملة', all.length ? '' : 'لا ملاحظات على بيانات المتدربين.')}
+    ${dQ.trim() ? (() => { const ids = new Set(all.map(x => x.trainee.id)), more = (AD.trainees || []).filter(t => !ids.has(t.id) && matchQ(dQ, t.full_name, t.national_id, t.phone, t.guardian_phone)).slice(0, 30);
+      return more.length ? `<div class="card rv" style="margin-top:12px"><div class="pad" style="padding-bottom:0"><b>متدربون آخرون مطابقون للبحث</b><p class="hint" style="margin:2px 0 0">بياناتهم مكتملة، ويمكن تصحيح أي خطأ فيها.</p></div><div class="tblwrap"><table class="tb"><tbody>${more.map(t => `<tr><td><b style="font-weight:600">${esc(t.full_name)}</b><div class="hint num" dir="ltr">${esc(t.national_id)} · ${esc(t.phone || '')}</div></td><td style="text-align:end"><button class="btn sm" data-de="${t.id}">${ic('edit')} تعديل البيانات</button></td></tr>`).join('')}</tbody></table></div></div>` : ''; })() : ''}`;
   $('#dq').oninput = e => { dQ = e.target.value; clearTimeout(pageData.t); pageData.t = setTimeout(() => { pageData(); const i = $('#dq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
   $('#dk').onchange = e => { dOnly = e.target.value; pageData(); };
   $('#dX').onclick = () => exportCSV('مراجعة-البيانات', [['الاسم', 'رقم الهوية', 'الجوال', 'الملاحظة'], ...list.flatMap(x => x.issues.filter(hit).map(i => [x.trainee.full_name, x.trainee.national_id, x.trainee.phone, i.text]))]);
-  $$('[data-de]').forEach(b => b.onclick = () => fixModal(all.find(x => x.trainee.id === b.dataset.de)));
+  $$('[data-de]').forEach(b => b.onclick = () => editTraineeModal(b.dataset.de));
 }
-function fixModal(x){
+/* بيانات المتدرب: لأي متدرب (لا لأصحاب الملاحظات فقط)، من «مراجعة البيانات» و«المتدربون» والاشتراك ونافذة الطلب */
+export function editTraineeModal(id, after){ const x = dataIssues(AD).find(y => y.trainee.id === id) || { trainee:(AD.trainees || []).find(t => t.id === id), issues:[] }; if(x.trainee) fixModal(x, after); }
+function fixModal(x, after){
   const t = x.trainee, miss = f => x.issues.some(i => i.field === f) ? ' class="field need"' : ' class="field"', orders = (AD.orders || []).filter(o => o.trainee_id === t.id && o.approval !== 'rejected');
   const sel = (id, name, list, v) => `<select class="inp" id="${id}" name="${name}"><option value="">—</option>${list.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
-  modal(`<h3>استكمال بيانات ${esc(t.full_name)}</h3>
+  modal(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${x.issues.length ? 'استكمال بيانات' : 'بيانات المتدرب'} ${esc(t.full_name)}</h3><button type="button" class="btn sm" id="fxSt">${ic('receipt')} كشف الحساب</button></div>
+    <p class="hint" style="margin:6px 0 10px">التعديل مسجّل في أرشيف الحركات. رقم الهوية يكتبه المتدرب عند الحضور، والجوال مفتاح دخول بوابته: أبلغه بأي تغيير فيهما.</p>
     <form id="fxF" novalidate><div class="grid g2">
       <div${miss('full_name')} style="grid-column:1/-1"><label for="fx-n">الاسم الكامل</label><input class="inp" id="fx-n" name="full_name" value="${esc(t.full_name)}"></div>
       <div${miss('national_id')}><label for="fx-i">رقم الهوية</label><input class="inp num" id="fx-i" name="national_id" dir="ltr" inputmode="numeric" maxlength="10" value="${esc(t.national_id)}"></div>
@@ -58,6 +64,7 @@ function fixModal(x){
       <div style="display:flex;gap:8px;justify-content:end;margin-top:12px"><button type="button" class="btn" id="fxX">إغلاق</button><button class="btn pri" id="fxS">${ic('check')} حفظ</button></div></form>`);
   ['#fx-i', '#fx-p', '#fx-g'].forEach(s => $(s).addEventListener('input', e => { e.target.value = toLatin(e.target.value).replace(/\D/g, ''); }));
   $('#fxX').onclick = closeModal;
+  $('#fxSt').onclick = () => statementModal(t.id);
   $('#fxF').onsubmit = async e => { e.preventDefault(); const f = e.target, b = $('#fxS'); $('#fxE').textContent = ''; setBusy(b, true, 'جارٍ الحفظ');
     try {
       const p = {}; for(const k of ['full_name', 'national_id', 'birth_date', 'phone', 'guardian_phone', 'email', 'city', 'education']){ const v = f[k].value.trim(); if(v !== String(t[k] || '')) p[k] = v; }
@@ -65,7 +72,7 @@ function fixModal(x){
       for(const fs of $$('[data-fo]', f)){ const o = AD.orders.find(y => y.id === fs.dataset.fo), total = +toLatin(fs.querySelector('[name=total]').value), dn = fs.querySelector('[name=discount_note]').value.trim();
         if(total !== +o.total || dn !== (o.discount_note || '')) await Store.saveOrderMeta(o.id, { total, discount_note:dn }); }
       for(const c of $$('[data-fn]', f)){ const i = +c.dataset.fn; if(!!t.import_notes[i].done !== c.checked) await Store.resolveImportNote(t.id, i, c.checked); }
-      await reloadAD(); closeModal(); toast('حُفظت البيانات'); pageData();
+      await reloadAD(); closeModal(); toast('حُفظت البيانات'); (after || pageData)();
     } catch(x2){ setBusy(b, false); $('#fxE').textContent = x2.message; } };
 }
 function importTab(){
