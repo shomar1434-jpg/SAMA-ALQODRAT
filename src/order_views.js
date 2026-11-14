@@ -10,6 +10,8 @@ import { AD, reloadAD } from './views2_admin.js';
 import { setBusy, toLatin } from './features.js';
 import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, EV_TXT, PAY_METHODS, orderReady, orderRemaining } from './order_logic.js';
 import { sar, pills } from './order_panel.js';
+import { waTo } from './absence_notify.js';
+import { CENTER } from './catalog.js';
 
 /* ---------- الإدارة: طلبات الشراء ---------- */
 let oF = { st:'open', q:'' };
@@ -48,6 +50,13 @@ export function pageOrders(){
   $('#reqAp').onchange = async e => { await Store.saveSettings({ require_order_approval:e.target.checked }); await reloadAD(); toast(e.target.checked ? 'فُعّل منع الحضور قبل الاعتماد' : 'أُلغي منع الحضور قبل الاعتماد'); };
 }
 
+/* تذكير بالسداد عبر واتساب: رسالة جاهزة للمتدرب أو لولي أمره، والإرسال بيد المسؤول */
+function remindHtml(o, t){
+  const rem = orderRemaining(o); if(!t || !(rem > 0) || o.approval === 'rejected') return '';
+  const msg = to => `السلام عليكم ورحمة الله وبركاته\n${to === 'g' ? `ولي أمر ${t.gender === 'أنثى' ? 'المتدربة' : 'المتدرب'}: ${t.full_name}` : `${t.gender === 'أنثى' ? 'المتدربة' : 'المتدرب'}: ${t.full_name}`}\nنذكّركم بالمبلغ المتبقي على طلب ${o.number} (${o.title}): ${fmtNum(rem)} ريال.\nللسداد أو الاستفسار تواصلوا معنا على ${CENTER.phones[0]}.\n${CENTER.name}`;
+  const a = waTo(t.phone, msg('t')), g = t.guardian_phone && t.guardian_phone !== t.phone ? waTo(t.guardian_phone, msg('g')) : '';
+  return a || g ? `<div class="ord-acts" style="margin-top:10px"><span class="hint" style="flex:1;min-width:160px">تذكير بالمتبقي (${sar(rem)}) عبر واتساب:</span>${a ? `<a class="btn sm" target="_blank" rel="noopener" href="${a}">${ic('send')} للمتدرب</a>` : ''}${g ? `<a class="btn sm" target="_blank" rel="noopener" href="${g}">${ic('send')} لولي الأمر</a>` : ''}</div>` : '';
+}
 function orderModal(o){
   const t = (AD.trainees || []).find(x => x.id === o.trainee_id), dup = (AD.orders || []).filter(x => x.trainee_id === o.trainee_id && x.id !== o.id && x.approval !== 'rejected').length;
   const methOpts = Object.entries(PAY_METHODS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
@@ -59,6 +68,7 @@ function orderModal(o){
       ${o.discount_note ? `<dt>سبب الخصم</dt><dd>${esc(o.discount_note)}</dd>` : ''}
       ${o.opening?.payments?.length ? `<dt>دفعات سابقة</dt><dd>${o.opening.payments.map(p => `${esc(p.label)} ${fmtNum(p.amount)} (${PAY_METHODS[p.method] || ''})`).join(' · ')}</dd>` : ''}</dl>
     ${dup ? `<p class="alert t-info" style="margin:10px 0 0"><span class="aic">${ic('alert')}</span><span>للمتدرب ${fmtNum(dup)} طلبًا آخر. تأكد أن التحويل نفسه لا يُعتمد لطلبين.</span></p>` : ''}
+    ${remindHtml(o, t)}
     <h4 class="ord-sec">1. مراجعة الطلب</h4>
     <div class="field"><label for="om-r">السبب أو المطلوب استكماله (إلزامي عند الرفض أو طلب الاستكمال)</label><input class="inp" id="om-r" maxlength="300" value="${esc(o.note || '')}"></div>
     <div class="ord-acts"><button class="btn pri sm" data-od="approved">${ic('check')} موافقة</button><button class="btn sm" data-od="needs_information">طلب استكمال معلومات</button><button class="btn sm danger soft" data-od="rejected">رفض مع السبب</button></div>
