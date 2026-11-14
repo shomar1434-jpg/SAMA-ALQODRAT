@@ -6,6 +6,7 @@ import { $, DAYS, addDays, dowOf, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riya
 import { AD, cohortSummary, progName, progOf } from './views2_admin.js';
 import { ic, toast } from './views2_head.js';
 import { catSort, cohortLabel, short, titleBar } from './views2_main.js';
+import { SECTIONS, sessionOn, subStatus, planName } from './qudurat.js';
 import { closeModal, modal } from './views2_programs.js';
 
 /* =====================================================================
@@ -54,6 +55,23 @@ export function sheetHtml(c, date){
       <tbody>${rows.map((x,i)=>`<tr class="${x.a?'':'abs'}"><td>${fmtNum(i+1)}</td><td class="nm">${esc(x.t.full_name)}</td><td dir="ltr">${esc(x.t.national_id)}</td><td dir="ltr">${esc(x.t.phone)}</td><td dir="ltr">${x.a?t12(x.a.time.slice(0,5)):'—'}</td>
         <td><span class="pst ${x.a?(x.a.status==='متأخر'?'warn':'ok'):'bad'}">${x.a?(x.a.status==='متأخر'?'متأخر':'حاضر'):'غائب'}</span>${x.a?.manual?'<i class="pman">يدوي</i>':''}</td><td></td></tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:18px">لا يوجد مسجلون في هذه الدفعة حتى هذا التاريخ</td></tr>`}</tbody></table>`,
     note:`سُجّل الحضور آليًا بمسح باركود البرنامج والتحقق برقم السجل المدني مقابل كشف الدفعة${rows.some(x=>x.a?.manual)?'، و«يدوي» تحضير أجراه مدير النظام':''}${pending?'، والكشف محرّر قبل انتهاء المحاضرة':''}.` });
+}
+
+/* ---------- 1-ب) كشف حضور يوم لقسم الباقات (القدرات والتحصيلي) ---------- */
+export function sectionSheetHtml(sec, date){
+  const today=riyadhNow(), ses=sessionOn(AD, sec, date), att=(AD.sub_attendance||[]).filter(a=>a.att_date===date);
+  const subs=(AD.subscriptions||[]).filter(s=>s.section===sec && ((s.created_at||'').slice(0,10)<=date) && (['active','pending'].includes(subStatus(s,date)) || att.some(a=>a.subscription_id===s.id)));
+  const rows=subs.map(s=>({s, t:AD.trainees.find(x=>x.id===s.trainee_id), p:(AD.plans||[]).find(x=>x.id===s.plan_id), a:att.find(a=>a.subscription_id===s.id)})).filter(x=>x.t).sort((a,b)=>a.t.full_name.localeCompare(b.t.full_name,'ar'));
+  const present=rows.filter(x=>x.a), late=present.filter(x=>x.a.status==='متأخر').length, pending=!!ses && date===today.date && toMin(today.hm)<toMin(ses.end);
+  const subj=[...new Set(subs.flatMap(s=>s.subjects||[]))].join('، ');
+  return docShell({ docNo:`ATT-Q${sec==='boys'?'B':'G'}-${date.replace(/-/g,'')}`, title:'كشف الحضور اليومي', sub:'باقات القدرات والتحصيلي · نموذج إثبات حضور المتدربين',
+    info:[['البرنامج','باقات القدرات والتحصيلي','wide'],['القسم',SECTIONS[sec]],['المقررات',subj||'—'],['اليوم',DAYS[dowOf(date)]],['التاريخ الهجري',fmtHijri(date)],['التاريخ الميلادي',fmtGreg(date)],
+      ['وقت الجلسة',ses?`${t12(ses.start)} – ${t12(ses.end)}`:'لا جلسة مجدولة'],['نوع الجلسة',ses?({regular:'منتظمة',makeup:'تعويضية',changed:'وقت معدَّل'}[ses.kind]||'منتظمة'):'—']],
+    stats:[['المشتركون',fmtNum(rows.length)],['الحاضرون',fmtNum(present.length),'ok'],['منهم متأخرون',fmtNum(late),'warn'],[pending?'لم يحضروا حتى الآن':'الغائبون',fmtNum(rows.length-present.length),'bad'],['نسبة الحضور',fmtNum(rows.length?Math.round(present.length/rows.length*100):0)+'٪']],
+    body:`<table class="ptab"><thead><tr><th style="width:30px">م</th><th>اسم المتدرب</th><th style="width:92px">السجل المدني</th><th style="width:70px">الباقة</th><th style="width:76px">وقت الحضور</th><th style="width:62px">الحالة</th><th style="width:92px">التوقيع</th></tr></thead>
+      <tbody>${rows.map((x,i)=>`<tr class="${x.a?'':'abs'}"><td>${fmtNum(i+1)}</td><td class="nm">${esc(x.t.full_name)}</td><td dir="ltr">${esc(x.t.national_id)}</td><td>${esc(x.p?planName(x.p):'—')}</td><td dir="ltr">${x.a?t12(String(x.a.time||'').slice(0,5)):'—'}</td>
+        <td><span class="pst ${x.a?(x.a.status==='متأخر'?'warn':'ok'):'bad'}">${x.a?(x.a.status==='متأخر'?'متأخر':'حاضر'):'غائب'}</span>${x.a?.manual?'<i class="pman">يدوي</i>':''}</td><td></td></tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:18px">لا يوجد مشتركون في هذا القسم</td></tr>`}</tbody></table>`,
+    note:`سُجّل الحضور بالباركود الموحد والتحقق برقم السجل المدني${rows.some(x=>x.a?.manual)?'، و«يدوي» تحضير أجراه المسؤول':''}${pending?'، والكشف محرّر قبل انتهاء الجلسة':''}.` });
 }
 
 /* ---------- 2) الملخص الأسبوعي / الشهري: نسبة حضور كل متدرب ---------- */
@@ -174,8 +192,8 @@ export function pageReports(){
   const card=(i,icon,tone,title,desc,form,btns)=>`<div class="card pad rv rep" style="--i:${i}"><div class="rep-h"><span class="kic-lg t-${tone}">${ic(icon)}</span><div><h3>${title}</h3><p class="hint">${desc}</p></div></div><div class="rep-f">${form}</div><div class="rep-b">${btns}</div></div>`;
   m.innerHTML = titleBar(`${ic('form')}التقارير والطباعة`, 'كل ما يُطبع ويُصدَّر، <em>في مكان واحد</em>', 'نماذج رسمية بشعارات المركز وجهات الاعتماد، بختم وتوقيع مدير المركز. تُطبع أو تُحفظ PDF من نافذة الطباعة، وتُصدَّر البيانات إلى Excel.')+
   `<div class="grid g2">
-    ${card(1,'calendar','success','كشف الحضور اليومي','نموذج إثبات لحضور يوم: بيانات البرنامج والدفعة، والمسجلون، ووقت حضور كل متدرب، وخانة توقيعه.',
-      `<div class="field"><label>التاريخ</label><input type="date" class="inp" id="r1d" value="${today}"></div><div class="field"><label>الدفعة</label><select class="inp" id="r1c"></select></div>`,
+    ${card(1,'calendar','success','كشف الحضور اليومي','نموذج إثبات لحضور يوم لأي جلسة سابقة: الدورات وأقسام باقات القدرات والتحصيلي، والمسجلون، ووقت حضور كل متدرب، وخانة توقيعه.',
+      `<div class="field"><label>التاريخ</label><input type="date" class="inp" id="r1d" value="${today}"></div><div class="field"><label>الجلسة</label><select class="inp" id="r1c"></select></div>`,
       `<button class="btn pri" id="r1">${ic('form')} معاينة الطباعة</button>`)}
     ${card(2,'activity','info','الملخص الأسبوعي','نسبة حضور كل متدرب وتأخره وغيابه خلال الأسبوع (الأحد إلى السبت)، مع الحضور اليومي.',
       `<div class="field"><label>البرنامج</label><select class="inp" id="r2p">${progOpts}</select></div><div class="field"><label>أي يوم في الأسبوع</label><input type="date" class="inp" id="r2d" value="${today}"></div><div class="hint" id="r2h"></div>`,
@@ -195,13 +213,14 @@ export function pageReports(){
       `<div class="field"><label>سجل الحضور من</label><div style="display:flex;gap:8px"><input type="date" class="inp" id="r6f" value="${addDays(today,-29)}"><input type="date" class="inp" id="r6t" value="${today}"></div></div>`,
       `<button class="btn" id="r6a">${ic('copy')} سجل الحضور للفترة</button><button class="btn" id="r6b">${ic('users')} المتدربون وتسجيلاتهم</button>`)}
   </div>`;
-  const fillDay=()=>{ const d=$('#r1d').value, cs=AD.cohorts.filter(c=>isSessionDay(c,d)&&d<=today);
-    $('#r1c').innerHTML = cs.length ? `<option value="all">كل دفعات اليوم (${fmtNum(cs.length)})</option>`+cs.map(c=>`<option value="${c.id}">${esc(short(progName(c.program_id)))} · ${cohortLabel(c)}</option>`).join('') : '<option value="">لا توجد محاضرات في هذا اليوم</option>';
-    $('#r1').disabled=!cs.length; };
+  const fillDay=()=>{ const d=$('#r1d').value, cs=AD.cohorts.filter(c=>isSessionDay(c,d)&&d<=today), ss=d<=today?Object.keys(SECTIONS).filter(sec=>sessionOn(AD,sec,d)):[], n=cs.length+ss.length;
+    $('#r1c').innerHTML = n ? `<option value="all">كل جلسات اليوم (${fmtNum(n)})</option>`+ss.map(sec=>`<option value="sec:${sec}">باقات القدرات والتحصيلي · ${SECTIONS[sec]}</option>`).join('')+cs.map(c=>`<option value="${c.id}">${esc(short(progName(c.program_id)))} · ${cohortLabel(c)}</option>`).join('') : '<option value="">لا توجد محاضرات في هذا اليوم</option>';
+    $('#r1').disabled=!n; };
   const wkTxt=()=>{ const w=weekOf($('#r2d').value); $('#r2h').textContent=`الأسبوع: ${fmtGreg(w.from)} – ${fmtGreg(w.to)}`; };
   $('#r1d').onchange=fillDay; fillDay(); $('#r2d').onchange=wkTxt; wkTxt();
   const overl=(pid,f,t)=>AD.cohorts.filter(c=>(!pid||c.program_id===pid)&&c.start_date<=t&&c.end_date>=f&&c.start_date<=today).sort((a,b)=>a.number-b.number);
-  $('#r1').onclick=()=>{ const d=$('#r1d').value, v=$('#r1c').value, cs=v==='all'?AD.cohorts.filter(c=>isSessionDay(c,d)):[AD.cohorts.find(c=>c.id===v)]; printSheets(cs.map(c=>({c,date:d})), `كشوف حضور ${fmtDate(d)}`); };
+  $('#r1').onclick=()=>{ const d=$('#r1d').value, v=$('#r1c').value, ss=v==='all'?Object.keys(SECTIONS).filter(sec=>sessionOn(AD,sec,d)):v.startsWith('sec:')?[v.slice(4)]:[], cs=v==='all'?AD.cohorts.filter(c=>isSessionDay(c,d)):v.startsWith('sec:')?[]:[AD.cohorts.find(c=>c.id===v)];
+    printDocs([...ss.map(sec=>sectionSheetHtml(sec,d)), ...cs.map(c=>sheetHtml(c,d))], `كشوف حضور ${fmtDate(d)}`); };
   const sumRun=(pid,f,t,kind,title)=>{ const cs=overl(pid,f,t); if(!cs.length) return toast('لم تنعقد دفعات في هذه الفترة'); printDocs(cs.map(c=>summaryHtml(c,f,t,kind)), title); };
   $('#r2').onclick=()=>{ const w=weekOf($('#r2d').value); sumRun($('#r2p').value,w.from,w.to,'week',`الملخص الأسبوعي · ${progName($('#r2p').value)}`); };
   $('#r2all').onclick=()=>{ const w=weekOf($('#r2d').value); sumRun(null,w.from,w.to,'week',`الملخص الأسبوعي · كل البرامج`); };

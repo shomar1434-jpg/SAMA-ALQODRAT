@@ -1,5 +1,5 @@
 import { LOGO } from './assets/logo.js';
-import { pageAdmins, pageAudit } from './admins_views.js';
+import { pageAdmins, pageAudit, changePasswordModal, logoutAllBox } from './admins_views.js';
 import { canSeePage, ADMIN_ROLES } from './admin_logic.js';
 import { CATEGORIES, catPill, computeEnd } from './catalog.js';
 import { PROFILE_FIELDS, STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, enrollsOf, isSessionDay, progCode, sessionDays, takenOf } from './data2.js';
@@ -42,9 +42,13 @@ export async function viewAdmin(r){
       <div class="sec">أدوات</div>
       <a href="#display">${ic('qr')}باركود محاضرات اليوم</a>
       <a href="#register">${ic('form')}دليل البرامج</a>
+      ${Store.mode==='cloud'?`<a href="#" id="chPass">${ic('lock')}تغيير كلمة المرور</a>`:''}
       <a href="#" id="logout">${ic('logout')}خروج</a>
+      ${Store.mode==='cloud'?`<a href="#" id="logoutAll">${ic('logout')}الخروج من كل الأجهزة</a>`:''}
     </aside><section class="main" id="main">${skeleton()}</section></div>`;
   $('#logout').onclick=async e=>{ e.preventDefault(); await Store.logout(); location.hash='#register'; };
+  if($('#chPass')) $('#chPass').onclick=e=>{ e.preventDefault(); changePasswordModal(); };
+  if($('#logoutAll')) $('#logoutAll').onclick=e=>{ e.preventDefault(); logoutAllBox(()=>{ location.hash='#register'; }); };
   if(!canSeePage(me?.role, r)){ $('#main').innerHTML=emptyBox('هذه الصفحة لمدير النظام', 'دورك الحالي: '+(ADMIN_ROLES[me?.role]||'')+'. اطلب من مدير النظام إن احتجت إليها.'); return; }
   try{ AD = await Store.adminData(); }catch(e){ $('#main').innerHTML=emptyBox('تعذّر تحميل البيانات', esc(e.message)); return; }
   if(!flt.to){ flt.to=riyadhNow().date; flt.from=addDays(flt.to,-29); }

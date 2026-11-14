@@ -18,7 +18,7 @@ export const joinLink = () => adminBase() + '#admin-join';
 /* نتيجة الدعوة: بريد أُرسل، أو كلمة مرور مؤقتة تظهر مرة واحدة */
 function inviteResult(r, email){
   if(r?.mode === 'password') {
-    modal(`<h3>أُنشئ حساب المسؤول</h3><div class="alert t-gold"><span class="aic">${ic('alert')}</span><div>تعذّر إرسال البريد إلى ${esc(email)}، فأُنشئ الحساب بكلمة مرور مؤقتة. <b>تظهر هنا مرة واحدة فقط</b>؛ سلّمها لصاحبها بنفسك، وسيُطلب منه تغييرها عند أول دخول.</div></div>
+    modal(`<h3>${r.reset ? 'كلمة مرور مؤقتة جديدة' : 'أُنشئ حساب المسؤول'}</h3><div class="alert t-gold"><span class="aic">${ic('alert')}</span><div>${r.reset ? `أُلغيت كلمة مرور ${esc(email)} السابقة وخرج من أجهزته.` : `تعذّر إرسال البريد إلى ${esc(email)}، فأُنشئ الحساب بكلمة مرور مؤقتة.`} <b>تظهر هنا مرة واحدة فقط</b>؛ سلّمها لصاحبها بنفسك، وسيُطلب منه تغييرها عند أول دخول.</div></div>
       <div class="field" style="margin-top:12px"><span class="lbl">كلمة المرور المؤقتة</span><code id="tmpP" dir="ltr" style="font-size:20px;letter-spacing:2px;display:block;padding:10px;border:1px solid var(--border);border-radius:10px;text-align:center">${esc(r.temp_password)}</code></div>
       <p class="hint">يدخل من صفحة دخول الإدارة ببريده (${esc(email)}) وهذه الكلمة.</p>
       <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="tmpC">${ic('copy')} نسخ</button><button class="btn pri" id="tmpX">تم التسليم</button></div>`);
@@ -43,14 +43,20 @@ export async function pageAdmins(){
   const me = await Store.adminMe(), main = $('#main');
   if(!isFull(me?.role)){ main.innerHTML = emptyBox('هذه الصفحة لمدير النظام', 'إدارة المسؤولين للمالك الأساسي ومدير النظام الكامل.'); return; }
   let L = []; try { L = await Store.listAdmins(); } catch(x){ main.innerHTML = emptyBox('تعذّر تحميل المسؤولين', esc(x.message)); return; }
-  const rowsHtml = L.map(a => { const R = adminRules(me, a);
+  const cur = L.filter(a => !a.removed), gone = L.filter(a => a.removed);
+  const rowsHtml = cur.map(a => { const R = adminRules(me, a);
     return `<tr><td><b>${esc(a.name || '—')}</b>${a.self ? ' <span class="hint">(أنت)</span>' : ''}${a.created_by ? `<div class="hint">أضافه: ${esc(a.created_by)}</div>` : ''}</td>
       <td dir="ltr" style="text-align:right">${esc(a.email || '')}</td><td>${rolePill(a.role, a.active !== false)}</td>
       <td>${a.pending ? '<span class="pill dot warn">مدعوّ لم يفعّل حسابه</span>' : a.active !== false ? '<span class="pill dot ok">فعّال</span>' : '<span class="pill dot g">معطَّل</span>'}</td>
-      <td style="white-space:nowrap">${R.canSetRole ? `<button class="btn sm" data-ar="${a.id}">${ic('edit')} الدور</button> ` : ''}${R.canToggle ? `<button class="btn sm ${a.active !== false ? 'danger soft' : ''}" data-aa="${a.id}">${a.active !== false ? 'تعطيل' : 'تفعيل'}</button>` : ''}${R.canCancelInvite ? `<button class="btn sm" data-ars="${a.id}">إعادة الإرسال</button> <button class="btn sm danger soft" data-ai="${a.id}">إلغاء الدعوة</button>` : ''}</td></tr>`; }).join('');
+      <td style="white-space:nowrap">${R.canSetRole ? `<button class="btn sm" data-ar="${a.id}">${ic('edit')} الدور</button> ` : ''}${R.canToggle ? `<button class="btn sm ${a.active !== false ? 'danger soft' : ''}" data-aa="${a.id}">${a.active !== false ? 'تعطيل' : 'تفعيل'}</button>` : ''}${R.canResetPassword ? ` <button class="btn sm" data-ap="${a.id}">${ic('lock')} كلمة مرور مؤقتة</button>` : ''}${R.canToggle ? ` <button class="btn sm danger soft" data-ax="${a.id}">${ic('trash')} حذف</button>` : ''}${R.canCancelInvite ? `<button class="btn sm" data-ars="${a.id}">إعادة الإرسال</button> <button class="btn sm danger soft" data-ai="${a.id}">إلغاء الدعوة</button>` : ''}</td></tr>`; }).join('');
+  const goneHtml = gone.length ? `<div class="card pad rv" id="adGone" style="margin-top:18px"><h3 class="ctitle">${ic('database')}المسؤولون المؤرشفون وعملياتهم <span class="pill g">${gone.length}</span></h3>
+    <p class="hint">حُذفوا من قائمة المسؤولين ولا يستطيعون الدخول. لا تُمحى عملياتهم: تبقى في أرشيف الحركات بأسمائهم${isOwner(me.role) ? '، وتعرضها هنا بزر «عملياته»' : ' (يطّلع عليها المالك الأساسي)'}. ويمكن إعادة أي منهم.</p>
+    <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th></th></tr></thead><tbody>${gone.map(a => `<tr><td><b>${esc(a.name || '—')}</b></td><td dir="ltr" style="text-align:right">${esc(a.email || '')}</td><td>${rolePill(a.role, false)}</td>
+      <td style="white-space:nowrap">${isOwner(me.role) ? `<button class="btn sm" data-aops="${a.id}">${ic('form')} عملياته</button> ` : ''}${adminRules(me, { ...a, active: true }).canToggle ? `<button class="btn sm" data-aa="${a.id}">إعادة</button>` : ''}</td></tr>
+      <tr id="aops-${a.id}" hidden><td colspan="4"></td></tr>`).join('')}</tbody></table></div></div>` : '';
   main.innerHTML = titleBar(`${ic('lock')}${ADMIN_ROLES[me.role]}`, 'إدارة <em>المسؤولين</em>', 'دعوة المسؤولين وتحديد أدوارهم وتعطيلهم. الحذف تعطيل يحفظ هوية المنفّذ في السجلات، ولا أحد يغيّر دوره بنفسه، والمالك الأساسي لا يُعدَّل.') + `
     <div class="card pad rv"><h3 class="ctitle">${ic('users')}المسؤولون</h3>
-      <div class="tblwrap"><table class="tb" id="adList"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div></div>
+      <div class="tblwrap"><table class="tb" id="adList"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div></div>${goneHtml}
     <div class="card pad rv" style="margin-top:18px"><h3 class="ctitle">${ic('plus')}دعوة مسؤول</h3>
       <form id="adF" class="grid g3" novalidate>
         <div class="field"><label for="ad-n">اسم المسؤول</label><input class="inp" id="ad-n" maxlength="80"></div>
@@ -68,6 +74,19 @@ export async function pageAdmins(){
   $$('[data-ars]').forEach(b => b.onclick = async () => { const a = L.find(x => x.id === b.dataset.ars); setBusy(b, true, 'جارٍ الإرسال');
     const go = async () => { try { inviteResult(await Store.addAdmin(a.email, a.name, a.role), a.email); } catch(x){ setBusy(b, false); if(/أعد إدخال كلمة المرور/.test(x.message)) reauth(go); else toast(x.message); } }; go(); });
   $$('[data-ai]').forEach(b => b.onclick = () => confirmBox('إلغاء الدعوة', 'تُلغى الدعوة ولا يستطيع صاحبها تفعيل حساب مسؤول.', async () => { try { await Store.removeAdmin(b.dataset.ai); toast('أُلغيت الدعوة'); pageAdmins(); } catch(x){ toast(x.message); } }, 'إلغاء الدعوة'));
+  $$('[data-ax]').forEach(b => b.onclick = () => { const a = L.find(x => x.id === b.dataset.ax);
+    confirmBox(`حذف ${a.name || a.email}`, 'يُحذف من قائمة المسؤولين ويفقد الدخول فورًا، ويُنقل إلى «المسؤولين المؤرشفين وعملياتهم» أسفل الصفحة. تبقى كل عملياته محفوظة باسمه، ويمكنك إعادته لاحقًا.',
+      async () => { try { await Store.removeAdmin(a.id); toast('حُذف من قائمة المسؤولين وأُرشفت عملياته'); pageAdmins(); } catch(x){ toast(x.message); } }, 'حذف'); });
+  $$('[data-aops]').forEach(b => b.onclick = async () => { const id = b.dataset.aops, row = $('#aops-' + id), cell = row.firstElementChild;
+    if(!row.hidden){ row.hidden = true; return; } row.hidden = false; cell.innerHTML = '<span class="hint">جارٍ التحميل…</span>';
+    try { const r = await Store.adminAudit({ actor: id, limit: 30 });
+      cell.innerHTML = r.rows.length ? `<ol class="aops" style="margin:0;padding-inline-start:18px;display:grid;gap:4px">${r.rows.map(x => `<li><span class="num">${esc(fmtAt(x.at))}</span> · ${esc(auditSection(x.action))} · ${esc(auditOp(x.action))}${x.entity ? ` · <span dir="auto">${esc(x.entity)}</span>` : ''}</li>`).join('')}</ol>
+        <div class="hint" style="margin-top:6px">${r.total > r.rows.length ? `آخر ${r.rows.length} من ${r.total} عملية. ` : `${r.total} عملية. `}<a href="#admin-audit" data-aall="${id}">كل عملياته في أرشيف الحركات</a></div>` : '<span class="hint">لا توجد عمليات مسجّلة باسمه.</span>';
+      const l = cell.querySelector('[data-aall]'); if(l) l.onclick = () => { AF = { ...AF, actor: id }; };
+    } catch(x){ cell.innerHTML = `<span class="errtxt">${esc(x.message)}</span>`; } });
+  $$('[data-ap]').forEach(b => b.onclick = () => { const a = L.find(x => x.id === b.dataset.ap);
+    confirmBox(`كلمة مرور مؤقتة لـ ${a.name || a.email}`, 'تُلغى كلمة مروره الحالية ويخرج من كل أجهزته، وتظهر لك كلمة مؤقتة مرة واحدة تسلّمها له، ويغيّرها عند أول دخول.',
+      async () => { try { const r = await Store.resetAdminPassword(a.id); setTimeout(() => inviteResult({ ...r, reset: true }, a.email), 60); } catch(x){ toast(x.message); } }, 'إنشاء كلمة مؤقتة'); });
   $$('[data-aa]').forEach(b => b.onclick = () => { const a = L.find(x => x.id === b.dataset.aa), on = a.active === false;
     modal(`<h3>${on ? 'تفعيل' : 'تعطيل'} ${esc(a.name)}</h3><p class="hint">${on ? 'يستعيد صلاحية لوحة الإدارة بدوره الحالي.' : 'يفقد صلاحية لوحة الإدارة فورًا، وتبقى عملياته السابقة في السجل باسمه.'}</p>
       <form id="aaF" class="grid" novalidate><div class="field"><label for="aa-r">السبب</label><input class="inp" id="aa-r" maxlength="200"></div><div class="errtxt" id="aaE" role="alert"></div>
@@ -128,4 +147,22 @@ export async function pageAudit(){
       toast(`صُدّرت ${fmtNum(r.rows.length)} حركة، وسُجّل التصدير في الأرشيف`); }
     catch(x){ toast(x.message); } setBusy(b, false); };
   load();
+}
+
+/* تغيير كلمة مرور المسؤول الحالي: الكلمة الحالية أولًا ثم الجديدة مرتين */
+export function changePasswordModal(){
+  modal(`<h3>تغيير كلمة المرور</h3><form id="cpF" class="grid" novalidate>
+    <div class="field"><label for="cp-o">كلمة المرور الحالية</label><input class="inp" id="cp-o" type="password" autocomplete="current-password"></div>
+    <div class="field"><label for="cp-a">كلمة المرور الجديدة (8 أحرف على الأقل)</label><input class="inp" id="cp-a" type="password" autocomplete="new-password"></div>
+    <div class="field"><label for="cp-b">أعد كتابة الجديدة</label><input class="inp" id="cp-b" type="password" autocomplete="new-password"></div>
+    <div class="errtxt" id="cpE" role="alert"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="cpC">إلغاء</button><button class="btn pri" id="cpS">${ic('lock')} حفظ</button></div></form>`);
+  $('#cpC').onclick = closeModal;
+  $('#cpF').onsubmit = async e => { e.preventDefault(); const er = $('#cpE'), b = $('#cpS'), n = $('#cp-a').value; er.textContent = '';
+    if(n.length < 8){ er.textContent = 'كلمة المرور الجديدة 8 أحرف على الأقل'; return; } if(n !== $('#cp-b').value){ er.textContent = 'الكلمتان الجديدتان غير متطابقتين'; return; }
+    setBusy(b, true, 'جارٍ الحفظ'); try { await Store.changePassword($('#cp-o').value, n); closeModal(); toast('غُيّرت كلمة المرور'); } catch(x){ setBusy(b, false); er.textContent = x.message; } };
+}
+/* الخروج من كل الأجهزة: لمن فقد جهازًا أو شكّ أن غيره دخل بحسابه */
+export function logoutAllBox(after){
+  confirmBox('الخروج من كل الأجهزة', 'تنتهي جلسات حسابك على كل الأجهزة، بما فيها هذا الجهاز، وتحتاج الدخول بكلمة مرورك من جديد.', async () => { await Store.logoutAll(); after(); }, 'خروج من الكل');
 }

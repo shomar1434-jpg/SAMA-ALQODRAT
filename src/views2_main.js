@@ -499,8 +499,11 @@ export async function viewDisplay(){
         <h3 style="font-size:17px;font-weight:600">${esc(x.title)}</h3>
         <div class="hint">${t12(x.start)} – ${t12(x.end)}${x.sub?` · ${esc(x.sub)}`:''}</div>
         <span class="pill dot ok" style="align-self:flex-start">${fmtNum(x.present)} من ${fmtNum(x.expected)} حاضر</span>
-        ${x.kind==='pkg'?`<a class="btn sm" href="#admin-qudurat" style="margin-top:auto">${ic('users')} المشتركون</a>`:`<a class="btn sm" href="#qr-${x.code}" style="margin-top:auto">${ic('qr')} باركود البرنامج (اختياري)</a>`}</div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد جلسات اليوم','تظهر هنا جلسات باقات القدرات والتحصيلي حسب جدول كل قسم، ودفعات البرامج في أيام محاضراتها.')}</div>`}</div></div>`;
+        <button class="btn pri sm" data-sheet="${x.kind}:${x.key}" style="margin-top:auto">${ic('form')} كشف حضور اليوم وطباعته</button></div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد جلسات اليوم','تظهر هنا جلسات باقات القدرات والتحصيلي حسب جدول كل قسم، ودفعات البرامج في أيام محاضراتها.')}</div>`}</div></div>`;
   makeQR($('#uQR'), url, 200); $('#uCp').onclick=()=>copyText(url,'نُسخ رابط التحضير');
+  // كشف حضور الجلسة لليوم: معاينة A4 ثم طباعة أو حفظ PDF للاحتفاظ به مرجعًا للمعهد
+  $$('[data-sheet]').forEach(b=>b.onclick=async()=>{ const [k,id]=b.dataset.sheet.split(':'); const [P,A]=await Promise.all([import('./print.js'), import('./views2_admin.js')]); A.setAD(D);
+    P.printDocs([k==='pkg'?P.sectionSheetHtml(id, today):P.sheetHtml(D.cohorts.find(c=>c.id===id), today)], `كشف حضور ${fmtDate(today)}`); });
 }
 
 /* =====================================================================
@@ -533,6 +536,7 @@ export function viewLogin(mode, note){
       <div class="errtxt" id="lErr" role="alert">${note?esc(note):''}</div>
       <button class="btn pri" id="lfGo">${ic('lock')} ${join?'تفعيل الحساب':'دخول'}</button>
       ${join?`<a class="btn" href="#admin">العودة إلى الدخول</a>`:''}
+      ${cloud&&!join?`<button type="button" class="linkbtn" id="lfForgot" style="justify-self:center;min-height:44px">نسيت كلمة المرور؟</button>`:''}
       ${cloud?'':`<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>البيانات تجريبية. رمز الدخول الافتراضي <b>1234</b>، وتغيّره من الإعدادات.</span></div>`}
     </form></div></div>`;
   $('#lf').onsubmit = async e=>{ e.preventDefault(); const F=Object.fromEntries(new FormData(e.target)), b=$('#lfGo'); $('#lErr').textContent='';
@@ -540,4 +544,8 @@ export function viewLogin(mode, note){
       if(!/^\S+@\S+\.\S+$/.test(u) || String(F.p||'').length<8){ $('#lErr').textContent='اكتب بريدك وكلمة مرور من 8 أحرف على الأقل'; return; }
       setBusy(b,true,'جارٍ التفعيل'); try{ const r=await Store.adminSignup(u, F.p); setBusy(b,false); if(r.confirm){ $('#lErr').textContent='أُرسلت رسالة تأكيد إلى بريدك. افتح الرابط فيها ثم ادخل من صفحة الدخول ببريدك وكلمة مرورك.'; return; } location.replace('#admin'); route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } return; }
     setBusy(b,true,'جارٍ الدخول'); try{ await Store.login(F.u, F.p); route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } };
+  if($('#lfForgot')) $('#lfForgot').onclick=async()=>{ const u=$('#lf-u').value.trim(), er=$('#lErr');
+    if(!/^\S+@\S+\.\S+$/.test(u)){ er.textContent='اكتب بريدك الإلكتروني في الخانة أعلاه ثم اضغط «نسيت كلمة المرور؟»'; $('#lf-u').focus(); return; }
+    const b=$('#lfForgot'); setBusy(b,true,'جارٍ الإرسال');
+    try{ await Store.requestPasswordReset(u); er.textContent='إن كان هذا البريد لحساب مسؤول فسيصله رابط لاختيار كلمة مرور جديدة. إن لم يصل خلال دقائق فاطلب من المالك «كلمة مرور مؤقتة».'; }catch(x){ er.textContent=x.message; } setBusy(b,false); };
 }

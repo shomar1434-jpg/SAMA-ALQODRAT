@@ -49,6 +49,24 @@ await p.click('[data-aa="staff-1"]'); await p.waitForSelector('#aaF'); await p.f
 D = await data();
 ok(D.admins.find(a => a.id === 'staff-1').active === false && D.admins.some(a => a.id === 'staff-1'), 'التعطيل لا يحذف الحساب');
 
+// الإزالة: تعطيل ينقل إلى «المسؤولين السابقين» ويُعاد، وكلمة مرور مؤقتة من المالك
+await put(D => { D.admins.push({ id:'staff-2', email:'staff2@center.sa', name:'مسؤول الاستقبال', role:'staff', active:true, pending:false }); });
+await go('admin-admins');
+await p.click('[data-ap="staff-2"]'); await p.waitForSelector('#mo'); await p.click('#mo'); await p.waitForSelector('#tmpP', { timeout: 3000 }).catch(() => {});
+ok(/^demo\d{6}$/.test(await text('#tmpP')) && /كلمة مرور مؤقتة جديدة/.test(await text('.modal')), 'المالك ينشئ كلمة مرور مؤقتة تظهر مرة واحدة');
+await p.click('#tmpX'); await p.waitForTimeout(600);
+await p.click('[data-ax="staff-2"]'); await p.waitForSelector('#mo'); await p.click('#mo'); await p.waitForTimeout(900);
+D = await data();
+const s2 = D.admins.find(a => a.id === 'staff-2');
+ok(s2 && s2.active === false && s2.removed === true, 'الحذف أرشفة: الحساب محفوظ معطّلًا');
+ok(!/مسؤول الاستقبال/.test(await text('#adList')) && /مسؤول الاستقبال/.test(await text('#adGone')) && /المسؤولون المؤرشفون وعملياتهم/.test(await text('#adGone')), 'المحذوف في «المسؤولين المؤرشفين وعملياتهم» أسفل الصفحة');
+await put(D => { D.audit_logs.push({ id: 'x-s2', at: new Date().toISOString(), actor: 'staff-2', actor_role: 'staff', actor_name: 'مسؤول الاستقبال', action: 'subscriptions.insert', entity: 'SQ-TEST' }); });
+await go('admin-admins'); await p.click('#adGone [data-aops="staff-2"]'); await p.waitForTimeout(600);
+ok(/SQ-TEST/.test(await text('#aops-staff-2')) && /أرشيف الحركات/.test(await text('#aops-staff-2')), 'عمليات المسؤول المؤرشف ظاهرة تحت اسمه');
+await p.click('#adGone [data-aa="staff-2"]'); await p.waitForSelector('#aaF'); await p.fill('#aa-r', 'عودة للعمل'); await p.click('#aaS'); await p.waitForTimeout(800);
+D = await data();
+ok(D.admins.find(a => a.id === 'staff-2').active === true && !D.admins.find(a => a.id === 'staff-2').removed, 'الإعادة ترجعه إلى القائمة فعّالًا');
+
 // ---- أرشيف الحركات ----
 await go('admin-audit'); await p.waitForSelector('#auList table');
 ok(/المسؤولون/.test(await text('#auList')) && /مدير النظام/.test(await text('#auList')), 'الأرشيف يعرض المنفّذ والقسم');
@@ -81,5 +99,9 @@ ok(!/إدارة المسؤولين/.test(nav2) && !/أرشيف الحركات/.t
 for (const h of ['admin-settings', 'admin-admins', 'admin-audit']) { await go(h); ok(/لمدير النظام|للمالك/.test(await text('#main')) && !(await p.$('#adF')) && !(await p.$('#auF')), `الرابط المباشر ${h} مرفوض للمسؤول العادي`); }
 
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
+// الجلسات: الخروج لهذا الجهاز فقط، وجلسة الإدارة منفصلة عن البوابات في المتصفح نفسه (فحص الشيفرة؛ السحابة لا تعمل في الاختبار)
+{ const src = (await import('node:fs')).readFileSync(new URL('../src/data2.js', import.meta.url), 'utf8');
+  ok(/async logout\(\)\{ await this\.sb\.auth\.signOut\(\{scope:'local'\}\)/.test(src) && /portalLogout[^\n]*signOut\(\{scope:'local'\}\)/.test(src), 'الخروج يُنهي جلسة هذا الجهاز فقط');
+  ok(/storageKey:'sama-admin-auth'/.test(src) && /logoutAll[^\n]*scope:'global'/.test(src), 'جلسة إدارة مستقلة، وخيار الخروج من كل الأجهزة'); }
 await b.close(); server.close();
 if (failed()) process.exit(1);
