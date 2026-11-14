@@ -15,6 +15,19 @@ import { ADMIN_ROLES, ROLE_HINT, adminRules, isOwner, isFull, AUDIT_SECTIONS, AU
 const fmtAt = at => { try { return new Date(at).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { timeZone:'Asia/Riyadh', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }); } catch(e){ return String(at || ''); } };
 const rolePill = (r, active = true) => `<span class="pill ${!active ? 'g' : r === 'owner' ? 'ok' : r === 'full' ? 'info' : 'g'}">${ADMIN_ROLES[r] || r}${active ? '' : ' · معطَّل'}</span>`;
 export const joinLink = () => adminBase() + '#admin-join';
+/* نتيجة الدعوة: بريد أُرسل، أو كلمة مرور مؤقتة تظهر مرة واحدة */
+function inviteResult(r, email){
+  if(r?.mode === 'password') {
+    modal(`<h3>أُنشئ حساب المسؤول</h3><div class="alert t-gold"><span class="aic">${ic('alert')}</span><div>تعذّر إرسال البريد إلى ${esc(email)}، فأُنشئ الحساب بكلمة مرور مؤقتة. <b>تظهر هنا مرة واحدة فقط</b>؛ سلّمها لصاحبها بنفسك، وسيُطلب منه تغييرها عند أول دخول.</div></div>
+      <div class="field" style="margin-top:12px"><span class="lbl">كلمة المرور المؤقتة</span><code id="tmpP" dir="ltr" style="font-size:20px;letter-spacing:2px;display:block;padding:10px;border:1px solid var(--border);border-radius:10px;text-align:center">${esc(r.temp_password)}</code></div>
+      <p class="hint">يدخل من صفحة دخول الإدارة ببريده (${esc(email)}) وهذه الكلمة.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="tmpC">${ic('copy')} نسخ</button><button class="btn pri" id="tmpX">تم التسليم</button></div>`);
+    $('#tmpC').onclick = async () => { try { await navigator.clipboard.writeText(r.temp_password); toast('نُسخت'); } catch(e){ toast('انسخها يدويًا'); } };
+    $('#tmpX').onclick = () => { closeModal(); pageAdmins(); };
+    return;
+  }
+  toast(r?.mode === 'existing' ? 'أصبح الحساب مسؤولًا' : r?.mode === 'email' ? `أُرسلت الدعوة إلى بريد ${email}` : 'أضيفت الدعوة'); pageAdmins();
+}
 
 /* إعادة التحقق بكلمة المرور قبل منح الصلاحيات الكاملة */
 function reauth(then){
@@ -34,7 +47,7 @@ export async function pageAdmins(){
     return `<tr><td><b>${esc(a.name || '—')}</b>${a.self ? ' <span class="hint">(أنت)</span>' : ''}${a.created_by ? `<div class="hint">أضافه: ${esc(a.created_by)}</div>` : ''}</td>
       <td dir="ltr" style="text-align:right">${esc(a.email || '')}</td><td>${rolePill(a.role, a.active !== false)}</td>
       <td>${a.pending ? '<span class="pill dot warn">مدعوّ لم يفعّل حسابه</span>' : a.active !== false ? '<span class="pill dot ok">فعّال</span>' : '<span class="pill dot g">معطَّل</span>'}</td>
-      <td style="white-space:nowrap">${R.canSetRole ? `<button class="btn sm" data-ar="${a.id}">${ic('edit')} الدور</button> ` : ''}${R.canToggle ? `<button class="btn sm ${a.active !== false ? 'danger soft' : ''}" data-aa="${a.id}">${a.active !== false ? 'تعطيل' : 'تفعيل'}</button>` : ''}${R.canCancelInvite ? `<button class="btn sm danger soft" data-ai="${a.id}">إلغاء الدعوة</button>` : ''}</td></tr>`; }).join('');
+      <td style="white-space:nowrap">${R.canSetRole ? `<button class="btn sm" data-ar="${a.id}">${ic('edit')} الدور</button> ` : ''}${R.canToggle ? `<button class="btn sm ${a.active !== false ? 'danger soft' : ''}" data-aa="${a.id}">${a.active !== false ? 'تعطيل' : 'تفعيل'}</button>` : ''}${R.canCancelInvite ? `<button class="btn sm" data-ars="${a.id}">إعادة الإرسال</button> <button class="btn sm danger soft" data-ai="${a.id}">إلغاء الدعوة</button>` : ''}</td></tr>`; }).join('');
   main.innerHTML = titleBar(`${ic('lock')}${ADMIN_ROLES[me.role]}`, 'إدارة <em>المسؤولين</em>', 'دعوة المسؤولين وتحديد أدوارهم وتعطيلهم. الحذف تعطيل يحفظ هوية المنفّذ في السجلات، ولا أحد يغيّر دوره بنفسه، والمالك الأساسي لا يُعدَّل.') + `
     <div class="card pad rv"><h3 class="ctitle">${ic('users')}المسؤولون</h3>
       <div class="tblwrap"><table class="tb" id="adList"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div></div>
@@ -46,14 +59,14 @@ export async function pageAdmins(){
         <p class="hint" id="adH" style="grid-column:1/-1;margin:0">${ROLE_HINT.staff}</p>
         <div class="errtxt" id="adE" role="alert" style="grid-column:1/-1"></div>
         <div style="grid-column:1/-1"><button class="btn pri" id="adS">${ic('plus')} إضافة الدعوة</button></div></form>
-      <div class="alert t-teal" style="margin-top:12px"><span class="aic">${ic('alert')}</span><div><b>رابط تفعيل الحساب للمدعوّين</b><p style="margin:4px 0 8px">أرسل هذا الرابط للمسؤول بعد إضافة دعوته؛ يفعّل منه حسابه بالبريد نفسه. الرابط لا يمنح أي صلاحية لمن لم تُضف دعوته.</p>
-        <code dir="ltr" id="adLink" style="word-break:break-all">${esc(joinLink())}</code> <button type="button" class="btn sm" id="adCopy">${ic('copy')} نسخ</button></div></div></div>`;
+      <p class="hint" style="margin:12px 0 0">يصل المدعوّ بريد من المنصة فيه رابط يختار منه كلمة مروره. إن تعذّر إرسال البريد تُنشأ له كلمة مرور مؤقتة تظهر لك مرة واحدة، فتسلّمها له، ويغيّرها عند أول دخول.</p></div>`;
   $('#ad-r').onchange = e => { $('#adH').textContent = ROLE_HINT[e.target.value]; };
-  $('#adCopy').onclick = async () => { try { await navigator.clipboard.writeText(joinLink()); toast('نُسخ الرابط'); } catch(e){ toast('انسخ الرابط يدويًا'); } };
   const add = async () => { const b = $('#adS'); setBusy(b, true, 'جارٍ الإضافة');
-    try { const r = await Store.addAdmin($('#ad-e').value, $('#ad-n').value, $('#ad-r').value); toast(r?.pending === false ? 'أصبح الحساب مسؤولًا' : 'أضيفت الدعوة؛ أرسل له رابط التفعيل'); pageAdmins(); }
+    try { const r = await Store.addAdmin($('#ad-e').value, $('#ad-n').value, $('#ad-r').value); inviteResult(r, $('#ad-e').value.trim().toLowerCase()); }
     catch(x){ setBusy(b, false); if(/أعد إدخال كلمة المرور/.test(x.message)) reauth(add); else $('#adE').textContent = x.message; } };
   $('#adF').onsubmit = e => { e.preventDefault(); $('#adE').textContent = ''; add(); };
+  $$('[data-ars]').forEach(b => b.onclick = async () => { const a = L.find(x => x.id === b.dataset.ars); setBusy(b, true, 'جارٍ الإرسال');
+    const go = async () => { try { inviteResult(await Store.addAdmin(a.email, a.name, a.role), a.email); } catch(x){ setBusy(b, false); if(/أعد إدخال كلمة المرور/.test(x.message)) reauth(go); else toast(x.message); } }; go(); });
   $$('[data-ai]').forEach(b => b.onclick = () => confirmBox('إلغاء الدعوة', 'تُلغى الدعوة ولا يستطيع صاحبها تفعيل حساب مسؤول.', async () => { try { await Store.removeAdmin(b.dataset.ai); toast('أُلغيت الدعوة'); pageAdmins(); } catch(x){ toast(x.message); } }, 'إلغاء الدعوة'));
   $$('[data-aa]').forEach(b => b.onclick = () => { const a = L.find(x => x.id === b.dataset.aa), on = a.active === false;
     modal(`<h3>${on ? 'تفعيل' : 'تعطيل'} ${esc(a.name)}</h3><p class="hint">${on ? 'يستعيد صلاحية لوحة الإدارة بدوره الحالي.' : 'يفقد صلاحية لوحة الإدارة فورًا، وتبقى عملياته السابقة في السجل باسمه.'}</p>

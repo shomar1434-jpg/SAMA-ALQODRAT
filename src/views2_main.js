@@ -54,6 +54,10 @@ export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
   cleanup(); closeModal(); closePrint();
+  // عائد من رابط بريد Supabase (دعوة مسؤول، تأكيد، استعادة كلمة المرور): تُعتمد الجلسة ثم يختار كلمة مروره
+  if(PAGE==='admin' && Store.authEvent){ const ev=Store.authEvent; Store.authEvent=null; history.replaceState(null,'',location.pathname+location.search+'#admin');
+    if(ev.error) return viewLogin('', 'انتهت صلاحية الرابط أو استُخدم من قبل. اطلب من مدير النظام إعادة إرسال الدعوة.');
+    const ok=await Store.authReady(); if(ok && ['invite','recovery'].includes(ev.type)) return viewSetPassword(ev.type); }
   let h = (location.hash||'').slice(1);
   // كل صفحة تخدم مساراتها فقط: مسارات الإدارة في /admin/ وبقية المسارات في الصفحة العامة
   const adminRoute = h.startsWith('admin')||h==='display'||h.startsWith('qr-');
@@ -82,6 +86,7 @@ export async function route(){
   if(r==='policies') return viewPolicies();
   if(r==='admin-join'){ if(await Store.isAdmin()){ location.replace('#admin'); return; } return viewLogin('join'); }
   if(!(await Store.isAdmin())) return viewLogin(r);
+  if(await Store.mustChangePassword()) return viewSetPassword('first');
   if(r==='display') return viewDisplay();
   return viewAdmin(r);
 }
@@ -475,7 +480,23 @@ export async function viewDisplay(){
 /* =====================================================================
    4) دخول المدير
    ===================================================================== */
-export function viewLogin(mode){
+/* اختيار كلمة المرور: للمدعوّ برابط البريد، ولمن أُنشئ حسابه بكلمة مؤقتة (أول دخول)، ولاستعادة كلمة المرور */
+export function viewSetPassword(kind){
+  const T={invite:['مرحبًا بك مسؤولًا في المنصة','اختر كلمة مرور لحسابك، ثم تدخل لوحة الإدارة بالدور الذي حدده لك مدير النظام.'],
+    first:['غيّر كلمة المرور المؤقتة','دخلت بكلمة مرور مؤقتة. اختر كلمة مرور خاصة بك قبل المتابعة.'],
+    recovery:['كلمة مرور جديدة','اختر كلمة مرور جديدة لحسابك.']}[kind]||['كلمة مرور جديدة',''];
+  $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
+    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${T[0]}</h2><div class="hint">${T[1]}</div></div></div>
+    <form id="spF" class="grid pad" novalidate>
+      <div class="field"><label for="sp-a">كلمة المرور (8 أحرف على الأقل)</label><input class="inp" id="sp-a" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="sp-b">أعد كتابتها</label><input class="inp" id="sp-b" type="password" autocomplete="new-password"></div>
+      <div class="errtxt" id="spE" role="alert"></div>
+      <button class="btn pri" id="spGo">${ic('lock')} حفظ والمتابعة</button></form></div></div>`;
+  $('#spF').onsubmit = async e=>{ e.preventDefault(); const a=$('#sp-a').value, b=$('#sp-b').value, er=$('#spE'), btn=$('#spGo'); er.textContent='';
+    if(a.length<8){ er.textContent='كلمة المرور 8 أحرف على الأقل'; return; } if(a!==b){ er.textContent='الكلمتان غير متطابقتين'; return; }
+    setBusy(btn,true,'جارٍ الحفظ'); try{ await Store.setPassword(a); location.replace(location.pathname+location.search+'#admin'); route(); }catch(x){ setBusy(btn,false); er.textContent=x.message; } };
+}
+export function viewLogin(mode, note){
   const cloud = Store.mode==='cloud', join = cloud && mode==='join';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
     <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${join?'تفعيل حساب مسؤول مدعوّ':'دخول مدير النظام'}</h2><div class="hint">${join?'لمن وصله رابط دعوة من مدير النظام':'الدفعات والحضور والتحليلات وإدارة البرامج'}</div></div></div>
@@ -483,7 +504,7 @@ export function viewLogin(mode){
       ${join?`<p class="hint" style="margin:0">اكتب البريد الذي دعاك به مدير النظام، واختر كلمة مرور من 8 أحرف على الأقل. تصلك رسالة تأكيد على بريدك؛ افتح الرابط فيها ثم ادخل من صفحة الدخول. البريد غير المدعوّ لا يحصل على أي صلاحية.</p>`:''}
       ${cloud?`<div class="field"><label for="lf-u">البريد الإلكتروني</label><input class="inp" id="lf-u" name="u" type="email" dir="ltr" autocomplete="username" required></div>`:''}
       <div class="field"><label for="lf-p">${cloud?(join?'كلمة مرور جديدة':'كلمة المرور'):'رمز الدخول'}</label><input class="inp" id="lf-p" name="p" type="password" ${cloud?`autocomplete="${join?'new-password':'current-password'}"`:'inputmode="numeric"'} required></div>
-      <div class="errtxt" id="lErr" role="alert"></div>
+      <div class="errtxt" id="lErr" role="alert">${note?esc(note):''}</div>
       <button class="btn pri" id="lfGo">${ic('lock')} ${join?'تفعيل الحساب':'دخول'}</button>
       ${join?`<a class="btn" href="#admin">العودة إلى الدخول</a>`:''}
       ${cloud?'':`<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>البيانات تجريبية. رمز الدخول الافتراضي <b>1234</b>، وتغيّره من الإعدادات.</span></div>`}
