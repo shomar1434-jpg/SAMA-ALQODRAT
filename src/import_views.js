@@ -82,11 +82,11 @@ function importTab(){
         <td><ul class="iss">${r.errors.map(e => `<li class="e">${esc(e)}</li>`).join('')}${r.notes.map(e => `<li>${esc(e)}</li>`).join('')}</ul></td></tr>`).join('')}</tbody></table></div>
       <p class="hint" style="margin:10px 0">يُنشأ لكل صف جاهز: ملف المتدرب، اشتراكه بتاريخ تسجيله الفعلي، وطلب شراء «موافق عليه» بدفعاته السابقة رصيدًا مرحَّلًا دون فواتير. متابعة الحضور تبدأ من اليوم فلا تُحسب الجلسات السابقة غيابًا. الصفوف المرفوضة لا تُستورد، والملاحظات تنتقل إلى «ما يحتاج مراجعة».</p>
       <div style="display:flex;gap:8px;justify-content:end"><button class="btn" id="imNo">إلغاء</button><button class="btn pri" id="imOk" ${s.ok ? '' : 'disabled'}>${ic('check')} اعتماد استيراد ${fmtNum(s.ok)} متدربًا</button></div></div>` : ''}`;
-  const run = text => { $('#imE2').textContent = ''; try { preview = parseLegacy(text, $('#im-g').value, AD.plans, riyadhNow().date); if(!preview.length) throw new Error('لا صفوف في الجدول'); pageData(); } catch(x){ preview = null; $('#imE2').textContent = x.message; } };
-  $('#imGo').onclick = () => run($('#im-t').value);
+  const run = text => { $('#imE2').textContent = ''; try { preview = parseLegacy(text, $('#im-g').value, AD.plans, riyadhNow().date); if(!preview.length) throw new Error('لا صفوف في الجدول'); pageData(); } catch(x){ preview = null; pageData(); $('#imE2').textContent = x.message; } };   // لا تبقى معاينة قديمة على الشاشة بعد فشل القراءة
+  $('#imGo').onclick = () => { if(!$('#im-t').value.trim()){ $('#imE2').textContent = preview ? 'المعاينة معروضة أدناه. لاستبدالها اختر ملفًا آخر أو الصق جدولًا.' : 'اختر ملف CSV أو الصق الجدول أولًا'; return; } run($('#im-t').value); };
   $('#im-file').onchange = async e => { const f = e.target.files[0]; if(f) run(await f.text()); };
   if(preview){ $('#imNo').onclick = () => { preview = null; pageData(); };
-    $('#imOk').onclick = async e => { const b = e.currentTarget; setBusy(b, true, 'جارٍ الاستيراد');
+    $('#imOk').onclick = async e => { const b = e.currentTarget; if(!preview?.length) return toast('لا بيانات للاستيراد؛ اختر الملف من جديد'); setBusy(b, true, 'جارٍ الاستيراد');
       try { const r = await Store.importLegacy(preview); await reloadAD(); preview = null; dTab = 'issues'; toast(`استُورد ${fmtNum(r.added)} متدربًا${r.skipped.length ? `، وتُرك ${fmtNum(r.skipped.length)}` : ''}`); pageData();
         if(r.skipped.length) (modal(`<h3>صفوف لم تُستورد (${fmtNum(r.skipped.length)})</h3><ul class="iss">${r.skipped.map(k => `<li>${esc(k.name)} — ${esc(k.why)}</li>`).join('')}</ul><div style="text-align:end;margin-top:12px"><button class="btn" id="skX">إغلاق</button></div>`), $('#skX').onclick = closeModal); }
       catch(x){ setBusy(b, false); toast(x.message); } }; }
