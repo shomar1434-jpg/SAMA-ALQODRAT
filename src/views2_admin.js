@@ -21,6 +21,7 @@ import { pageOrders, openOrdersCount } from './order_views.js';
 import { pageInvoices } from './invoice_views.js';
 import { pageData } from './import_views.js';
 import { pageAccess } from './access_views.js';
+import { requestsHtml, bindRequests } from './request_views.js';
 
 /* =====================================================================
    5) لوحة الإدارة
@@ -227,7 +228,7 @@ export function pageCohorts(){
   const q=cohQ.trim(); const mt=c=>!q||progName(c.program_id).includes(q);
   m.innerHTML = titleBar(`${ic('users')}الدفعات والكشوف`, `${fmtNum(act.length)} دفعة نشطة، <em>و${fmtNum(arc.length)} في الأرشيف</em>`, 'لكل برنامج دفعة نشطة واحدة بكشف تسجيلها، وهو ما يعتمد عليه التحضير اليومي. تُؤرشف الدفعة تلقائيًا بعد انتهاء مدتها، فيُفتح للبرنامج دفعة جديدة على الباركود نفسه.',
       `<a class="btn pri sm" href="#admin-programs">${ic('plus')} فتح دفعة لبرنامج</a>`)+
-    `<div class="filters rv" style="--i:1"><div class="seg" style="margin:0"><button data-ct="active" class="${cohTab==='active'?'on':''}">${ic('activity')}النشطة <span class="pill g">${fmtNum(act.length)}</span></button><button data-ct="archived" class="${cohTab==='archived'?'on':''}">${ic('database')}الأرشيف <span class="pill g">${fmtNum(arc.length)}</span></button></div>
+    requestsHtml(AD)+`<div class="filters rv" style="--i:1"><div class="seg" style="margin:0"><button data-ct="active" class="${cohTab==='active'?'on':''}">${ic('activity')}النشطة <span class="pill g">${fmtNum(act.length)}</span></button><button data-ct="archived" class="${cohTab==='archived'?'on':''}">${ic('database')}الأرشيف <span class="pill g">${fmtNum(arc.length)}</span></button></div>
       <span style="flex:1"></span><input class="inp" id="cq" placeholder="بحث باسم البرنامج" value="${esc(q)}" style="min-width:220px"></div>
     <div id="cohList"></div>`;
   const list=(cohTab==='active'?act:arc).filter(mt);
@@ -257,6 +258,7 @@ export function cohortSummary(c){ const today=riyadhNow().date, es=enrollsOf(AD,
 export function bindCohortActions(back){
   $$('[data-cv]').forEach(b=>b.onclick=()=>{ cohortView=b.dataset.cv; pageCohorts(); window.scrollTo(0,0); });
   $$('[data-cp]').forEach(b=>b.onclick=()=>{ const p=AD.programs.find(x=>progCode(x)===b.dataset.cp); copyText(programUrl(p,AD.settings),'نُسخ رابط نموذج التسجيل'); });
+  bindRequests(AD, async()=>{ await reloadAD(); pageCohorts(); });
   $$('[data-ro]').forEach(x=>x.onchange=async()=>{ const c=AD.cohorts.find(y=>y.id===x.dataset.ro); await Store.saveCohort({...c, reg_open:x.checked}); await reloadAD(); toast(x.checked?'فُتح التسجيل في الدفعة':'أُغلق التسجيل في الدفعة'); back(); });
   $$('[data-ec]').forEach(b=>b.onclick=()=>{ const c=AD.cohorts.find(y=>y.id===b.dataset.ec); cohortModal(progOf(c.program_id), c, back); });
   $$('[data-ar]').forEach(b=>b.onclick=()=>{ const c=AD.cohorts.find(y=>y.id===b.dataset.ar);
