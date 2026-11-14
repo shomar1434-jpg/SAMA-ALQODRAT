@@ -23,8 +23,15 @@ const live = s => ['pending', 'active'].includes(s.status);
 const solo = id => { const t = D.trainees.find(x => x.id === id); return D.trainees.filter(x => x.phone === t.phone).length === 1; };
 const sub = D.subscriptions.find(s => live(s) && s.section === 'boys' && s.subjects.includes('كمي') && solo(s.trainee_id)), st = D.trainees.find(t => t.id === sub.trainee_id);
 
+// ---- طباعة كشف اليوم ----
+await login('teacher', T.phone);
+await p.click('#tPrint'); await p.waitForSelector('#printRoot.on .pdoc');
+const sheet = await text('#printRoot .pdoc');
+ok(/كشف الحضور والغياب اليومي/.test(sheet) && sheet.includes(T.full_name) && sheet.includes(st.full_name) && /غائب/.test(sheet) && /مدير المركز/.test(sheet) && !sheet.includes(st.national_id) && !sheet.includes(st.phone), 'المدرب يطبع كشف الحضور والغياب اليومي بلا هوية ولا جوال');
+await p.click('#pbBack'); await p.waitForTimeout(300);
+ok(!(await p.$('#printRoot.on')) && !!(await p.$('#tSheet')), 'الرجوع من الطباعة يعيد الكشف');
 // ---- ملف المدرب: الصورة والسيرة ----
-await login('teacher', T.phone); await tab('data-tt', 'profile');
+await tab('data-tt', 'profile');
 await p.setInputFiles('#tp-av', { name: 'me.png', mimeType: 'image/png', buffer: await png() }); await p.waitForTimeout(500);
 ok(!!(await p.$('#tpAv img.avt')), 'الصورة تُعرض قبل الحفظ بعد قصّها');
 await p.setInputFiles('#tp-av', { name: 'x.txt', mimeType: 'text/plain', buffer: Buffer.from('x') }); await p.waitForTimeout(300);
