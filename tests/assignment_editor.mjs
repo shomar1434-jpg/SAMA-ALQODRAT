@@ -70,7 +70,7 @@ await adminBank(); await p.click('[data-ka="كمي"]'); await p.waitForTimeout(3
 D = await data();
 ok(D.questions.filter(q => q.shared && q.subject === 'كمي').every(q => q.key_status === 'approved'), 'الإدارة تعتمد مفاتيح المقرر');
 await login('teacher', T.phone); await tab('data-tt', 'hw'); await p.click('#hwAdd'); await p.waitForTimeout(300);
-await p.fill('#hf-t', 'اختبار رسمي معتمد'); await p.selectOption('#hf-ty', 'exam'); await p.selectOption('#hf-rv', 'never'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200);
+await p.fill('#hf-t', 'اختبار رسمي معتمد'); await p.selectOption('#hf-ty', 'exam'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200); await p.selectOption('#hf-rv', 'never');
 await p.selectOption('#hf-u', 'النموذج 1'); await p.click('#hfS'); await p.waitForTimeout(800);
 D = await data();
 ok(D.assignments.some(a => a.title === 'اختبار رسمي معتمد' && a.type === 'exam' && a.reveal === 'never' && !a.targets), 'بعد الاعتماد يُنشر الاختبار الرسمي لكل متدربي المقرر');

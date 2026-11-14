@@ -20,8 +20,8 @@ import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
 import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml, printDaySheet } from './trainer_views.js';
 
-const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
-const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
+const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','chat','المراسلة'],['rate','award','تقييم المدرب']];
+const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','chat','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
 let sTab = 'dash', tTab = 'today';
 const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
@@ -106,7 +106,7 @@ export function achievementPill(a){ return a.overall == null ? '<span class="pil
 export function achievementHtml(it){
   const a = it.achievement, row = (lbl, v, txt) => `<li data-zone="${v == null ? '' : v < GAUGE_RED ? 'red' : v < it.threshold ? 'yellow' : 'green'}"><span class="ga-l">${lbl}</span>
     <span class="ga-bar" role="img" aria-label="${lbl}: ${v == null ? 'غير متاح بعد' : v + '٪'}"><i style="width:${v ?? 0}%"></i></span><b class="num">${v == null ? '—' : fmtNum(v) + '٪'}</b><span class="hint">${txt}</span></li>`;
-  return `<div class="card pad ach-card rv"><div class="ach-head"><div class="ind-h">${ic('award')}<b>نسبة الإنجاز</b></div>
+  return `<div class="card pad ach-card rv"><div class="ach-head"><div class="ind-h">${ic('flag')}<b>نسبة الإنجاز</b><span class="ind-sub">من مدة الباقة كاملة حتى نهايتها</span></div>
       <div class="ach-big num">${a.overall == null ? '—' : fmtNum(a.overall) + '٪'}</div></div>
     <ul class="gauge-axes">
       ${row('الحضور', a.attendance, a.total ? `أيام الحضور: ${fmtNum(a.attended)} من أصل ${fmtNum(a.total)} مقررة في الباقة` : 'يبدأ من أول يوم حضور')}
@@ -116,7 +116,7 @@ export function achievementHtml(it){
 }
 export function gaugeHtml(it){
   const g = progressGauge(it), zt = { red:'danger', yellow:'gy', green:'success' };
-  return `<div class="card pad gauge-card rv" data-zone="${g.zone || 'none'}"><div class="ind-h">${ic('activity')}<b>مؤشر الأداء العام</b></div>
+  return `<div class="card pad gauge-card rv" data-zone="${g.zone || 'none'}"><div class="ind-h">${ic('activity')}<b>مؤشر الأداء العام</b><span class="ind-sub">أداؤك حتى اليوم في الجلسات التي انعقدت</span></div>
     <div class="gauge-body"><div class="gauge-dial">${gaugeSvg(g)}<div class="gauge-val">${g.score == null ? '<span class="hint">—</span>' : `<b class="num">${fmtNum(g.score)}</b><span>من ١٠٠</span>`}</div>
       <span class="pill gauge-lbl ${g.zone ? zt[g.zone] : ''}">${g.label}</span></div>
       <ul class="gauge-axes">${g.axes.map(x => { const z = x.value == null ? '' : x.value < GAUGE_RED ? 'red' : x.value < g.thr ? 'yellow' : 'green';

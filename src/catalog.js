@@ -118,7 +118,7 @@ export const CATALOG = {
   ]
 };
 export const CAT_TONE = {'الإدارة والأعمال':'brand','التربية والمجتمع':'success','الحاسب والتقنية':'info','الفنون والمهارات':'early','التهيئة لاختبارات قياس':'gold','الشريعة والقانون':'warning'};
-export const CAT_ICON = {'الإدارة والأعمال':'chart','التربية والمجتمع':'users','الحاسب والتقنية':'grid','الفنون والمهارات':'spark','التهيئة لاختبارات قياس':'award','الشريعة والقانون':'book'};
+export const CAT_ICON = {'الإدارة والأعمال':'chart','التربية والمجتمع':'users','الحاسب والتقنية':'monitor','الفنون والمهارات':'palette','التهيئة لاختبارات قياس':'target','الشريعة والقانون':'scale'};
 export const catPill = c => ({brand:'',success:'ok',info:'info',early:'early',gold:'o',warning:'warn'}[CAT_TONE[c]] ?? 'g');
 export const catalogPrograms = () => Object.entries(CATALOG).flatMap(([cat,list])=>list.map(([name,hours,dd,acc])=>({
   id:uid(), name, category:cat, hours, duration_days:dd, accreditation_no:acc, description:'',

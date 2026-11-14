@@ -35,15 +35,20 @@ export const progName = id => progOf(id)?.name || '—';
 export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
 export async function viewAdmin(r){
   const app=$('#app');
-  const me=await Store.adminMe(); setMe(me); const pages=([['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-orders','wallet','طلبات الشراء'],['admin-invoices','form','الفواتير'],['admin-data','search','مراجعة البيانات'],['admin-access','lock','تفعيل الأجهزة'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-notify','alert','الإشعارات والرسائل'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-admins','lock','إدارة المسؤولين'],['admin-audit','form','أرشيف الحركات'],['admin-settings','settings','الإعدادات']]).filter(([h])=>canSeePage(me?.role, h));
+  const me=await Store.adminMe(); setMe(me); /* القائمة الجانبية مجمّعة في أقسام، ولكل صفحة أيقونة تخصها */
+  const GROUPS=[['التشغيل اليومي',[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-daily','clipboard','تقرير اليوم']]],
+    ['المتدربون والتعليم',[['admin-trainees','id','المتدربون'],['admin-data','search','مراجعة البيانات'],['admin-users','user','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-access','key','تفعيل الأجهزة'],['admin-notify','bell','الإشعارات والرسائل']]],
+    ['المالية',[['admin-orders','wallet','طلبات الشراء'],['admin-invoices','receipt','الفواتير']]],
+    ['المحتوى والتقارير',[['admin-programs','book','البرامج والباقات'],['admin-reports','printer','التقارير والطباعة'],['admin-policies','shield','مركز السياسات'],['admin-partners','handshake','النبذة والشركاء']]],
+    ['الضبط والحوكمة',[['admin-rules','pie','آلية الاحتساب'],['admin-admins','lock','إدارة المسؤولين'],['admin-audit','history','أرشيف الحركات'],['admin-settings','settings','الإعدادات']]]]
+    .map(([g,ps])=>[g,ps.filter(([h])=>canSeePage(me?.role, h))]).filter(([,ps])=>ps.length);
   app.innerHTML = `<div class="admin"><aside class="side">
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة${me?.role?` · ${ADMIN_ROLES[me.role]}`:''}</span></b></div>
-      <div class="sec">الصفحات</div>
-      ${pages.map(([h,i,t])=>`<a href="#${h}" class="${r===h?'on':''}">${ic(i)}${t}</a>`).join('')}
+      ${GROUPS.map(([g,ps])=>`<div class="sec">${g}</div>${ps.map(([h,i,t])=>`<a href="#${h}" class="${r===h?'on':''}">${ic(i)}${t}</a>`).join('')}`).join('')}
       <div class="sec">أدوات</div>
       <a href="#display">${ic('qr')}باركود محاضرات اليوم</a>
-      <a href="#register">${ic('form')}دليل البرامج</a>
-      ${Store.mode==='cloud'?`<a href="#" id="chPass">${ic('lock')}تغيير كلمة المرور</a>`:''}
+      <a href="#register">${ic('book')}دليل البرامج</a>
+      ${Store.mode==='cloud'?`<a href="#" id="chPass">${ic('key')}تغيير كلمة المرور</a>`:''}
       <a href="#" id="logout">${ic('logout')}خروج</a>
       ${Store.mode==='cloud'?`<a href="#" id="logoutAll">${ic('logout')}الخروج من كل الأجهزة</a>`:''}
     </aside><section class="main" id="main">${skeleton()}</section></div>`;
@@ -259,7 +264,7 @@ export function pageCohorts(){
   const act=AD.cohorts.filter(c=>!cohortArchived(c,today)).sort((a,b)=>a.start_date.localeCompare(b.start_date));
   const arc=AD.cohorts.filter(c=>cohortArchived(c,today)).sort((a,b)=>b.end_date.localeCompare(a.end_date));
   const mt=c=>matchQ(cohQ,progName(c.program_id),c.trainer,c.hall);
-  m.innerHTML = titleBar(`${ic('users')}الدفعات والكشوف`, `${fmtNum(act.length)} دفعة نشطة، <em>و${fmtNum(arc.length)} في الأرشيف</em>`, 'لكل برنامج دفعة نشطة واحدة بكشف تسجيلها، وهو ما يعتمد عليه التحضير اليومي. تُؤرشف الدفعة تلقائيًا بعد انتهاء مدتها، فيُفتح للبرنامج دفعة جديدة على الباركود نفسه.',
+  m.innerHTML = titleBar(`${ic('users')}الدفعات والكشوف`, `${fmtNum(act.length)} دفعة نشطة، <em>و${fmtNum(arc.length)} في الأرشيف</em>`, 'لكل برنامج دفعة نشطة واحدة بكشف تسجيلها، وهو ما يعتمد عليه التحضير اليومي. تُؤرشف الدفعة تلقائيًا بعد انتهاء مدتها. والتحضير اليومي بباركود المركز الموحد في «باركود محاضرات اليوم»، ولكل برنامج باركود تسجيل خاص به.',
       `<a class="btn pri sm" href="#admin-programs">${ic('plus')} فتح دفعة لبرنامج</a>`)+
     requestsHtml(AD)+`<div class="filters rv" style="--i:1"><div class="seg" style="margin:0"><button data-ct="active" class="${cohTab==='active'?'on':''}">${ic('activity')}النشطة <span class="pill g">${fmtNum(act.length)}</span></button><button data-ct="archived" class="${cohTab==='archived'?'on':''}">${ic('database')}الأرشيف <span class="pill g">${fmtNum(arc.length)}</span></button></div>
       <span style="flex:1"></span><input class="inp" id="cq" placeholder="بحث باسم البرنامج" value="${esc(cohQ)}" style="min-width:220px"></div>
@@ -373,7 +378,7 @@ export function cohortOpened(p){
   const url=programUrl(p,AD.settings), c=activeCohortOf(AD,p.id);
   modal(`<div style="text-align:center"><div class="bigcheck">${ic('check')}</div><h3 style="margin-bottom:4px">فُتحت ${cohortLabel(c)}</h3><p class="hint" style="margin:0 0 14px">${esc(p.name)} · تبدأ ${fmtDate(c.start_date)}</p>
     <div class="qrbox" style="display:inline-block;box-shadow:var(--shadow-card);border:1px solid var(--border)"><div id="qrM"></div></div>
-    <p class="hint" style="margin:12px 0 4px">هذا باركود البرنامج الثابت: يفتح نموذج تسجيل الدفعة، ويُستخدم في التحضير اليومي.</p>
+    <p class="hint" style="margin:12px 0 4px">هذا باركود البرنامج الثابت: يفتح نموذج التسجيل في دفعته. والتحضير اليومي بباركود المركز الموحد.</p>
     <div class="hint" dir="ltr" style="word-break:break-all;margin-bottom:14px">${esc(url)}</div>
     <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" id="mcp">${ic('copy')} نسخ رابط التسجيل</button><a class="btn" href="#qr-${progCode(p)}">${ic('expand')} عرض الباركود</a><button class="btn pri" id="mok">${ic('form')} كشف الدفعة</button></div></div>`);
   makeQR($('#qrM'), url, 200);
