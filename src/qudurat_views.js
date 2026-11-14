@@ -219,7 +219,7 @@ function tabSubs(){
         <td class="num">${s.start_date ? `${fmtShort(s.start_date)} – ${fmtShort(st.end)}` : '—'}</td>
         <td>${st.rate == null ? '<span class="hint">—</span>' : `<b class="num">${fmtNum(st.rate)}٪</b><div class="hint">${fmtNum(st.attended)} من ${fmtNum(st.held)}</div>`}</td>
         <td style="min-width:110px">${s.start_date ? `<div class="tbar" role="img" aria-label="مضى ${fmtNum(st.timePct)}٪ من المدة"><i style="width:${st.timePct}%"></i></div><div class="hint">${fmtNum(st.daysLeft)} يومًا متبقية</div>` : '<span class="hint">لم تبدأ</span>'}</td>
-        <td style="white-space:nowrap"><button class="btn sm" data-sv="${s.id}" aria-label="سجل ${esc(t?.full_name || '')}">${ic('calendar')}</button> <button class="btn sm" data-se="${s.id}" aria-label="تعديل">${ic('edit')}</button></td></tr>`).join('')}
+        <td style="white-space:nowrap"><button class="btn sm" data-sv="${s.id}" title="سجل الحضور" aria-label="سجل حضور ${esc(t?.full_name || '')}">${ic('calendar')} السجل</button> <button class="btn sm" data-se="${s.id}" title="تعديل الاشتراك" aria-label="تعديل اشتراك ${esc(t?.full_name || '')}">${ic('edit')} تعديل</button></td></tr>`).join('')}
       </tbody></table></div>` : emptyBox('لا توجد اشتراكات مطابقة', 'غيّر عوامل التصفية أو أضف مشتركًا.')}</div>`;
   let tmr; $('#qq').oninput = e => { qf.q = e.target.value; clearTimeout(tmr); tmr = setTimeout(() => { tabSubs(); const el = $('#qq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
   $('#qp').onchange = e => { qf.plan = e.target.value; tabSubs(); };

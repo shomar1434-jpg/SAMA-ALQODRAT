@@ -35,7 +35,7 @@ export function makeQR(el, text, size=300){ try{ el.innerHTML=''; new QRCode(el,
 export async function copyText(t, msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'نُسخ'); }catch(e){ toast('تعذّر النسخ في هذا المتصفح'); } }
 export function centerFooter(){
   return `<footer class="cfoot rv"><div class="cf-brand"><img src="${LOGO}" alt=""><div><b>${CENTER.name}</b><span class="hint">سجل تجاري ${CENTER.cr} · برامج معتمدة من ${CENTER.accreditor}</span></div></div>
-    <div class="cf-items"><span>${ic('pin')}${CENTER.address} · ص.ب ${CENTER.pobox}</span><span dir="ltr">${ic('activity')}${CENTER.phones.join('  ·  ')}</span><span dir="ltr">${ic('form')}${CENTER.email}</span></div></footer>`;
+    <div class="cf-items"><span>${ic('pin')}${CENTER.address} · ص.ب ${CENTER.pobox}</span><span dir="ltr">${ic('phone')}${CENTER.phones.join('  ·  ')}</span><span dir="ltr">${ic('mail')}${CENTER.email}</span></div></footer>`;
 }
 /* حالة الدفعة كما يراها المتدرب */
 export function cohortPublicState(c, today=riyadhNow().date){
@@ -64,7 +64,7 @@ export async function route(){
   if(PAGE==='public' && adminRoute){ location.replace(adminBase()+'#'+h); return; }
   if(PAGE==='admin' && h && !adminRoute){ location.replace(publicBase()+'#'+h); return; }
   if(PAGE==='admin' && !h) h='admin';
-  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
+  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : ['contact','verify'].includes(h)||h.startsWith('verify') ? '' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
   $('#modeTag').textContent = Store.mode==='cloud' ? 'متصل بقاعدة البيانات' : 'بيانات تجريبية';
   $('#modeTag').classList.toggle('cloud', Store.mode==='cloud');
@@ -204,7 +204,7 @@ export function regFormHtml(title, sub, chooser=''){
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
       <div id="rfPol" style="grid-column:1/-1" hidden></div>
-      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود البرنامج والتحقق برقم سجلي المدني.</span></label>
+      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود المركز الموحد والتحقق برقم سجلي المدني.</span></label>
     </form>
     <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
     <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;
@@ -286,7 +286,7 @@ export function bindRegForm(target, cohortsFn){
       $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك</h2>
         <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم تسجيلك:</p><div class="refbox">${esc(r.ref)}</div>
         <div class="grid" style="gap:6px;max-width:460px;margin:0 auto 12px">${cs.map(c=>`<div class="pill info" style="justify-content:center;padding:6px 12px">${c.program?esc(c.program)+' · ':''}${cohortLabel(c)} · تبدأ ${fmtShort(c.start)}</div>`).join('')}</div>
-        <p class="hint" style="max-width:480px;margin:0 auto">في أيام البرنامج امسح باركود البرنامج المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p>${gNote}${manarNote}${r.order?'':waBtn(r.ref, 'برنامج '+((r.cohorts||[]).map(x=>x.program).join('، ')))}<div id="ordBox" style="text-align:start;max-width:520px;margin:16px auto 0">${orderPanelHtml(r.order, F.full_name)}</div></div>`;
+        <p class="hint" style="max-width:480px;margin:0 auto">في أيام التدريب امسح باركود المركز الموحد المعلّق في القاعة، ثم أدخل رقم سجلك المدني لتسجيل حضورك.</p>${gNote}${manarNote}${r.order?'':waBtn(r.ref, 'برنامج '+((r.cohorts||[]).map(x=>x.program).join('، ')))}<div id="ordBox" style="text-align:start;max-width:520px;margin:16px auto 0">${orderPanelHtml(r.order, F.full_name)}</div></div>`;
       { const rebind=o=>{ $('#ordBox').innerHTML=orderPanelHtml(o, F.full_name); bindOrderPanel($('#ordBox'), o, {national_id:F.national_id}, rebind); }; if(r.order) bindOrderPanel($('#ordBox'), r.order, {national_id:F.national_id}, rebind); }
       liveSay('اكتمل تسجيلك. رقم تسجيلك '+r.ref+(r.order?'، ورقم طلب الشراء '+r.order.number:''));
     }catch(er){ setBusy(b,false); showErrorSummary($('#rfSum'), [{id:'rf-full_name',label:'تعذّر التسجيل',msg:er.message}]); $('#rfE').textContent=er.message; }

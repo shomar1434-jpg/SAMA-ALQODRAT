@@ -54,7 +54,7 @@ export function sheetHtml(c, date){
     body:`<table class="ptab"><thead><tr><th style="width:30px">م</th><th>اسم المتدرب</th><th style="width:92px">السجل المدني</th><th style="width:88px">الجوال</th><th style="width:76px">وقت الحضور</th><th style="width:62px">الحالة</th><th style="width:92px">التوقيع</th></tr></thead>
       <tbody>${rows.map((x,i)=>`<tr class="${x.a?'':'abs'}"><td>${fmtNum(i+1)}</td><td class="nm">${esc(x.t.full_name)}</td><td dir="ltr">${esc(x.t.national_id)}</td><td dir="ltr">${esc(x.t.phone)}</td><td dir="ltr">${x.a?t12(x.a.time.slice(0,5)):'—'}</td>
         <td><span class="pst ${x.a?(x.a.status==='متأخر'?'warn':'ok'):'bad'}">${x.a?(x.a.status==='متأخر'?'متأخر':'حاضر'):'غائب'}</span>${x.a?.manual?'<i class="pman">يدوي</i>':''}</td><td></td></tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:18px">لا يوجد مسجلون في هذه الدفعة حتى هذا التاريخ</td></tr>`}</tbody></table>`,
-    note:`سُجّل الحضور آليًا بمسح باركود البرنامج والتحقق برقم السجل المدني مقابل كشف الدفعة${rows.some(x=>x.a?.manual)?'، و«يدوي» تحضير أجراه مدير النظام':''}${pending?'، والكشف محرّر قبل انتهاء المحاضرة':''}.` });
+    note:`سُجّل الحضور آليًا بمسح الباركود الموحد والتحقق برقم السجل المدني مقابل كشف الدفعة${rows.some(x=>x.a?.manual)?'، و«يدوي» تحضير أجراه مدير النظام':''}${pending?'، والكشف محرّر قبل انتهاء المحاضرة':''}.` });
 }
 
 /* ---------- 1-ب) كشف حضور يوم لقسم الباقات (القدرات والتحصيلي) ---------- */

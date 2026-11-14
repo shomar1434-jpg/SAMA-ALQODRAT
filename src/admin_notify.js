@@ -20,7 +20,7 @@ export function pageNotify(){
   m.innerHTML = titleBar(`${ic('alert')}الإشعارات والرسائل`, 'رسائل الإدارة <em>والتنبيهات</em>',
       'تصل الرسالة إلى صندوق الوارد في بوابة المستلم مع صوت التنبيه، وتظهر إشعارًا على جهازه إن ثبّت المنصة وفعّل الإشعارات.') +
     `<div class="grid g2" style="align-items:start">
-      <form class="card pad rv" id="nf" novalidate><h3 class="ctitle">${ic('activity')}رسالة جديدة</h3>
+      <form class="card pad rv" id="nf" novalidate><h3 class="ctitle">${ic('send')}رسالة جديدة</h3>
         <div class="field"><label for="nf-aud">إلى</label><select class="inp" id="nf-aud" name="audience">${Object.entries(AUDIENCE_TXT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="field"><label for="nf-scope">النطاق</label><select class="inp" id="nf-scope" name="scope">${Object.entries(SCOPE_TXT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="field" id="nf-secF" hidden><label for="nf-sec">القسم</label><select class="inp" id="nf-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}">قسم ${v}</option>`).join('')}</select></div>

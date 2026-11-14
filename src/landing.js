@@ -37,8 +37,9 @@ export const BULB_SVG = `<svg class="bulb-art" viewBox="0 0 320 340" aria-hidden
     <rect x="118" y="252" width="84" height="18" rx="9" fill="url(#base)"/><rect x="122" y="274" width="76" height="16" rx="8" fill="url(#base)"/><path d="M134 294h52l-8 14h-36z" fill="#151515"/></g>
 </svg>`;
 export const STAR_SVG = (cls='') => `<svg class="star ${cls}" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C1E1DC"/><stop offset="1" stop-color="#59A598"/></linearGradient></defs><path d="M50 0C54 34 66 46 100 50 66 54 54 66 50 100 46 66 34 54 0 50 34 46 46 34 50 0z" fill="url(#sg)"/></svg>`;
-export const SCROLL_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><rect x="34" y="14" width="74" height="84" rx="8" fill="#C1E1DC"/><path d="M108 22v-2a8 8 0 0 0-16 0v70" fill="none" stroke="#1A746B" stroke-width="5"/><rect x="48" y="34" width="44" height="5" rx="2.5" fill="#1A746B"/><rect x="48" y="48" width="36" height="5" rx="2.5" fill="#1A746B"/><rect x="48" y="62" width="40" height="5" rx="2.5" fill="#1A746B"/><path d="M30 98h70" stroke="#59A598" stroke-width="6" stroke-linecap="round"/><g class="medal"><path d="M18 52l-8 22 12-5 6 11 6-22zM46 52l8 22-12-5-6 11-6-22z" fill="#E17D32"/><circle cx="32" cy="40" r="20" fill="#FCD147" stroke="#E1A732" stroke-width="3"/><path d="M32 29l3.4 7 7.6 1.1-5.5 5.3 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.5-5.3 7.6-1.1z" fill="#fff"/></g></svg>`;
-export const QUOTE_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><circle cx="60" cy="55" r="46" fill="#C1E1DC"/><g class="medal" fill="#1A746B"><path d="M36 74V58c0-14 8-24 20-28l3 7c-7 3-10 8-10 14h10v23zM66 74V58c0-14 8-24 20-28l3 7c-7 3-10 8-10 14h10v23z"/></g><circle cx="96" cy="22" r="7" fill="#FCD147"/><circle cx="20" cy="88" r="5" fill="#59A598"/></svg>`;
+/* رؤيتنا: منظار يتطلع إلى نجمة الأفق؛ رسالتنا: هدف وسهم يصيبه */
+export const SCROLL_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><circle cx="62" cy="56" r="46" fill="#C1E1DC"/><path d="M14 92c18-10 34-14 48-14s30 4 48 14" fill="none" stroke="#59A598" stroke-width="5" stroke-linecap="round"/><g transform="rotate(-28 54 64)"><rect x="26" y="56" width="52" height="16" rx="4" fill="#1A746B"/><rect x="74" y="52" width="16" height="24" rx="4" fill="#12444A"/><rect x="18" y="59" width="10" height="10" rx="2" fill="#12444A"/></g><path d="M48 74l-8 22M58 74l8 22" stroke="#1A746B" stroke-width="4" stroke-linecap="round"/><g class="medal"><path d="M96 14l3.2 6.6 7.2 1-5.2 5 1.2 7.2-6.4-3.4-6.4 3.4 1.2-7.2-5.2-5 7.2-1z" fill="#FCD147" stroke="#E1A732" stroke-width="2" stroke-linejoin="round"/></g></svg>`;
+export const QUOTE_SVG = `<svg class="win-art" viewBox="0 0 120 110" aria-hidden="true"><circle cx="56" cy="58" r="44" fill="#C1E1DC"/><circle cx="56" cy="58" r="32" fill="#fff" stroke="#1A746B" stroke-width="5"/><circle cx="56" cy="58" r="19" fill="#59A598"/><circle cx="56" cy="58" r="8" fill="#1A746B"/><g class="medal"><path d="M58 56 98 18" stroke="#12444A" stroke-width="5" stroke-linecap="round"/><path d="M92 12l14-2-2 14-5-2-5-5z" fill="#E17D32"/></g><circle cx="20" cy="94" r="5" fill="#FCD147"/></svg>`;
 
 export function siteFooter(){
   const ph = CENTER.phones;
@@ -47,13 +48,13 @@ export function siteFooter(){
       <div class="sf-col sf-brand"><span class="sf-logo"><img src="${LOGOS.sama}" alt="شعار مركز سما القدرات للتدريب"></span>
         <p>${CENTER.mission}.</p><span class="sf-cr">سجل تجاري ${CENTER.cr}</span></div>
       <div class="sf-col"><h4>تواصل معنا</h4>
-        ${ph.map(n=>`<a class="sf-item" href="tel:${n}" dir="ltr">${ic('activity')}<span>${n}</span></a>`).join('')}
-        <a class="sf-item" href="mailto:${CENTER.email}" dir="ltr">${ic('form')}<span>${CENTER.email}</span></a>
+        ${ph.map(n=>`<a class="sf-item" href="tel:${n}" dir="ltr">${ic('phone')}<span>${n}</span></a>`).join('')}
+        <a class="sf-item" href="mailto:${CENTER.email}" dir="ltr">${ic('mail')}<span>${CENTER.email}</span></a>
         <a class="sf-item" href="${waLink()}" target="_blank" rel="noopener">${WA_LOGO}<span>واتساب المركز</span></a>
         ${socialHtml()}</div>
       <div class="sf-col"><h4>العنوان</h4>
         <a class="sf-item" href="${MAP_URL}" target="_blank" rel="noopener">${ic('pin')}<span>${CENTER.address}</span></a>
-        <span class="sf-item">${ic('database')}<span>صندوق البريد ${CENTER.pobox}</span></span>
+        <span class="sf-item">${ic('inbox')}<span>صندوق البريد ${CENTER.pobox}</span></span>
         <h4 style="margin-top:14px">روابط سريعة</h4>
         <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من إفادة حضور</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
       <div class="sf-col"><h4>معتمد من</h4>
@@ -82,14 +83,14 @@ export function viewContact(){
   $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">تواصل معنا</span><h2>قنوات <em>${esc(CENTER.name)}</em></h2><p class="hint">${esc(CENTER.address)}</p></div>
     <h3 class="ct-h">التواصل المباشر</h3><div class="ct-grid">
       ${card(waLink('السلام عليكم، لدي استفسار عن برامج مركز سما القدرات.'), WA_LOGO, 'واتساب المركز', 'للاستفسار والتسجيل ومتابعة السداد')}
-      ${CENTER.phones.map(n => card('tel:' + n, ic('activity'), 'اتصال', n, false)).join('')}
-      ${card('mailto:' + CENTER.email, ic('form'), 'البريد الإلكتروني', CENTER.email, false)}
+      ${CENTER.phones.map(n => card('tel:' + n, ic('phone'), 'اتصال', n, false)).join('')}
+      ${card('mailto:' + CENTER.email, ic('mail'), 'البريد الإلكتروني', CENTER.email, false)}
       ${card(CENTER.map, ic('pin'), 'موقعنا على الخريطة', 'خرائط قوقل')}</div>
     <h3 class="ct-h">منصات التواصل الاجتماعي</h3><div class="ct-grid">
       ${card(CENTER.social.snapchat, SOC[0][2], 'سناب شات', 'samagodrat.sa')}${card(CENTER.social.tiktok, SOC[1][2], 'تيك توك', '@samagodrat.sa')}${card(CENTER.social.instagram, SOC[2][2], 'إنستقرام', 'samagodrat.sa')}${card(CENTER.telegram, TG_LOGO, 'قناة تيليجرام', 'مواد علمية خاصة بالقدرات')}</div>
     <h3 class="ct-h">البرامج والخدمات</h3><div class="ct-grid">
       ${card('#register', ic('book'), 'البرامج التدريبية', 'دليل البرامج المعتمدة والتسجيل', false)}${card('#home', ic('award'), 'باقات القدرات والتحصيلي', 'الباقات والأسعار والتسجيل', false)}${card('#enroll', ic('form'), 'سجّل الآن', 'نموذج التسجيل الموحّد', false)}
-      ${card(CENTER.manar, ic('award'), 'منصة منار', 'إصدار الشهادات المعتمدة من المؤسسة العامة للتدريب التقني والمهني')}</div></div>${siteFooter()}`;
+      ${card(CENTER.manar, ic('grad'), 'منصة منار', 'إصدار الشهادات المعتمدة من المؤسسة العامة للتدريب التقني والمهني')}</div></div>${siteFooter()}`;
 }
 
 export async function viewHome(){
@@ -106,7 +107,7 @@ export async function viewHome(){
           <div class="cover-text">
             ${STAR_SVG('s1')}
             <h1 data-reveal style="--i:1"><span class="t1">منصة مركز سما القدرات للتدريب</span><span class="rule"></span><span class="t2">أهلًا بكم في المنصة الرقمية</span></h1>
-            <p data-reveal style="--i:3">${fmtNum(P.length)} برنامجًا تدريبيًا معتمدًا في ${fmtNum(cats.length)} مجالات، بإشراف ${CENTER.accreditor}. سجّل في الدفعة المفتوحة، وتابع حضورك بباركود برنامجك.</p>
+            <p data-reveal style="--i:3">${fmtNum(P.length)} برنامجًا تدريبيًا معتمدًا في ${fmtNum(cats.length)} مجالات، بإشراف ${CENTER.accreditor}. سجّل في برنامجك أو باقتك، وسجّل حضورك بباركود المركز الموحد.</p>
             <div class="cover-cta" data-reveal style="--i:4"><a class="btn pri lg" href="#enroll" id="ctaEnroll">${ic('form')} سجّل الآن</a><a class="btn lg ghost-t" href="#register">${ic('book')} استعرض البرامج</a><a class="btn lg ghost-t" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
           </div>
         </div>
@@ -147,9 +148,9 @@ export async function viewHome(){
     <section class="steps3">
       <div class="sec-head" data-reveal><span class="kicker">كيف تبدأ</span><h2>ثلاث خطوات <em>من التسجيل إلى الشهادة</em></h2></div>
       <ol class="st-grid">
-        <li data-reveal style="--i:0"><span class="n">١</span>${ic('form')}<b>سجّل في الدفعة</b><span>اختر البرنامج من الدليل، وأكمل نموذج دفعته المفتوحة برقم سجلك المدني.</span></li>
-        <li data-reveal style="--i:1"><span class="n">٢</span>${ic('qr')}<b>امسح باركود البرنامج</b><span>في كل يوم تدريبي امسح الباركود الثابت للبرنامج في القاعة.</span></li>
-        <li data-reveal style="--i:2"><span class="n">٣</span>${ic('award')}<b>احضر وأتمّ برنامجك</b><span>يُطابَق سجلك مع كشف الدفعة فيُسجَّل حضورك ووقته تلقائيًا.</span></li>
+        <li data-reveal style="--i:0"><span class="n">١</span>${ic('form')}<b>سجّل في برنامجك</b><span>اختر البرنامج أو الباقة من الدليل، وأكمل نموذج التسجيل الموحّد برقم سجلك المدني.</span></li>
+        <li data-reveal style="--i:1"><span class="n">٢</span>${ic('qr')}<b>امسح الباركود الموحد</b><span>في كل يوم تدريبي امسح باركود المركز المعلّق في القاعة، واكتب سجلك المدني.</span></li>
+        <li data-reveal style="--i:2"><span class="n">٣</span>${ic('award')}<b>احضر وأتمّ برنامجك</b><span>يتعرف النظام على جلستك الآن فيُسجَّل حضورك ووقته تلقائيًا.</span></li>
       </ol>
     </section>
     ${siteFooter()}
