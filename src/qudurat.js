@@ -153,3 +153,32 @@ export function demoQudurat(D, person, rnd){
     }
   }
 }
+
+/* ---------- تحليلات الباقات لكل قسم في فترة (لوحة التحليلات) ----------
+   المتوقع في يوم جلسة = الاشتراكات القائمة فيه (بدأت قبله أو فيه، ولم تنتهِ، ومتابَعة منه)، والحضور يوم واحد لكل تاريخ.
+   الجلسة الجارية اليوم تُحتسب بعد بدايتها فقط، والقادمة لا تُحتسب. */
+export function quduratAnalytics(D, from, to, n = riyadhNow()){
+  const subs = (D.subscriptions || []).filter(s => s.status !== 'cancelled' && s.start_date);
+  const att = (D.sub_attendance || []).filter(a => a.att_date >= from && a.att_date <= to);
+  const last = to < n.date ? to : n.date;
+  const live = (s, d) => s.start_date <= d && (!s.end_date || s.end_date >= d) && (!s.track_from || s.track_from <= d);
+  const out = {};
+  for (const sec of Object.keys(SECTIONS)) {
+    const mine = subs.filter(s => s.section === sec), ids = new Set(mine.map(s => s.id));
+    const days = sessionsBetween(D, sec, from, last).filter(s => s.date < n.date || toMin(n.hm) >= toMin(s.start)).map(s => {
+      const exp = mine.filter(x => live(x, s.date)), a = att.filter(x => x.att_date === s.date && ids.has(x.subscription_id));
+      return { date:s.date, expected:exp.length, present:a.length, late:a.filter(x => x.status === 'متأخر').length };
+    });
+    const e = days.reduce((t, x) => t + x.expected, 0), p = days.reduce((t, x) => t + x.present, 0), l = days.reduce((t, x) => t + x.late, 0);
+    const active = (D.subscriptions || []).filter(s => s.section === sec && subStatus(s, n.date) === 'active').length;
+    const pending = (D.subscriptions || []).filter(s => s.section === sec && subStatus(s, n.date) === 'pending').length;
+    const todayS = sessionOn(D, sec, n.date);
+    const byPlan = {};
+    for (const s of mine) { const k = s.plan_id || '—'; byPlan[k] = byPlan[k] || { expected:0, present:0 };
+      for (const d of days) if (live(s, d.date)) { byPlan[k].expected++; if (att.some(x => x.subscription_id === s.id && x.att_date === d.date)) byPlan[k].present++; } }
+    out[sec] = { days, sessions:days.length, expected:e, present:p, late:l, rate:e ? Math.min(100, Math.round(p / e * 100)) : 0, lateRate:p ? Math.round(l / p * 100) : 0,
+      active, pending, today: todayS ? { ...todayS, present: (D.sub_attendance || []).filter(x => x.att_date === n.date && ids.has(x.subscription_id)).length,
+        expected: mine.filter(x => live(x, n.date)).length } : null, byPlan };
+  }
+  return out;
+}

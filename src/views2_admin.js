@@ -12,6 +12,7 @@ import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hou
 import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
 import { pageSettings } from './views2_settings.js';
 import { pageQudurat } from './qudurat_views.js';
+import { quduratAnalytics, SECTIONS, planName } from './qudurat.js';
 import { pageUsers } from './admin_users.js';
 import { pageDaily } from './report_views.js';
 import { pagePolicies } from './policy_views.js';
@@ -78,11 +79,18 @@ export function expectedOf(c, from, to){ const today=riyadhNow().date, es=enroll
 
 export function pageDashboard(){
   const m=$('#main'); const {programs}=AD;
-  m.innerHTML = titleBar(`${ic('chart')}التحليلات`, 'التسجيل والحضور، <em>لكل دفعة وبرنامج</em>', 'غيّر الفترة أو المجال أو البرنامج فتتحدث المؤشرات والرسوم. تشمل الدفعات المنعقدة في الفترة، النشطة منها والمؤرشفة.', `<button class="btn sm" id="rf">${ic('refresh')} تحديث</button>`)+
+  m.innerHTML = titleBar(`${ic('chart')}التحليلات`, 'التسجيل والحضور، <em>للدورات والباقات</em>', 'غيّر الفترة فتتحدث المؤشرات والرسوم. قسم «باقات القدرات والتحصيلي» يحلّل حضور البنين والبنات في الفترة، وقسم الدورات يتبع المجال والبرنامج المختارين.', `<button class="btn sm" id="rf">${ic('refresh')} تحديث</button>`)+
     `<div class="filters rv" style="--i:1"><span class="lbl">${ic('calendar')}الفترة</span><input type="date" class="inp" id="fFrom" value="${flt.from}"><span class="lbl">إلى</span><input type="date" class="inp" id="fTo" value="${flt.to}">
       <span class="lbl">${ic('grid')}المجال</span><select class="inp" id="fCat"><option value="all">كل المجالات</option>${allCats().map(c=>`<option ${flt.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <span class="lbl">${ic('book')}البرنامج</span><select class="inp" id="fProg" style="max-width:260px"><option value="all">جميع البرامج</option>${allCats().map(c=>{ const ps=programs.filter(p=>p.category===c&&(flt.cat==='all'||flt.cat===c)); return ps.length?`<optgroup label="${esc(c)}">${ps.map(p=>`<option value="${p.id}" ${flt.prog===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select>
       <span style="flex:1"></span><div class="seg" style="margin:0">${[7,30,90].map(d=>`<button data-q="${d}">آخر ${fmtNum(d)} يومًا</button>`).join('')}</div></div>
+    <h2 class="sec-title rv" style="--i:1;margin-top:6px">${ic('award')}باقات القدرات والتحصيلي <span class="hint" style="font-size:13px;font-weight:400">البنون والبنات · حسب الفترة المختارة</span></h2>
+    <div class="grid g2" id="qSec" style="margin-bottom:14px"></div>
+    <div class="charts" style="margin-bottom:18px">
+      <div class="ch c8 rv" style="--i:2"><h3>${ic('activity')}حضور الباقات اليومي</h3><p>عدد الحاضرين في كل جلسة: البنون والبنات</p><div class="cv"><canvas id="cQTrend"></canvas></div></div>
+      <div class="ch c4 rv" style="--i:3"><h3>${ic('award')}نسبة الحضور حسب الباقة</h3><p>الحضور ÷ المتوقع في جلسات الفترة</p><div class="cv"><canvas id="cQPlan"></canvas></div></div>
+    </div>
+    <h2 class="sec-title rv" style="--i:4">${ic('book')}الدورات والبرامج <span class="hint" style="font-size:13px;font-weight:400">حسب المجال والبرنامج المختارين</span></h2>
     <div class="kpis" id="kpis"></div>
     <div class="charts">
       <div class="ch c8 rv" style="--i:2"><h3>${ic('activity')}اتجاه الحضور اليومي</h3><p>عدد الحاضرين في الوقت والمتأخرين لكل يوم</p><div class="cv"><canvas id="cTrend"></canvas></div></div>
@@ -102,6 +110,26 @@ export function pageDashboard(){
   $$('[data-q]').forEach(b=>b.onclick=()=>{ $('#fTo').value=riyadhNow().date; $('#fFrom').value=addDays(riyadhNow().date,-(+b.dataset.q-1)); apply(); });
   $('#rf').onclick=()=>route();
   drawDashboard();
+}
+/* باقات القدرات والتحصيلي في لوحة التحليلات: بطاقة لكل قسم، ورسم الحضور اليومي، ونسبة كل باقة */
+function drawQudurat(from, to){
+  const Q=quduratAnalytics(AD, from, to), G=gridOpt(), tone=r=>r>=85?'ok':r>=70?'info':r>=50?'warn':'bad';
+  $('#qSec').innerHTML = ['boys','girls'].map((sec,i)=>{ const q=Q[sec], t=q.today;
+    return `<div class="card pad rv" style="--i:${i+2}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 class="ctitle" style="margin:0">${ic('users')}قسم ${SECTIONS[sec]}</h3>
+        ${t?`<span class="pill dot ${toMin(riyadhNow().hm)>=toMin(t.end)?'g':toMin(riyadhNow().hm)>=toMin(t.start)?'ok':'warn'}">جلسة اليوم ${t12(t.start)} – ${t12(t.end)}</span>`:'<span class="pill g">لا جلسة اليوم</span>'}</div>
+      <div class="qstats" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px">
+        ${[['المشتركون النشطون',fmtNum(q.active),q.pending?`و${fmtNum(q.pending)} بانتظار أول حضور`:''],['حضور اليوم',t?`${fmtNum(t.present)} من ${fmtNum(t.expected)}`:'—',''],
+           ['نسبة الحضور في الفترة',q.expected?fmtNum(q.rate)+'٪':'—',`${fmtNum(q.present)} من ${fmtNum(q.expected)} · ${fmtNum(q.sessions)} جلسة`],['نسبة التأخر',q.present?fmtNum(q.lateRate)+'٪':'—','من الحاضرين']]
+          .map(([k,v,h],j)=>`<div style="background:var(--surface-sunken);border-radius:12px;padding:10px"><div class="hint" style="font-size:12px">${k}</div><b style="font-size:20px;font-weight:700;display:block" style="${j===2&&q.expected?`color:var(--${({ok:'success',info:'brand',warn:'warning',bad:'danger'})[tone(q.rate)]})`:''}">${v}</b>${h?`<div class="hint" style="font-size:11.5px">${h}</div>`:''}</div>`).join('')}</div></div>`; }).join('');
+  if(!window.Chart) return;
+  const dates=[...new Set(Object.values(Q).flatMap(q=>q.days.map(d=>d.date)))].sort();
+  const col={boys:cssv('--brand'), girls:cssv('--gold')};
+  mk('cQTrend',{type:'bar',data:{labels:dates.map(fmtShort),datasets:['boys','girls'].map(sec=>({label:SECTIONS[sec],data:dates.map(d=>Q[sec].days.find(x=>x.date===d)?.present ?? null),backgroundColor:col[sec],borderRadius:6}))},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:'top',align:'end'},tooltip:{callbacks:{afterLabel:c=>{ const sec=['boys','girls'][c.datasetIndex], d=Q[sec].days.find(x=>x.date===dates[c.dataIndex]); return d?`من ${d.expected} متوقع · متأخر ${d.late}`:''; }}}},
+      scales:{x:{...G,grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:10}},y:{...G,beginAtZero:true,ticks:{precision:0}}}}});
+  const plans=(AD.plans||[]).filter(p=>Object.values(Q).some(q=>q.byPlan[p.id]?.expected));
+  mk('cQPlan',{type:'bar',data:{labels:plans.map(p=>planName(p)),datasets:['boys','girls'].map(sec=>({label:SECTIONS[sec],data:plans.map(p=>{ const b=Q[sec].byPlan[p.id]; return b?.expected?Math.round(b.present/b.expected*100):null; }),backgroundColor:col[sec],borderRadius:999,barPercentage:.7}))},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{position:'top',align:'end'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw}٪`}}},scales:{x:{...G,beginAtZero:true,max:100,ticks:{callback:v=>v+'٪'}},y:{grid:{display:false},border:{display:false}}}}});
 }
 export function drawDashboard(){
   chartTheme(); const P=pal(), G=gridOpt();
@@ -129,6 +157,7 @@ export function drawDashboard(){
     kpiCard(5,'wallet','early','الإيرادات المتوقعة',Math.round(revenue/1000),' ألف',revenue?'ريال، للبرامج المسعّرة':'حدّد الأسعار لتظهر الإيرادات')
   ].join('');
   countUp($('#kpis'));
+  drawQudurat(from, to);
   if(!window.Chart){ $$('.cv').forEach(c=>c.innerHTML=emptyBox('تعذّر تحميل مكتبة الرسوم','تحقق من الاتصال ثم اضغط تحديث.')); }
   const days=[]; for(let d=from; d<=to; d=addDays(d,1)) days.push(d);
   mk('cTrend',{type:'bar',data:{labels:days.map(fmtShort),datasets:[
