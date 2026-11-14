@@ -98,6 +98,6 @@ function importModal(t, done){
     $('#imp-t').value = await f.text(); show(); };
   $('#impC').onclick = closeModal;
   $('#impGo').onclick = async () => { const b = $('#impGo'); setBusy(b, true, 'جارٍ الاستيراد');
-    try { const r = await Store.adminImportQuestions(t.id, parsed.rows, $('#imp-pub').checked ? 'published' : 'draft'); closeModal(); toast(`أُضيف ${fmtNum(r.count)} سؤال إلى بنك ${t.full_name}`); done(); }
+    try { const r = await Store.adminImportQuestions(t.id, parsed.rows, $('#imp-pub').checked ? 'published' : 'draft'); closeModal(); toast(`أُضيف ${fmtNum(r.count)} سؤال إلى بنك ${t.full_name}${r.skipped ? `، وتُخطّي ${fmtNum(r.skipped)} مكررًا` : ''}`); done(); }
     catch(x){ setBusy(b, false); $('#impE').textContent = x.message; } };
 }
