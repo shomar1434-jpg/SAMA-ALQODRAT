@@ -499,8 +499,11 @@ export async function viewDisplay(){
         <h3 style="font-size:17px;font-weight:600">${esc(x.title)}</h3>
         <div class="hint">${t12(x.start)} – ${t12(x.end)}${x.sub?` · ${esc(x.sub)}`:''}</div>
         <span class="pill dot ok" style="align-self:flex-start">${fmtNum(x.present)} من ${fmtNum(x.expected)} حاضر</span>
-        ${x.kind==='pkg'?`<a class="btn sm" href="#admin-qudurat" style="margin-top:auto">${ic('users')} المشتركون</a>`:`<a class="btn sm" href="#qr-${x.code}" style="margin-top:auto">${ic('qr')} باركود البرنامج (اختياري)</a>`}</div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد جلسات اليوم','تظهر هنا جلسات باقات القدرات والتحصيلي حسب جدول كل قسم، ودفعات البرامج في أيام محاضراتها.')}</div>`}</div></div>`;
+        <button class="btn pri sm" data-sheet="${x.kind}:${x.key}" style="margin-top:auto">${ic('form')} كشف حضور اليوم وطباعته</button></div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد جلسات اليوم','تظهر هنا جلسات باقات القدرات والتحصيلي حسب جدول كل قسم، ودفعات البرامج في أيام محاضراتها.')}</div>`}</div></div>`;
   makeQR($('#uQR'), url, 200); $('#uCp').onclick=()=>copyText(url,'نُسخ رابط التحضير');
+  // كشف حضور الجلسة لليوم: معاينة A4 ثم طباعة أو حفظ PDF للاحتفاظ به مرجعًا للمعهد
+  $$('[data-sheet]').forEach(b=>b.onclick=async()=>{ const [k,id]=b.dataset.sheet.split(':'); const [P,A]=await Promise.all([import('./print.js'), import('./views2_admin.js')]); A.setAD(D);
+    P.printDocs([k==='pkg'?P.sectionSheetHtml(id, today):P.sheetHtml(D.cohorts.find(c=>c.id===id), today)], `كشف حضور ${fmtDate(today)}`); });
 }
 
 /* =====================================================================
