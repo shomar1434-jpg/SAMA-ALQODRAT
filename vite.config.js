@@ -9,7 +9,7 @@ function swPlugin(){
   return { name: 'sama-sw', apply: 'build', configResolved(c){ out = resolve(c.root, c.build.outDir); },
     closeBundle(){
       const files = []; const walk = d => readdirSync(d).forEach(f => { const p = join(d, f); statSync(p).isDirectory() ? walk(p) : files.push(p); }); walk(out);
-      const list = files.map(p => relative(out, p).split('\\').join('/')).filter(u => u !== 'sw.js' && !u.startsWith('admin/') && /\.(html|js|css|webp|png|jpg|svg|webmanifest)$/.test(u)).sort();
+      const list = files.map(p => relative(out, p).split('\\').join('/')).filter(u => u !== 'sw.js' && !u.startsWith('admin/') && !u.startsWith('guide/') && /\.(html|js|css|webp|png|jpg|svg|webmanifest)$/.test(u)).sort();
       const h = createHash('sha256'); list.forEach(u => { h.update(u); h.update(readFileSync(join(out, u))); });
       const tpl = readFileSync(resolve(import.meta.dirname, 'scripts/sw.template.js'), 'utf8');
       writeFileSync(join(out, 'sw.js'), tpl.replace('__VERSION__', h.digest('hex').slice(0, 12)).replace('__PRECACHE__', JSON.stringify(list)));

@@ -4,6 +4,7 @@ import { initStore, Store, LocalStore, cohortArchived, cohortState, progCode, en
 import { applyTheme, getTheme, setTheme } from './views2_head.js';
 import { route } from './views2_main.js';
 import { initPwa } from './pwa.js';
+import { mountGuide } from './guide_link.js';
 import { $, makeSaudiId, riyadhNow } from './utils.js';
 
 export function boot(page){
@@ -22,4 +23,5 @@ export function boot(page){
   window.addEventListener('hashchange', route);
   route();
   initPwa();
+  if(page === 'admin') mountGuide('admin');
 }

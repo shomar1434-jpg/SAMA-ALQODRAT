@@ -2,6 +2,7 @@
    البوابات: المتدرب، والمدرب، وولي الأمر. لكل بوابة صفحة مستقلة ودور محدد،
    والبيانات محصورة بالدور من الخادم (portalData). الحساب من portal_logic.js.
    ===================================================================== */
+import { mountGuide } from './guide_link.js';
 import { CENTER } from './catalog.js';
 import { waLink, WA_LOGO } from './landing.js';
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, DAYS } from './utils.js';
@@ -36,6 +37,7 @@ export function bootPortal(role){
   window.addEventListener('hashchange', render);
   render();
   initPwa();
+  mountGuide(role);
 }
 
 async function render(){
