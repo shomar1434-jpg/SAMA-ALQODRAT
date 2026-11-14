@@ -86,6 +86,10 @@ export function subEnd(plan, start){
 }
 export const subStatus = (s, today = riyadhNow().date) => s.status === 'cancelled' ? 'cancelled' : !s.start_date ? 'pending' : (s.end_date && s.end_date < today) ? 'ended' : 'active';
 
+/* جلسات ما قبل التتبع: من بداية الاشتراك حتى يوم إدخاله في المنصة (track_from). لا سجل حضور لها، فتُحتسب حضورًا
+   إلا عدد أيام الغياب الذي تدخله الإدارة من الكشوف اليدوية (prior_absences) ↔ sub_stats */
+export const priorSessions = (D, s) => { if(!(s.start_date && s.track_from && s.track_from > s.start_date)) return [];
+  const last = addDays(s.track_from, -1); return sessionsBetween(D, s.section, s.start_date, s.end_date && s.end_date < last ? s.end_date : last); };
 /* إحصاء الاشتراك: الجلسات من البداية حتى النهاية، والمنعقد منها، والحضور (يوم واحد لكل تاريخ) */
 export function subStats(D, s, n = riyadhNow()){
   const att = (D.sub_attendance || []).filter(a => a.subscription_id === s.id);
@@ -93,20 +97,22 @@ export function subStats(D, s, n = riyadhNow()){
   const st = subStatus(s, n.date);
   if (!s.start_date) return { status:st, plan, total:0, held:0, attended:0, late:0, score:0, absent:0, remaining:0, rate:null, finalRate:0, required:0, needed:0, reachable:true, consec:0, lastAtt:null, timePct:0, daysLeft:null, next:null, att };
   const end = s.end_date || subEnd(plan, s.start_date);
-  const all = sessionsBetween(D, s.section, s.track_from && s.track_from > s.start_date ? s.track_from : s.start_date, end);   // المسجّلون سابقًا: المتابعة من تاريخ إدخالهم
-  const held = all.filter(x => sessionDone(x, n) || att.some(a => a.att_date === x.date));
+  const prior = priorSessions(D, s), pa = Math.min(prior.length, Math.max(0, Number(s.prior_absences) || 0));
+  const tracked = sessionsBetween(D, s.section, s.track_from && s.track_from > s.start_date ? s.track_from : s.start_date, end);   // المسجّلون سابقًا: التتبع الفعلي من تاريخ إدخالهم
+  const all = [...prior, ...tracked];
+  const heldT = tracked.filter(x => sessionDone(x, n) || att.some(a => a.att_date === x.date)), held = [...prior, ...heldT];
   const days = new Set(att.map(a => a.att_date));
-  const attended = days.size, late = att.filter(a => a.status === 'متأخر').length;
+  const attended = days.size + prior.length - pa, late = att.filter(a => a.status === 'متأخر').length;
   const lw = D.settings?.late_weight ?? 1, score = attended - late * (1 - lw);
   const span = Math.max(1, (Date.parse(end) - Date.parse(s.start_date)) / 864e5 + 1);
   const passed = Math.min(span, Math.max(0, (Date.parse(n.date) - Date.parse(s.start_date)) / 864e5 + 1));
   const remaining = Math.max(0, all.length - held.length);
   const thr = (D.settings?.cert_threshold ?? 75) / 100, required = Math.ceil(all.length * thr), needed = Math.max(0, Math.ceil(required - score - 1e-9));
-  let consec = 0; for (let i = held.length - 1; i >= 0; i--) { if (days.has(held[i].date)) break; consec++; }
+  let consec = 0; for (let i = heldT.length - 1; i >= 0; i--) { if (days.has(heldT[i].date)) break; consec++; }
   const rate = held.length ? Math.round(score / held.length * 100) : null;
   return { status:st, plan, end, total:all.length, held:held.length, attended, late, score, absent:Math.max(0, held.length - attended), remaining, rate,
     finalRate: rate ?? 0, required, needed, reachable: needed <= remaining, consec, lastAtt: [...days].sort().pop() || null,
-    timePct: Math.round(passed / span * 100), daysLeft: Math.max(0, Math.round(span - passed)), next: all.find(x => !sessionDone(x, n)) || null, att };
+    timePct: Math.round(passed / span * 100), daysLeft: Math.max(0, Math.round(span - passed)), next: all.find(x => !sessionDone(x, n)) || null, att, prior:prior.length, priorAbsences:pa };
 }
 
 /* الاشتراكات التي لها جلسة الآن (مع مدة السماح قبل البداية) */

@@ -6,7 +6,7 @@ import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, addDays, validSa
 import { ic, emptyBox, ringSvg, toast, countUp } from './views2_head.js';
 import { Store } from './data2.js';
 import { sectionDaysTxt } from './data2.js';
-import { TIERS, MODES, DURATION_TXT, planTotal, planName, planOpen, SECTIONS, SUB_STATUS, SUB_TONE, EXC_TXT, subStats, subStatus, sessionOn, sessionsBetween, sectionOfGender } from './qudurat.js';
+import { TIERS, MODES, DURATION_TXT, planTotal, planName, planOpen, SECTIONS, SUB_STATUS, SUB_TONE, EXC_TXT, subStats, subStatus, sessionOn, sessionsBetween, sectionOfGender, priorSessions } from './qudurat.js';
 import { initMarquee } from './marquee.js';
 import { regFormHtml, bindRegForm, titleBar, kpiCard } from './views2_main.js';
 import { siteFooter } from './landing.js';
@@ -268,9 +268,9 @@ function subDetail(id){
       <div class="tbar big" role="img" aria-label="مضى ${fmtNum(st.timePct)}٪ من مدة الباقة"><i style="width:${st.timePct}%"></i></div>
       <p class="hint" style="margin:6px 0 12px">من ${fmtDate(s.start_date)} إلى ${fmtDate(st.end)}${s.start_manual ? ' (تاريخ بداية أدخلته الإدارة)' : ''}</p>
       <div class="daygrid">${days.map(d => { const a = st.att.find(x => x.att_date === d.date), fut = d.date > n.date;
-        const cls = a ? (a.status === 'متأخر' ? 'late' : 'ok') : fut ? 'fut' : 'abs';
-        return `<button class="dg ${cls}" ${fut ? 'disabled' : ''} data-dd="${d.date}" title="${fmtDate(d.date)}${a ? ' · ' + a.status : fut ? '' : ' · غائب'}" aria-label="${fmtDate(d.date)}: ${a ? a.status : fut ? 'قادمة' : 'غائب'}"><span>${fmtShort(d.date)}</span></button>`; }).join('')}</div>
-      <p class="hint" style="margin:8px 0 0">اضغط يومًا منعقدًا للتبديل بين: حاضر ← متأخر ← غائب. كل تعديل يُسجَّل في سجل التدقيق.</p>`
+        const pre = !a && s.track_from && d.date < s.track_from, cls = a ? (a.status === 'متأخر' ? 'late' : 'ok') : pre ? 'pre' : fut ? 'fut' : 'abs', lbl = a ? a.status : pre ? 'قبل المنصة (من الكشف اليدوي)' : fut ? 'قادمة' : 'غائب';
+        return `<button class="dg ${cls}" ${fut ? 'disabled' : ''} data-dd="${d.date}" title="${fmtDate(d.date)} · ${lbl}" aria-label="${fmtDate(d.date)}: ${lbl}"><span>${fmtShort(d.date)}</span></button>`; }).join('')}</div>
+      <p class="hint" style="margin:8px 0 0">اضغط يومًا منعقدًا للتبديل بين: حاضر ← متأخر ← غائب. كل تعديل يُسجَّل في سجل التدقيق.${st.prior ? ` الأيام المنقطة قبل التسجيل في المنصة (${fmtNum(st.prior)} جلسة) تُحتسب حضورًا عدا ${fmtNum(st.priorAbsences)} يوم غياب من الكشوف اليدوية، وتعدّلها من «تعديل».` : ''}</p>`
     : emptyBox('لم يبدأ الاشتراك بعد', 'يبدأ تلقائيًا من أول حضور بالباركود، أو حدّد تاريخ البداية من «تعديل».')}
     <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap">
       <button class="btn sm danger soft" id="sdC">${s.status === 'cancelled' ? 'استعادة الاشتراك' : 'إلغاء الاشتراك'}</button>
@@ -297,6 +297,9 @@ function subModal(s){
       <div class="field"><label for="sm-sec">القسم</label><select class="inp" id="sm-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${(s?.section || 'boys') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="field" style="grid-column:1/-1"><label for="sm-start">تاريخ البداية الفعلي</label><input class="inp" type="date" id="sm-start" name="start_date" value="${s?.start_date || ''}" max="${riyadhNow().date}">
         <span class="hint">اتركه فارغًا ليبدأ الاشتراك تلقائيًا من أول حضور بالباركود. للمتدربين الذين بدؤوا قبل المنصة اكتب تاريخ أول يوم حضروه.</span></div>
+      ${s && priorSessions(D, s).length ? `<div class="field" style="grid-column:1/-1"><label for="sm-pa">أيام الغياب قبل التسجيل في المنصة (من الكشوف اليدوية)</label>
+        <input class="inp num" id="sm-pa" name="prior_absences" type="number" inputmode="numeric" min="0" max="${priorSessions(D, s).length}" value="${Number(s.prior_absences) || 0}" style="max-width:140px">
+        <span class="hint">من ${fmtDate(s.start_date)} حتى ${fmtDate(addDays(s.track_from, -1))}: ${fmtNum(priorSessions(D, s).length)} جلسة بلا سجل في المنصة، وتُحتسب حضورًا عدا العدد الذي تكتبه هنا.</span></div>` : ''}
       <div class="errtxt" id="smE" style="grid-column:1/-1"></div>
       <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="smC">إلغاء</button><button class="btn pri" id="smS">${ic('check')} حفظ</button></div></form>`);
   $('#smC').onclick = closeModal;
