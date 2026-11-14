@@ -567,7 +567,7 @@ export const LocalStore = {
     Object.assign(t,p); this.audit('trainee.update', id, {fields:Object.keys(p)}); this.save(); return {ok:true}; },
   async resolveImportNote(id, idx, done=true){ const t=this.data.trainees.find(x=>x.id===id); if(!t?.import_notes?.[idx]) throw new Error('الملاحظة غير موجودة'); t.import_notes[idx].done=!!done; this.save(); return {ok:true}; },
   /* استيراد المسجّلين سابقًا: ملف المتدرب، اشتراكه بتاريخه الفعلي، وطلب شراء بدفعاته السابقة رصيدًا مرحَّلًا (بلا فواتير) */
-  async importLegacy(rows){ const D=this.data, today=riyadhNow().date, res={added:0, skipped:[]}; D.orders=D.orders||[];
+  async importLegacy(rows){ if(!Array.isArray(rows)||!rows.length) throw new Error('لا صفوف للاستيراد؛ اختر الملف من جديد'); const D=this.data, today=riyadhNow().date, res={added:0, skipped:[]}; D.orders=D.orders||[];
     for(const r of rows){ if(r.errors?.length){ res.skipped.push({name:r.full_name, why:r.errors[0]}); continue; }
       const plan=D.plans.find(p=>p.id===r.plan_id); if(!plan){ res.skipped.push({name:r.full_name, why:'الباقة غير معروفة'}); continue; }
       let t=D.trainees.find(x=>x.national_id===r.national_id);
@@ -690,8 +690,10 @@ export const LocalStore = {
   async adminImportQuestions(teacher_id, rows, status){ const t=this._bankTeacher(teacher_id); if(!Array.isArray(rows)||!rows.length) throw new Error('لا توجد أسئلة صالحة للاستيراد'); if(rows.length>2000) throw new Error('الحد 2000 سؤال في المرة الواحدة');
     rows.forEach((q,i)=>{ try { validateQuestion(q); } catch(e){ throw new Error(`السطر ${i+1}: ${e.message}`); } if(!(t.subjects||[]).includes(q.subject)) throw new Error(`السطر ${i+1}: المقرر ليس من مقررات المدرب`); });
     const L=(this.data.questions=this.data.questions||[]), at=new Date().toISOString(), st=status==='draft'?'draft':'published';
+    const same=q=>L.some(x=>x.teacher_id===t.id&&x.status!=='deleted'&&x.subject===q.subject&&x.text.trim()===q.text.trim()), fresh=[];   // لا تكرار: السؤال الموجود بنصه في بنك المدرب نفسه يُتخطى
+    rows.forEach(q=>{ if(!same(q)&&!fresh.some(y=>y.subject===q.subject&&y.text.trim()===q.text.trim())) fresh.push(q); }); const skipped=rows.length-fresh.length; rows=fresh;
     rows.forEach(q=>L.push({id:uid(), teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:st, version:1, created_at:at}));
-    this.audit('question.import', t.id, String(rows.length)); this.save(); return {count:rows.length}; },
+    this.audit('question.import', t.id, String(rows.length)); this.save(); return {count:rows.length, skipped}; },
   audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'admin', action, entity:String(entity), detail:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
   async resetDemo(){ this.data = makeDemo(); this.autoArchive(); this.save(); },
   async clearPeople(){ const D=this.data; D.trainees=[]; D.enrollments=[]; D.attendance=[]; D.cohorts=[]; D.certificates=[]; D.subscriptions=[]; D.sub_attendance=[]; D.checkin_attempts=[]; this.save(); }
@@ -701,7 +703,11 @@ export const LocalStore = {
 export const CloudStore = {
   mode:'cloud', sb:null,
   init(){ this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); },
-  _e(r){ if(r.error){ const m=r.error.message||''; throw new Error(/foreign key|violates/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
+  _e(r){ if(r.error){ const m=r.error.message||'', c=r.error.code||'';
+      if(c==='23505'||/duplicate key/.test(m)) throw new Error(/teachers_phone/.test(m)?'رقم الجوال مستخدم لمدرب آخر':/teachers_national_id/.test(m)?'رقم الهوية مستخدم لمدرب آخر':/national_id/.test(m)?'رقم الهوية مسجّل مسبقًا':'هذا السجل موجود مسبقًا');
+      if(c==='23514'||/check constraint/.test(m)) throw new Error('إحدى القيم المدخلة غير صالحة؛ راجع الجوال ورقم الهوية والحقول المطلوبة');
+      if(/row-level security/.test(m)) throw new Error('غير مصرح بهذه العملية؛ سجّل الدخول كمسؤول');
+      throw new Error(/foreign key/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
   async catalog(){ const d=this._e(await this.sb.rpc('public_catalog')); return {programs:d.programs||[], packages:d.packages||[]}; },
   async publicProgram(code){ return this._e(await this.sb.rpc('public_program',{p_code:code})); },
   async publicSettings(){ return this._e(await this.sb.rpc('public_settings')) || {}; },
@@ -813,7 +819,8 @@ export const CloudStore = {
   async rateTeacher(p){ return this._e(await this.sb.rpc('student_rate',{p})); },
   async sendMessage(p, role){ return this._e(await this.sb.rpc('send_message',{p, p_role:role})); },
   async markThreadRead({trainee_id, teacher_id}, role){ await this.sb.rpc('mark_thread_read',{p_trainee:trainee_id, p_teacher:teacher_id, p_role:role}); },
-  async saveTeacher(t){ const row={full_name:t.full_name, phone:normPhone(t.phone), national_id:t.national_id||null, section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
+  async saveTeacher(t){ if(!/^05\d{8}$/.test(normPhone(t.phone))) throw new Error('رقم الجوال غير صحيح'); if(t.national_id && !/^[12]\d{9}$/.test(t.national_id)) throw new Error('رقم الهوية 10 أرقام');
+    const row={full_name:t.full_name, phone:normPhone(t.phone), national_id:t.national_id||null, section:t.section, subjects:t.subjects, active:t.active!==false}; this._e(t.id ? await this.sb.from('teachers').update(row).eq('id',t.id) : await this.sb.from('teachers').insert(row)); },
   async orderReportTransfer(f){ return this._e(await this.sb.rpc('order_report_transfer',{p:f})); },
   async reviewOrder(id, decision, reason, expected_version){ return this._e(await this.sb.rpc('admin_review_order',{p_id:id, p_decision:decision, p_reason:reason||'', p_version:expected_version??null})); },
   async confirmOrderPayment(id, amount, confirmed=true, reason='', method='transfer'){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed, p_reason:reason||'', p_method:method})); },
@@ -821,7 +828,7 @@ export const CloudStore = {
   async saveOrderMeta(id, f){ return this._e(await this.sb.rpc('admin_save_order_meta',{p_id:id, p:f})); },
   async saveTrainee(id, f){ return this._e(await this.sb.rpc('admin_save_trainee',{p_id:id, p:f})); },
   async resolveImportNote(id, idx, done=true){ return this._e(await this.sb.rpc('admin_resolve_import_note',{p_id:id, p_idx:idx, p_done:done})); },
-  async importLegacy(rows){ return this._e(await this.sb.rpc('admin_import_legacy',{p:rows})); },
+  async importLegacy(rows){ if(!Array.isArray(rows)||!rows.length) throw new Error('لا صفوف للاستيراد؛ اختر الملف من جديد'); return this._e(await this.sb.rpc('admin_import_legacy',{p:rows})); },
   async attachReceipt(id, image){ return this._e(await this.sb.rpc('admin_attach_receipt',{p_id:id, p_image:image})); },
   async invoiceReceipt(id){ return this._e(await this.sb.rpc('admin_invoice_receipt',{p_id:id})); },
   async setOrderProvisional(id, on, reason){ return this._e(await this.sb.rpc('admin_order_provisional',{p_id:id, p_on:!!on, p_reason:reason||''})); },
