@@ -5,6 +5,7 @@
 import { $, $$, esc, fmtNum, fmtShort, riyadhNow, t12 } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { modal, closeModal } from './views2_programs.js';
+import { docShell, printDocs, fmtGreg, fmtHijri } from './print.js';
 import { Store } from './data2.js';
 import { teacherDashboard } from './portal_logic.js';
 import { teacherTeaches } from './learning_logic.js';
@@ -118,3 +119,15 @@ export function teacherPeople(D, reload, go){
           try { await Store.saveGroup({ name:$('#gs-n').value, trainee_ids:[...picked] }); closeModal(); toast('حُفظت المجموعة'); go('groups'); reload(); } catch(x){ setBusy(b, false); $('#gsE').textContent = x.message; } }; };
       wire(); sel(); } };
 }
+
+/* ---------- طباعة كشف الحضور والغياب اليومي للمدرب (A4): الغائبون ومن لم يسجل أولًا ---------- */
+export function daySheetDoc(dash, n){
+  const ORD = { 'غائب':0, 'لم يسجل بعد':1, 'متأخر':2, 'حاضر':3 }, rows = dash.rows.slice().sort((a, b) => (ORD[a.today] ?? 4) - (ORD[b.today] ?? 4) || a.name.localeCompare(b.name, 'ar'));
+  const c = k => rows.filter(r => r.today === k).length;
+  return docShell({ docNo:`DAY-${n.date.replace(/-/g, '')}`, title:'كشف الحضور والغياب اليومي', sub:`${fmtGreg(n.date)} · ${fmtHijri(n.date)}`,
+    info:[['المدرب', dash.teacher.name, 'wide'], ['القسم', dash.teacher.section], ['المقررات', dash.teacher.subjects.join('، ')], ['وقت الجلسة', dash.session ? `${t12(dash.session.start)} – ${t12(dash.session.end)}` : 'لا جلسة اليوم']],
+    stats:[['المتدربون', fmtNum(rows.length)], ['حاضر', fmtNum(c('حاضر')), 'ok'], ['متأخر', fmtNum(c('متأخر')), 'warn'], ['غائب', fmtNum(c('غائب')), 'bad'], ['لم يسجل بعد', fmtNum(c('لم يسجل بعد'))]],
+    body:`<table class="ptab"><thead><tr><th>م</th><th>المتدرب</th><th>الباقة</th><th>حالة اليوم</th><th>وقت التسجيل</th><th>نسبة الحضور</th><th>غياب متتالٍ</th><th>ملاحظات</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td>${fmtNum(i + 1)}</td><td>${esc(r.name)}</td><td>${esc(r.plan)}</td><td><b>${esc(r.today)}</b></td><td>${r.time ? t12(r.time) : '—'}</td><td>${r.rate == null ? '—' : fmtNum(r.rate) + '٪'}</td><td>${r.consec ? fmtNum(r.consec) : '—'}</td><td></td></tr>`).join('') || '<tr><td colspan="8">لا متدربين في نطاق المدرب</td></tr>'}</tbody></table>`,
+    note:'الحالة من سجل مسح الحضور وقت الطباعة؛ «لم يسجل بعد» تصبح «غائب» بعد انتهاء الجلسة.' });
+}
+export const printDaySheet = (dash, n) => printDocs([daySheetDoc(dash, n)], 'كشف الحضور والغياب اليومي');

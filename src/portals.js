@@ -17,7 +17,7 @@ import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
 import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
-import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml } from './trainer_views.js';
+import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml, printDaySheet } from './trainer_views.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
 const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
@@ -292,7 +292,7 @@ function viewTeacher(D, quiet){
     ${daySummaryHtml(D, t)}
     <div class="card pad rv" style="margin-top:16px" id="tSheet"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       <h3 class="ctitle">${ic('calendar')}كشف اليوم · ${fmtDate(n.date)}</h3>
-      <div class="hint">${fmtNum(t.rows.filter(r => ['حاضر', 'متأخر'].includes(r.today)).length)} حاضر · ${fmtNum(t.missing.length)} لم يسجل · تحديث تلقائي كل 30 ثانية</div></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="hint">${fmtNum(t.rows.filter(r => ['حاضر', 'متأخر'].includes(r.today)).length)} حاضر · ${fmtNum(t.missing.length)} لم يسجل · تحديث تلقائي كل 30 ثانية</span><button class="btn sm" id="tPrint">${ic('form')} طباعة الكشف</button></div></div>
       ${t.rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>اليوم</th><th>الوقت</th><th>نسبة الحضور</th><th>الإنجاز</th><th>غياب متتالٍ</th><th></th></tr></thead><tbody>
         ${t.rows.map(r => `<tr><td><button class="linkbtn" data-tv="${r.trainee_id}" aria-label="عرض تقدم ${esc(r.name)}">${esc(r.name)}</button></td><td>${esc(r.plan)}</td>
           <td><span class="pill dot ${['لم يسجل بعد','لا جلسة'].includes(r.today) ? 'g' : statusPill(r.today)}">${r.today}</span></td><td class="num">${r.time ? t12(r.time) : '—'}</td>
@@ -310,6 +310,7 @@ function viewTeacher(D, quiet){
   $$('[data-tv]').forEach(b => b.onclick = () => { const tr = D.trainees.find(x => x.id === b.dataset.tv), dash = studentDashboard(mirrorData(D), tr), it = dash.items[0];
     modal(`<div class="mirror"><h3>${esc(tr.full_name)}</h3><p class="hint" style="margin:0 0 6px">${ic('chart')} مرآة لوحة المتدرب: ما تراه هنا هو ما يراه المتدرب وولي أمره.</p>${it ? studentPanelHtml(it) : emptyBox('لا يوجد اشتراك')}</div><div style="text-align:end;margin-top:12px"><button class="btn pri" id="tvX">إغلاق</button></div>`); $('#tvX').onclick = closeModal; });
   $$('[data-tn]').forEach(b => b.onclick = () => notifyModal(D, b.dataset.tn));
+  if($('#tPrint')) $('#tPrint').onclick = () => printDaySheet(t, n);
 }
 function notifyModal(D, trainee_id){
   const tr = D.trainees.find(x => x.id === trainee_id);

@@ -1193,3 +1193,4 @@ img,svg,video,canvas{max-width:100%}
 .avt.ph{display:inline-grid;place-items:center;background:var(--brand-tint);color:var(--brand);font-weight:600;font-size:20px}.avt.ph.lg{font-size:32px}
 .cv{margin-top:6px}.cv summary{cursor:pointer;color:var(--brand);font-size:14px;min-height:44px;display:flex;align-items:center}.cv p{white-space:pre-line}
 .tcard h3{margin:0 0 4px}.tcard .ord-amt{flex-wrap:wrap}
+#people .linkbtn{min-height:44px;display:inline-flex;align-items:center}
