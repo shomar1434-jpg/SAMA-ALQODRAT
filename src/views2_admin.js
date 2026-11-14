@@ -6,7 +6,7 @@ import { PROFILE_FIELDS, STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArc
 import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules, setBusy } from './features.js';
 import { pagePartners } from './partners.js';
 import { exportCSV, pageReports, printDayModal, printSheets, traineesRows } from './print.js';
-import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin } from './utils.js';
+import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin, matchQ } from './utils.js';
 import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, statusPill, toast } from './views2_head.js';
 import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hoursTxt, kpiCard, makeQR, programUrl, route, short, titleBar } from './views2_main.js';
 import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
@@ -226,7 +226,7 @@ export function pageAttendance(){
       ${kpiCard(3,'x','danger','الغائبون',future?0:Math.max(0,totalExp-dayAtt.length),'',future?'يوم قادم':'حتى الآن')}</div>
     <div id="sessList">${sess.length?'':emptyBox('لا توجد محاضرات في هذا اليوم','اختر يومًا آخر من الشريط أعلاه.')}</div>`;
   countUp(m);
-  const q=attQ.trim(); const match=t=>!q||t.full_name.includes(q)||t.national_id.includes(q);
+  const match=t=>matchQ(attQ,t.full_name,t.national_id,t.phone);
   $('#sessList').innerHTML += sess.map((c,si)=>{
     const roster=rosterOf(c), present=dayAtt.filter(a=>a.cohort_id===c.id), pct=roster.length?Math.round(present.length/roster.length*100):0;
     const rows=roster.map(e=>({e,t:trainees.find(x=>x.id===e.trainee_id),a:present.find(x=>x.enrollment_id===e.id)})).filter(x=>x.t&&match(x.t)).sort((x,y)=>(x.a?0:1)-(y.a?0:1)||(x.a&&y.a?x.a.time.localeCompare(y.a.time):0));
@@ -258,11 +258,11 @@ export function pageCohorts(){
   const m=$('#main'), today=riyadhNow().date;
   const act=AD.cohorts.filter(c=>!cohortArchived(c,today)).sort((a,b)=>a.start_date.localeCompare(b.start_date));
   const arc=AD.cohorts.filter(c=>cohortArchived(c,today)).sort((a,b)=>b.end_date.localeCompare(a.end_date));
-  const q=cohQ.trim(); const mt=c=>!q||progName(c.program_id).includes(q);
+  const mt=c=>matchQ(cohQ,progName(c.program_id),c.trainer,c.hall);
   m.innerHTML = titleBar(`${ic('users')}الدفعات والكشوف`, `${fmtNum(act.length)} دفعة نشطة، <em>و${fmtNum(arc.length)} في الأرشيف</em>`, 'لكل برنامج دفعة نشطة واحدة بكشف تسجيلها، وهو ما يعتمد عليه التحضير اليومي. تُؤرشف الدفعة تلقائيًا بعد انتهاء مدتها، فيُفتح للبرنامج دفعة جديدة على الباركود نفسه.',
       `<a class="btn pri sm" href="#admin-programs">${ic('plus')} فتح دفعة لبرنامج</a>`)+
     requestsHtml(AD)+`<div class="filters rv" style="--i:1"><div class="seg" style="margin:0"><button data-ct="active" class="${cohTab==='active'?'on':''}">${ic('activity')}النشطة <span class="pill g">${fmtNum(act.length)}</span></button><button data-ct="archived" class="${cohTab==='archived'?'on':''}">${ic('database')}الأرشيف <span class="pill g">${fmtNum(arc.length)}</span></button></div>
-      <span style="flex:1"></span><input class="inp" id="cq" placeholder="بحث باسم البرنامج" value="${esc(q)}" style="min-width:220px"></div>
+      <span style="flex:1"></span><input class="inp" id="cq" placeholder="بحث باسم البرنامج" value="${esc(cohQ)}" style="min-width:220px"></div>
     <div id="cohList"></div>`;
   const list=(cohTab==='active'?act:arc).filter(mt);
   $('#cohList').innerHTML = cohTab==='active'
@@ -403,7 +403,7 @@ function bindChangeReq(){
 export function pageTrainees(){
   const m=$('#main'); queueMicrotask(bindChangeReq); const {programs,trainees,enrollments,attendance}=AD;
   const ensOf = t => enrollments.filter(e=>e.trainee_id===t.id);
-  const list = trainees.filter(t=>(!trQ||t.full_name.includes(trQ)||t.national_id.includes(trQ)||t.phone.includes(trQ)||ensOf(t).some(e=>(e.ref||'').includes(trQ))) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
+  const list = trainees.filter(t=>matchQ(trQ,t.full_name,t.national_id,t.phone,...ensOf(t).map(e=>e.ref)) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
     .sort((a,b)=>(ensOf(b).map(e=>e.created_at).sort().pop()||'').localeCompare(ensOf(a).map(e=>e.created_at).sort().pop()||''));
   m.innerHTML = titleBar(`${ic('id')}المتدربون`, `سجل المتدربين، <em>${fmtNum(list.length)} متدرب</em>`, 'كل متدرب بسجله المدني مرة واحدة، مع كل الدفعات التي سجّل فيها ونسبة حضوره في كل منها.', `<button class="btn sm" id="csvx">${ic('database')} تصدير Excel</button><button class="btn sm" id="csv">${ic('copy')} نسخ كجدول</button>`)+
    `${changeReqHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">
@@ -415,7 +415,7 @@ export function pageTrainees(){
        return `<button class="enr" data-cv="${c.id}"><span class="pill dot ${e.status==='ملغى'?'bad':STATE_PILL[cohortState(c)]}">${e.status==='ملغى'?'ملغى':STATE_TXT[cohortState(c)]}</span><span style="flex:1;text-align:right">${esc(short(progName(e.program_id)))} · د${fmtNum(c.number)}</span><span class="hint num">${r===null?'—':fmtNum(r)+'٪'}</span></button>`; }).join('')}</div></td>
      <td><button class="btn sm danger soft" data-del="${t.id}" title="حذف المتدرب">${ic('trash')}</button></td></tr>`).join('')}
    </tbody></table></div>${list.length>400?`<p class="hint">تظهر أول ٤٠٠ نتيجة. استخدم البحث لتضييق القائمة.</p>`:''}` : emptyBox('لا يوجد متدربون مطابقون','غيّر البحث أو المرشح.')}`;
-  $('#tq').oninput=e=>{ trQ=e.target.value.trim(); clearTimeout(window._tq); window._tq=setTimeout(()=>{ pageTrainees(); const el=$('#tq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); };
+  $('#tq').oninput=e=>{ trQ=e.target.value; clearTimeout(window._tq); window._tq=setTimeout(()=>{ pageTrainees(); const el=$('#tq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); };
   $('#tp').onchange=e=>{ trP=e.target.value; pageTrainees(); };
   $('#csvx').onclick=()=>exportCSV('المتدربون-وتسجيلاتهم', traineesRows());
   $$('[data-cv]').forEach(b=>b.onclick=()=>{ cohortView=b.dataset.cv; location.hash='#admin-cohorts'; });

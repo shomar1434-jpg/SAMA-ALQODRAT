@@ -33,3 +33,10 @@ export function makeSaudiId(prefix){
   for(let c=0;c<10;c++){ if(validSaudiId(base+c)) return base+c; }
 }
 export function hash32(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+
+/* البحث: تطبيع عربي (الهمزات، التاء المربوطة، الألف المقصورة، التشكيل، الأرقام العربية) وكلمات متعددة بأي ترتيب.
+   كل كلمة في نص البحث يجب أن تظهر في أحد الحقول؛ المسافات بين الكلمات مقبولة وتُطوى المكررة. */
+export const normAr = s => String(s ?? '').toLowerCase().replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '')
+  .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\s+/g, ' ').trim();
+export const matchQ = (q, ...fields) => { const toks = normAr(q).split(' ').filter(Boolean); if(!toks.length) return true;
+  const hay = normAr(fields.filter(x => x != null && x !== '').join(' ')); return toks.every(t => hay.includes(t)); };

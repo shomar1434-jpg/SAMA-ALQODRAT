@@ -2,7 +2,7 @@
    الإدارة: «تفعيل الأجهزة» (#admin-access) — إصدار رموز التفعيل للمتدربين وأولياء الأمور والمدربين (فرديًا أو جماعيًا)،
    وكشف قابل للطباعة والتصدير، وإلغاء الأجهزة المفعَّلة. الرمز يظهر مرة واحدة عند إصداره ولا يُحفظ نصًّا في الخادم.
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
@@ -43,7 +43,7 @@ export async function pageAccess(){
   draw();
 }
 function draw(){
-  const all = people(aRole).map(p => ({ ...p, ...stateOf(p) })), list = all.filter(p => (!aQ || p.name.includes(aQ) || p.phone.includes(aQ)) && (aOnly === 'all' || p.st === aOnly)), n = k => all.filter(p => p.st === k).length;
+  const all = people(aRole).map(p => ({ ...p, ...stateOf(p) })), list = all.filter(p => matchQ(aQ, p.name, p.phone) && (aOnly === 'all' || p.st === aOnly)), n = k => all.filter(p => p.st === k).length;
   $('#acBody').removeAttribute('aria-busy');
   const RQ = X.requests || [];
   $('#acBody').innerHTML = `${RQ.length ? `<div class="card pad rv" id="acReq" style="margin-bottom:14px"><h3 class="ctitle">${ic('bell')}طلبات دخول الآن (${fmtNum(RQ.length)})</h3><p class="hint" style="margin:-4px 0 10px">كتب صاحب الحساب رقم هويته على جهاز جديد فصدر له رمز تحقق. تأكد من هويته ومن رمز الجهاز الظاهر عنده، ثم أبلغه الرمز. الرمز صالح ربع ساعة ولهذا الجهاز وحده.</p>
@@ -60,7 +60,7 @@ function draw(){
         <td>${p.st === 'on' ? `<span class="pill dot ok">${fmtNum(p.dev)} جهاز مفعَّل</span>` : p.st === 'wait' ? `<span class="pill dot warn">${ACT_ST.active}</span><div class="hint">ينتهي ${fmtShort(p.act.expires_at.slice(0, 10))}</div>` : `<span class="pill dot g">${p.act ? ACT_ST[actStatus(p.act)] : 'بلا رمز'}</span>`}</td>
         <td style="white-space:nowrap"><button class="btn sm pri" data-ai="${p.phone}">${p.st === 'none' ? 'إصدار رمز' : 'رمز جديد'}</button>${p.dev ? ` <button class="btn sm danger soft" data-av="${p.phone}">إلغاء الأجهزة</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : emptyBox('لا حسابات بهذه التصفية')}`;
   $$('[data-ar]').forEach(b => b.onclick = () => { aRole = b.dataset.ar; aOnly = 'all'; draw(); });
-  $('#ac-q').oninput = e => { aQ = e.target.value.trim(); clearTimeout(draw.t); draw.t = setTimeout(() => { draw(); const i = $('#ac-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
+  $('#ac-q').oninput = e => { aQ = e.target.value; clearTimeout(draw.t); draw.t = setTimeout(() => { draw(); const i = $('#ac-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
   $('#ac-o').onchange = e => { aOnly = e.target.value; draw(); };
   const nameOf = ph => all.find(p => p.phone === ph)?.name || '', done = async rows => { issued = rows.map(r => ({ ...r, name:nameOf(r.phone) })); X = await Store.accessData(); draw(); };
   $$('[data-ai]').forEach(b => b.onclick = async () => { setBusy(b, true, '…'); try { await done([await Store.issueActivation(b.dataset.ai, aRole)]); toast('صدر رمز التفعيل'); } catch(x){ setBusy(b, false); toast(x.message); } });

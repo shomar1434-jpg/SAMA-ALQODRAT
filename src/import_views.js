@@ -2,7 +2,7 @@
    الإدارة: «مراجعة البيانات» (#admin-data) — يقرأ قاعدة المتدربين ويستخرج ما ينقص أو يحتاج مراجعة ليكمله المسؤول،
    ومعه استيراد المسجّلين سابقًا من كشف Excel (لصق أو ملف CSV) بمعاينة قبل الاعتماد.
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort, riyadhNow } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, riyadhNow, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
@@ -26,7 +26,7 @@ export function pageData(){
 function issuesTab(all, n){
   const kinds = [['all', 'كل الملاحظات'], ['birth_date', 'تاريخ الميلاد'], ['guardian_phone', 'جوال ولي الأمر'], ['email', 'البريد'], ['full_name', 'الاسم'], ['national_id', 'رقم الهوية'], ['order', 'الرسوم والدفعات'], ['note', 'ملاحظات الكشف السابق']];
   const hit = i => dOnly === 'all' || (dOnly === 'note' ? i.note != null : dOnly === 'order' ? String(i.field || '').startsWith('order:') : i.field === dOnly);
-  const list = all.filter(x => (!dQ || x.trainee.full_name.includes(dQ) || x.trainee.national_id.includes(dQ) || (x.trainee.phone || '').includes(dQ)) && x.issues.some(hit));
+  const list = all.filter(x => matchQ(dQ, x.trainee.full_name, x.trainee.national_id, x.trainee.phone, x.trainee.guardian_phone) && x.issues.some(hit));
   $('#dBody').innerHTML = `<div class="filters"><label class="sr-only" for="dq">بحث</label><input class="inp" id="dq" type="search" placeholder="الاسم أو الهوية أو الجوال" value="${esc(dQ)}" style="flex:1;min-width:200px">
       <label class="sr-only" for="dk">نوع الملاحظة</label><select class="inp" id="dk">${kinds.map(([k, v]) => `<option value="${k}" ${dOnly === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <button class="btn sm" id="dX" ${list.length ? '' : 'disabled'}>${ic('copy')} تصدير CSV</button></div>
@@ -34,7 +34,7 @@ function issuesTab(all, n){
     ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الملاحظات</th><th></th></tr></thead><tbody>${list.slice(0, 300).map(x => `<tr><td style="min-width:170px"><b style="font-weight:600">${esc(x.trainee.full_name)}</b><div class="hint num" dir="ltr">${esc(x.trainee.national_id)} · ${esc(x.trainee.phone || '')}</div>${x.trainee.imported ? '<span class="pill info">مسجّل سابقًا</span>' : ''}</td>
         <td><ul class="iss">${x.issues.filter(hit).map(i => `<li class="${i.note != null ? 'n' : ''}">${esc(i.text)}</li>`).join('')}</ul></td><td><button class="btn sm pri" data-de="${x.trainee.id}">${ic('edit')} استكمال</button></td></tr>`).join('')}</tbody></table></div></div>`
       : emptyBox(all.length ? 'لا نتائج بهذه التصفية' : 'البيانات مكتملة', all.length ? '' : 'لا ملاحظات على بيانات المتدربين.')}`;
-  $('#dq').oninput = e => { dQ = e.target.value.trim(); clearTimeout(pageData.t); pageData.t = setTimeout(() => { pageData(); const i = $('#dq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
+  $('#dq').oninput = e => { dQ = e.target.value; clearTimeout(pageData.t); pageData.t = setTimeout(() => { pageData(); const i = $('#dq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
   $('#dk').onchange = e => { dOnly = e.target.value; pageData(); };
   $('#dX').onclick = () => exportCSV('مراجعة-البيانات', [['الاسم', 'رقم الهوية', 'الجوال', 'الملاحظة'], ...list.flatMap(x => x.issues.filter(hit).map(i => [x.trainee.full_name, x.trainee.national_id, x.trainee.phone, i.text]))]);
   $$('[data-de]').forEach(b => b.onclick = () => fixModal(all.find(x => x.trainee.id === b.dataset.de)));

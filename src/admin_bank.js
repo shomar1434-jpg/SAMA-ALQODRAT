@@ -3,7 +3,7 @@
    الإدارة تضيف وتعدّل وتوقف، وتستورد دفعة باللصق من Excel أو من ملف CSV.
    من هذا البنك يرسل المدرب واجبات اختبار تُصحَّح آليًا، ويقيس المتدرب مستواه.
    ===================================================================== */
-import { $, $$, esc, fmtNum } from './utils.js';
+import { $, $$, esc, fmtNum, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
@@ -48,7 +48,7 @@ export function pageBank(){
 function body(t, mine){
   const units = [...new Set(mine.filter(q => !fSub || q.subject === fSub).map(q => q.unit || 'عام'))].sort((a, b) => a.localeCompare(b, 'ar'));
   if(fUnit && !units.includes(fUnit)) fUnit = '';
-  const list = mine.filter(q => (!fSub || q.subject === fSub) && (!fUnit || q.unit === fUnit) && (!fSt || q.status === fSt) && (!fQ || q.text.includes(fQ)))
+  const list = mine.filter(q => (!fSub || q.subject === fSub) && (!fUnit || q.unit === fUnit) && (!fSt || q.status === fSt) && matchQ(fQ, q.text, q.code, q.unit))
     .sort((a, b) => (a.subject + a.unit).localeCompare(b.subject + b.unit, 'ar') || String(a.created_at).localeCompare(String(b.created_at)));
   const per = (t.subjects || []).map(s => { const x = mine.filter(q => q.subject === s); return `<div class="kpi-s"><span>${esc(s)}</span><b class="num">${fmtNum(x.filter(q => q.status === 'published').length)}</b><small>منشور من ${fmtNum(x.length)}</small></div>`; }).join('');
   $('#bankBody').innerHTML = `<div class="card pad rv" style="margin-top:14px">
@@ -66,7 +66,7 @@ function body(t, mine){
       : emptyBox(mine.length ? 'لا أسئلة بهذه التصفية' : 'البنك فارغ', mine.length ? '' : 'أضف الأسئلة واحدًا واحدًا، أو الصقها كلها من ملف Excel.')}</div>`;
   const re = () => body(t, mine);
   $('#bf-s').onchange = e => { fSub = e.target.value; re(); }; $('#bf-u').onchange = e => { fUnit = e.target.value; re(); };
-  $('#bf-st').onchange = e => { fSt = e.target.value; re(); }; $('#bf-q').oninput = e => { fQ = e.target.value.trim(); clearTimeout(re.t); re.t = setTimeout(() => { re(); const i = $('#bf-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+  $('#bf-st').onchange = e => { fSt = e.target.value; re(); }; $('#bf-q').oninput = e => { fQ = e.target.value; clearTimeout(re.t); re.t = setTimeout(() => { re(); const i = $('#bf-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
   const done = async () => { await reloadAD(); pageBank(); };
   $('#bkAdd').onclick = () => questionModal({ q:null, subjects:t.subjects, title:`سؤال جديد · بنك ${t.full_name}`, save:o => Store.adminSaveQuestion({ ...o, teacher_id:t.id }), done });
   $$('[data-qe]').forEach(b => b.onclick = () => questionModal({ q:mine.find(q => q.id === b.dataset.qe), subjects:t.subjects, save:o => Store.adminSaveQuestion({ ...o, teacher_id:t.id }), done }));

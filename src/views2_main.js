@@ -5,7 +5,7 @@ import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessio
 import { liveSay, setBusy, showErrorSummary, toLatin, viewVerify, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
 import { closePrint } from './print.js';
-import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
+import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
 import { viewAdmin } from './views2_admin.js';
 import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
@@ -148,8 +148,8 @@ export function renderCatalogCards(){
       bindRegForm({package_id:k.id}, ()=>ps.map(p=>p.cohort)); $('#pkgForm').scrollIntoView({behavior:'smooth'}); });
     return;
   }
-  const q=cat.q.trim(), rank={open:0,running:1,closed:2,none:3};
-  const list = programs.filter(p=>(cat.cf==='all'||p.category===cat.cf) && (!q||p.name.includes(q)||(p.accreditation_no||'').includes(q)) && (!cat.open||cohortPublicState(p.cohort).k==='open'))
+  const rank={open:0,running:1,closed:2,none:3};
+  const list = programs.filter(p=>(cat.cf==='all'||p.category===cat.cf) && matchQ(cat.q,p.name,p.accreditation_no,p.category) && (!cat.open||cohortPublicState(p.cohort).k==='open'))
     .sort((a,b)=>rank[cohortPublicState(a.cohort).k]-rank[cohortPublicState(b.cohort).k] || catSort(a.category,b.category));
   $('#resCount').textContent = `${fmtNum(list.length)} برنامج`;
   box.innerHTML = list.length ? list.map(programCard).join('') : `<div style="grid-column:1/-1">${emptyBox('لا توجد برامج مطابقة','غيّر المجال أو كلمة البحث.')}</div>`;

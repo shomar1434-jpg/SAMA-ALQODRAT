@@ -1,3 +1,4 @@
+import { matchQ } from './utils.js';
 /* =====================================================================
    الفواتير الداخلية (مرجع المسؤول لمراجعة الحسابات): تصدر فاتورة برقم تسلسلي عند تأكيد السداد،
    وتحفظ نسخة ثابتة من بيانات العميل والخدمة والتحويل. لا تُحذف؛ تُلغى بسبب مكتوب.
@@ -17,7 +18,7 @@ export function buildInvoice(o, t, { amount, seq, date, prior = 0, method = 'ت�
     method, transfer_date:transfer_date || o.claim?.date || date, transfer_ref:transfer_ref ?? (o.claim?.reference || ''), issue_date:date, status:'issued', void_reason:'', has_receipt:false };
 }
 export const invoiceFilter = (list, { from, to, st, q }) => (list || []).filter(i => (!from || i.issue_date >= from) && (!to || i.issue_date <= to) && (!st || st === 'all' || i.status === st) &&
-  (!q || i.number.includes(q.toUpperCase()) || i.order_number.includes(q.toUpperCase()) || i.customer_name.includes(q) || i.customer_phone.includes(q) || i.customer_nid.includes(q) || (i.transfer_ref || '').includes(q)));
+  matchQ(q, i.number, i.order_number, i.customer_name, i.customer_phone, i.customer_nid, i.transfer_ref));
 /* الإجماليات للفواتير السارية فقط */
 export const invoiceTotals = list => { const ok = (list || []).filter(i => i.status === 'issued');
   return { count:ok.length, voided:(list || []).length - ok.length, paid:Math.round(ok.reduce((a, i) => a + i.paid, 0) * 100) / 100, remaining:Math.round(ok.reduce((a, i) => a + i.remaining, 0) * 100) / 100 }; };
