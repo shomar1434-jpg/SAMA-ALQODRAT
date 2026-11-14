@@ -480,6 +480,7 @@ export const LocalStore = {
   async listAdmins(){ const D=this.data; D.admins=D.admins||[{id:'demo-admin', email:'admin@demo.local', name:'مدير النظام', role:'owner', active:true, pending:false, self:true}];
     D.admins.forEach(a=>{ if(!a.role) a.role=a.id==='demo-admin'?'owner':'staff'; }); return JSON.parse(JSON.stringify(D.admins)); },
   async adminSignup(){ throw new Error('حسابات المسؤولين تعمل مع قاعدة البيانات فقط؛ ادخل هنا برمز الدخول التجريبي'); },
+  async authReady(){ return false; }, async mustChangePassword(){ return false; }, async setPassword(){ return true; },
   async adminMe(){ if(!this.admin) return null; const a=(await this.listAdmins()).find(x=>x.id==='demo-admin'); return {id:a.id, email:a.email, name:a.name, role:a.role}; },
   async reauth(pass){ if(pass!==this.data.settings.admin_pin) throw new Error('كلمة المرور غير صحيحة'); this._reauthAt=Date.now(); return true; },
   _recent(){ return !!this._reauthAt && Date.now()-this._reauthAt < 600000; },
@@ -495,7 +496,7 @@ export const LocalStore = {
   async addAdmin(email, name, role='staff'){ const D=this.data, e=String(email||'').trim().toLowerCase(), me=await this.adminMe(); await this.listAdmins();
     if(!['owner','full'].includes(me?.role)) throw new Error('إدارة المسؤولين لمدير النظام فقط'); checkRole(me, role, null, this._recent());
     if(!/^\S+@\S+\.\S+$/.test(e)) throw new Error('اكتب بريدًا صحيحًا'); if(String(name||'').trim().length<3) throw new Error('اكتب اسم المسؤول');
-    if(D.admins.some(a=>a.email===e)) throw new Error('هذا البريد له حساب مسؤول؛ فعّله أو عدّل دوره من القائمة'); D.admins.push({id:uid(), email:e, name:String(name).trim(), role, active:true, pending:true, created_by:me.name, created_at:new Date().toISOString()}); this.audit('admin_invites.insert', e, {after:{email:e, role}}); this.save(); return {ok:true, pending:true}; },
+    if(D.admins.some(a=>a.email===e)) throw new Error('هذا البريد له حساب مسؤول؛ فعّله أو عدّل دوره من القائمة'); D.admins.push({id:uid(), email:e, name:String(name).trim(), role, active:true, pending:true, created_by:me.name, created_at:new Date().toISOString()}); this.audit('admin_invites.insert', e, {after:{email:e, role}}); this.save(); return {ok:true, pending:true, mode:'local'}; },
   async removeAdmin(id){ const D=this.data; await this.listAdmins(); const a=D.admins.find(x=>x.id===id); if(!a) throw new Error('غير موجود');
     if(a.pending){ D.admins.splice(D.admins.indexOf(a),1); this.audit('admin_invites.delete', a.email); this.save(); return {ok:true}; } return this.setAdminActive(id, false, 'إزالة من قائمة المسؤولين'); },
   async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role);
@@ -720,7 +721,12 @@ export const LocalStore = {
 /* ---------------- Supabase: نفس الواجهة عبر دوال آمنة وجداول محمية بالصلاحيات ---------------- */
 export const CloudStore = {
   mode:'cloud', sb:null,
-  init(){ this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); },
+  init(){ const h=location.hash||'';   // رابط من بريد Supabase (دعوة، تأكيد، استعادة) يحمل الجلسة في الجزء بعد #؛ يُلتقط قبل أن تقرأه المكتبة
+    if(/access_token=|error_description=|[#&]type=(invite|recovery|signup|magiclink)/.test(h)){ const q=new URLSearchParams(h.replace(/^#/,'')); this.authEvent={type:q.get('type')||'', error:q.get('error_description')||''}; }
+    this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); },
+  async authReady(){ const {data:{session}}=await this.sb.auth.getSession(); if(session) await this.sb.rpc('claim_admin'); return !!session; },
+  async mustChangePassword(){ const {data:{session}}=await this.sb.auth.getSession(); return !!session?.user?.user_metadata?.must_change_password; },
+  async setPassword(p){ if(String(p||'').length<8) throw new Error('كلمة المرور 8 أحرف على الأقل'); const r=await this.sb.auth.updateUser({password:p, data:{must_change_password:false}}); if(r.error) throw new Error(/same|different/i.test(r.error.message)?'اختر كلمة مرور مختلفة عن المؤقتة':'تعذّر حفظ كلمة المرور: '+r.error.message); await this.sb.rpc('claim_admin'); return true; },
   _e(r){ if(r.error){ const m=r.error.message||'', c=r.error.code||'';
       if(c==='23505'||/duplicate key/.test(m)) throw new Error(/teachers_phone/.test(m)?'رقم الجوال مستخدم لمدرب آخر':/teachers_national_id/.test(m)?'رقم الهوية مستخدم لمدرب آخر':/national_id/.test(m)?'رقم الهوية مسجّل مسبقًا':'هذا السجل موجود مسبقًا');
       if(c==='23514'||/check constraint/.test(m)) throw new Error('إحدى القيم المدخلة غير صالحة؛ راجع الجوال ورقم الهوية والحقول المطلوبة');
@@ -802,7 +808,10 @@ export const CloudStore = {
   async accessData(){ const [d,a]=await Promise.all([this.sb.from('device_sessions').select('uid,phone,role,label,created_at,revoked_at').order('created_at',{ascending:false}).limit(5000), this.sb.from('activation_codes').select('id,phone,role,expires_at,used_at,revoked,created_at').order('created_at',{ascending:false}).limit(5000)]);
     const q=await this.sb.rpc('admin_login_requests'); return {devices:this._e(d).map(x=>({...x, id:x.uid})), activations:this._e(a), requests:this._e(q)||[]}; },
   async listAdmins(){ return this._e(await this.sb.rpc('admin_list')); },
-  async addAdmin(email, name, role='staff'){ return this._e(await this.sb.rpc('admin_add',{p_email:String(email||'').trim().toLowerCase(), p_name:String(name||'').trim(), p_role:role})); },
+  async addAdmin(email, name, role='staff'){   // دالة الخادم admin-invite: تسجّل الدعوة بصلاحيات المتصل ثم ترسل البريد أو تنشئ كلمة مرور مؤقتة
+    const {data, error}=await this.sb.functions.invoke('admin-invite',{body:{email:String(email||'').trim().toLowerCase(), name:String(name||'').trim(), role, redirect:adminBase()}});
+    if(error){ let m=''; try{ m=(await error.context.json()).error||''; }catch(e){} throw new Error(m||'تعذّر إرسال الدعوة؛ حاول مرة أخرى'); }
+    return {...data, pending:data?.mode!=='existing'}; },
   async removeAdmin(id){ return this._e(await this.sb.rpc('admin_remove',{p_id:id})); },
   /* إنشاء حساب مسؤول مدعوّ: يسجّل ببريده وكلمة مرور يختارها، ثم يُمنح الصلاحية إن كان بريده في قائمة المدعوين */
   async adminSignup(email, pass){ const r=await this.sb.auth.signUp({email, password:pass, options:{emailRedirectTo:adminBase()+'#admin'}}); if(r.error) throw new Error(r.error.message.includes('registered')?'هذا البريد له حساب؛ ادخل بكلمة مرورك':'تعذّر إنشاء الحساب: '+r.error.message);

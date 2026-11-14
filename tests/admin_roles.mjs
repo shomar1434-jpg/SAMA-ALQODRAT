@@ -24,7 +24,7 @@ const nav = await text('.side');
 ok(/إدارة المسؤولين/.test(nav) && /أرشيف الحركات/.test(nav) && /الإعدادات/.test(nav) && /المالك الأساسي/.test(nav), 'المالك يرى إدارة المسؤولين والأرشيف ودوره');
 await go('admin-admins');
 ok(/المالك الأساسي/.test(await text('#adList')) && !(await p.$('#adList [data-aa]')) && !(await p.$('#adList [data-ar]')), 'المالك لا يُعطَّل ولا يُغيَّر دوره');
-ok(/admin\/#admin-join/.test(await text('#adLink')), 'رابط تفعيل للمدعوّين');
+ok(/بريد من المنصة/.test(await text('#main')) && !(await p.$('#adLink')), 'شرح الدعوة بالبريد بدل رابط يُنسخ');
 
 // دعوة «مدير كامل» تحتاج إعادة التحقق
 await p.fill('#ad-n', 'مدير المركز الثاني'); await p.fill('#ad-e', 'full@center.sa'); await p.selectOption('#ad-r', 'full'); await p.click('#adS'); await p.waitForSelector('#raF');
