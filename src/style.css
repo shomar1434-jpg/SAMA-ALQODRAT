@@ -1194,3 +1194,5 @@ img,svg,video,canvas{max-width:100%}
 .cv{margin-top:6px}.cv summary{cursor:pointer;color:var(--brand);font-size:14px;min-height:44px;display:flex;align-items:center}.cv p{white-space:pre-line}
 .tcard h3{margin:0 0 4px}.tcard .ord-amt{flex-wrap:wrap}
 #people .linkbtn{min-height:44px;display:inline-flex;align-items:center}
+
+.dg.pre{background:var(--surface-sunken);color:var(--ink-subtle);border:1px dashed var(--border-strong,var(--border))}

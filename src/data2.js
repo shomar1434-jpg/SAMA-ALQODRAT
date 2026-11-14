@@ -3,7 +3,7 @@ import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './po
 import { catalogPrograms, computeEnd } from './catalog.js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, adminBase, PAGE } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
-import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
+import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween, priorSessions } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
@@ -455,6 +455,7 @@ export const LocalStore = {
     const start=f.start_date||null;
     if(f.id){ const s=D.subscriptions.find(x=>x.id===f.id); if(!s) throw new Error('الاشتراك غير موجود');
       Object.assign(s, {plan_id:plan.id, section:f.section||s.section, subjects:f.subjects||s.subjects, start_date:start, end_date:start?subEnd(plan,start):null, status:start?'active':'pending', start_manual:!!start});
+      if(f.prior_absences!=null && f.prior_absences!==''){ const pa=Number(f.prior_absences), mx=priorSessions(D,s).length; if(!Number.isInteger(pa)||pa<0||pa>mx) throw new Error(`أيام الغياب السابقة من 0 إلى ${mx}`); s.prior_absences=pa; }
       this.audit('subscription.update', s.id); this.save(); return s; }
     if(D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`${t.full_name} مشترك مسبقًا في ${planName(plan)}`);
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:f.section||sectionOfGender(t.gender), subjects:f.subjects||[...(plan.subjects||[])], status:start?'active':'pending', start_date:start, end_date:start?subEnd(plan,start):null, start_manual:!!start, created_at:new Date().toISOString()};
