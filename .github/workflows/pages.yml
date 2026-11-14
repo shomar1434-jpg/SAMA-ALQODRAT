@@ -1,0 +1,39 @@
+name: pages
+# يبني الموقع مربوطًا بمشروع Supabase وينشره على GitHub Pages.
+# القيمتان أدناه عامتان (رابط المشروع والمفتاح العام anon) وليستا سرًّا؛ الحماية في RLS ودوال الخادم.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vite build
+        env:
+          VITE_SUPABASE_URL: https://rivemywlarsfeeffylao.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdmVteXdsYXJzZmVlZmZ5bGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODQ3NjMsImV4cCI6MjExMDE2MDc2M30.5ts3rFDsEaw7XOgDrV6ywF5JQ0oKVswi2lEIyRLthMc
+      - uses: actions/configure-pages@v5
+        with: { enablement: true }
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
