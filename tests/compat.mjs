@@ -41,7 +41,7 @@ for (const [name, w, h, touch] of SIZES) {
   await p.click('#installBtn'); await check('نافذة التثبيت'); await p.click('#pwaX');
   await login(p, 'guardian', '0509000010'); await check('بوابة ولي الأمر');
   await login(p, 'teacher', '0501000003'); await check('بوابة المدرب');
-  for (const t of ['hw', 'bank', 'msg', 'rate']) { await p.click(`[data-tt="${t}"]`); await check('المدرب/' + t); }
+  for (const t of ['people', 'groups', 'hw', 'bank', 'msg', 'rate', 'profile']) { await p.click(`[data-tt="${t}"]`); await check('المدرب/' + t); }
   await p.goto(U + 'admin/'); await p.waitForSelector('[name=p]'); await check('دخول الإدارة');
   await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForSelector('#main');
   for (const r of ['admin', 'admin-attendance', 'admin-cohorts', 'admin-qudurat', 'admin-users', 'admin-bank', 'admin-orders', 'admin-invoices', 'admin-data', 'admin-access', 'admin-notify', 'admin-trainees', 'admin-settings']) { await p.goto(U + 'admin/#' + r); await p.waitForSelector('#main'); await check('الإدارة/' + r); }

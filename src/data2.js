@@ -9,10 +9,10 @@ import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { keepNote } from './import_logic.js';
 import { ACT_TTL_DAYS, newActCode, checkActivation, resolveIdent, deviceShort, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL } from './device_logic.js';
-import { checkProfile } from './trainer_logic.js';
+import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
-import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen } from './learning_logic.js';
+import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -201,7 +201,7 @@ export function scopeData(D, role, phone){
     settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes',...Object.keys(CALC_DEFAULTS).filter(k=>k.startsWith('msg_'))]) };
   const tSafe=t=>({id:t.id, full_name:t.full_name, gender:t.gender});
   const ordersFor=ids=>(D.orders||[]).filter(o=>ids.includes(o.trainee_id)).map(o=>orderPublic(o, D.settings.bank));
-  const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true, bio:t.bio||'', avatar:t.avatar||''}));
+  const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true, bio:t.bio||'', avatar:t.avatar||'', cv:t.cv||''}));
   const forTrainees=ids=>{ const subs=(D.subscriptions||[]).filter(s=>ids.includes(s.trainee_id)), sid=subs.map(s=>s.id);
     const scopes=subs.flatMap(s=>(s.subjects||[]).map(x=>s.section+':'+x));
     return { trainees:D.trainees.filter(t=>ids.includes(t.id)).map(tSafe), subscriptions:subs, sub_attendance:(D.sub_attendance||[]).filter(a=>sid.includes(a.subscription_id)),
@@ -223,7 +223,7 @@ export function scopeData(D, role, phone){
       sub_attendance:(D.sub_attendance||[]).filter(a=>subs.some(s=>s.id===a.subscription_id)), guardian_links:(D.guardian_links||[]).filter(l=>l.status==='verified'&&ids.includes(l.trainee_id)).map(l=>({id:l.id, trainee_id:l.trainee_id, status:l.status, relation:l.relation})),
       assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&(D.assignments||[]).some(a=>a.id===x.assignment_id&&a.teacher_id===me.id)),
       notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id), notifications_in:(D.notifications||[]).filter(x=>x.to==='teacher'&&x.teacher_id===me.id),
-      questions:teacherBank(D, me),
+      questions:teacherBank(D, me), groups:(D.trainer_groups||[]).filter(g=>g.teacher_id===me.id).map(g=>({id:g.id, name:g.name, trainee_ids:g.trainee_ids.filter(id=>ids.includes(id)), created_at:g.created_at})),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject))),
       rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
       // دفعات البرامج المسندة إليه: كشفها وحضورها (أسماء المتدربين فقط)
@@ -607,7 +607,7 @@ export const LocalStore = {
   async saveAssignment(a){ const me=await this._me(); validateAssignment(a); if(!teacherCovers(me, me.section, a.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.assignments, row={title:a.title.trim(), body:String(a.body||'').slice(0,4000), subject:a.subject, section:me.section, publish_date:a.publish_date, due_date:a.due_date, max_score:+a.max_score||10};
     if(a.kind==='quiz'&&!a.id){ row.kind='quiz'; row.quiz=buildQuiz(this.data, me, a.subject, a.unit||null, a.count, a.question_ids); } else if(!a.id) row.kind='text';
-    if(!a.id){ row.type=a.type||'homework'; row.reveal=a.reveal||'after_submit'; row.targets=checkTargets(this.data, me, a.subject, a.targets??null); row.target_label=row.targets?String(a.target_label||`${row.targets.length} متدربًا`).slice(0,80):''; if(row.type==='exam'&&row.kind==='quiz') checkExamKeys(this.data, row.quiz); }
+    if(!a.id){ row.type=a.type||'homework'; row.reveal=a.reveal||'after_submit'; row.max_attempts=row.kind==='quiz'?attemptsOf(a):1; row.targets=checkTargets(this.data, me, a.subject, a.targets??null); row.target_label=row.targets?String(a.target_label||`${row.targets.length} متدربًا`).slice(0,80):''; if(row.type==='exam'&&row.kind==='quiz') checkExamKeys(this.data, row.quiz); }
     if(a.id){ const ex=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(ex?.kind==='quiz'){ delete row.subject; } }
     if(a.id){ const x=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row); } else L.push({id:uid(), teacher_id:me.id, ...row, created_at:new Date().toISOString()});
     this.save(); return {ok:true}; },
@@ -624,11 +624,15 @@ export const LocalStore = {
     const row={answer:txt.slice(0,6000), status:draft?'draft':'submitted', submitted_at:draft?null:new Date().toISOString(), late:!draft&&riyadhNow().date>a.due_date};
     if(s) Object.assign(s,row); else D.submissions.push({id:uid(), assignment_id:a.id, trainee_id, ...row}); this.save(); return {ok:true}; },
   _gradeStarted(a, s, extra){ const g=gradeQuiz(a, {...(s.answers||{}), ...(extra||{})}), now=new Date().toISOString();
-    Object.assign(s, {answer:'', answers:g.answers, review:g.review, status:'graded', score:g.score, feedback:`أجبت ${g.right} من ${g.total} إجابة صحيحة`, submitted_at:now, graded_at:now, late:riyadhNow().date>a.due_date}); this.save(); return g; },
+    const n=s.attempt_no||1, best=s.best_score!=null&&s.best_score>g.score?s.best_score:g.score;
+    Object.assign(s, {answer:'', answers:g.answers, review:g.review, status:'graded', score:best, feedback:`أجبت ${g.right} من ${g.total} إجابة صحيحة`+(n>1?` (المحاولة ${n}، وتُحتسب أعلى درجة)`:''), submitted_at:now, graded_at:now, late:riyadhNow().date>a.due_date}); this.save(); return g; },
   /* بدء الاختبار: مرة واحدة فقط؛ يبدأ العدّ من لحظة البدء (دقيقتان لكل سؤال) */
-  async startQuiz({trainee_id, assignment_id}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
+  async startQuiz({trainee_id, assignment_id, retry}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
     if(!a||a.kind!=='quiz'||!studentHasScope(D,trainee_id,a.section,a.subject)||a.publish_date>riyadhNow().date||(Array.isArray(a.targets)&&!a.targets.includes(trainee_id))) throw new Error('الواجب غير متاح لك');
-    let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s) return {started_at:s.started_at, deadline:s.deadline, status:s.status, again:true};
+    let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s&&retry&&attemptsLeft(a,s)>0){ const at=new Date().toISOString(); // محاولة جديدة ضمن حد المدرب: تُحفظ أعلى درجة ويبدأ العدّ من جديد
+      Object.assign(s,{best_score:Math.max(s.best_score??0, s.score??0), attempt_no:(s.attempt_no||1)+1, status:'draft', answers:{}, review:undefined, score:null, feedback:'', started_at:at, deadline:quizDeadline(at,a), submitted_at:null, graded_at:null}); this.save();
+      return {started_at:s.started_at, deadline:s.deadline, status:'draft', attempt_no:s.attempt_no}; }
+    if(s) return {started_at:s.started_at, deadline:s.deadline, status:s.status, again:true};
     const at=new Date().toISOString(); s={id:uid(), assignment_id:a.id, trainee_id, answer:'', answers:{}, status:'draft', started_at:at, deadline:quizDeadline(at, a), late:false}; D.submissions.push(s); this.save();
     return {started_at:s.started_at, deadline:s.deadline, status:'draft'}; },
   async saveQuizAnswer({trainee_id, assignment_id, question_id, value}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id), s=D.submissions.find(x=>x.assignment_id===assignment_id&&x.trainee_id===trainee_id);
@@ -638,6 +642,12 @@ export const LocalStore = {
   finalizeExpiredQuizzes(){ const D=this.data, now=Date.now(); let n=0; (D.submissions||[]).forEach(s=>{ if(s.status==='draft'&&s.deadline&&now>Date.parse(s.deadline)+20000){ const a=(D.assignments||[]).find(x=>x.id===s.assignment_id); if(a?.kind==='quiz'){ this._gradeStarted(a, s, null); n++; } } }); return n; },
   /* ملف المدرب: يعدّل نبذته ورابط قناته وصورته فقط */
   async saveMyProfile(p){ const me=await this._me(), x=checkProfile(p); Object.assign(me, x); this.audit('teacher.profile', me.id); this.save(); return {ok:true}; },
+  /* مجموعات المدرب المحفوظة: من متدربيه فقط */
+  async saveGroup(g){ const me=await this._me(), D=this.data, x=checkGroup(D, me, g); D.trainer_groups=D.trainer_groups||[];
+    if(g.id){ const ex=D.trainer_groups.find(y=>y.id===g.id&&y.teacher_id===me.id); if(!ex) throw new Error('غير مصرح'); Object.assign(ex, x); }
+    else { if(D.trainer_groups.filter(y=>y.teacher_id===me.id).length>=GROUPS_MAX) throw new Error(`الحد ${GROUPS_MAX} مجموعة`); D.trainer_groups.push({id:uid(), teacher_id:me.id, ...x, created_at:new Date().toISOString()}); }
+    this.save(); return {ok:true}; },
+  async deleteGroup(id){ const me=await this._me(), D=this.data, i=(D.trainer_groups||[]).findIndex(y=>y.id===id&&y.teacher_id===me.id); if(i<0) throw new Error('غير مصرح'); D.trainer_groups.splice(i,1); this.save(); return {ok:true}; },
   async saveQuestion(q){ const me=await this._me(); validateQuestion(q); if(!teacherCovers(me, me.section, q.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.questions, row={subject:q.subject, section:me.section, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
     if(q.id){ const x=L.find(y=>y.id===q.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row,{version:(x.version||1)+1}); }
@@ -787,6 +797,8 @@ export const CloudStore = {
   async gradeSubmission(id, g){ return this._e(await this.sb.rpc('teacher_grade',{p_id:id, p:g})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
   async saveMyProfile(p){ return this._e(await this.sb.rpc('teacher_save_profile',{p:checkProfile(p)})); },
+  async saveGroup(g){ return this._e(await this.sb.rpc('teacher_save_group',{p:{id:g.id||null, name:String(g.name||'').trim(), trainee_ids:g.trainee_ids||[]}})); },
+  async deleteGroup(id){ return this._e(await this.sb.rpc('teacher_delete_group',{p_id:id})); },
   async startQuiz(f){ return this._e(await this.sb.rpc('student_start_quiz',{p:f})); },
   async saveQuizAnswer(f){ return this._e(await this.sb.rpc('student_save_quiz_answer',{p:f})); },
   async saveQuestion(q){ return this._e(await this.sb.rpc('teacher_save_question',{p:q})); },

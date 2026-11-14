@@ -17,10 +17,10 @@ import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
 import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
-import { teacherGroups, teacherProfile, daySummaryHtml, trainersCardHtml } from './trainer_views.js';
+import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml } from './trainer_views.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','activity','المراسلة'],['rate','award','تقييم المدرب']];
-const T_TABS = [['today','calendar','كشف اليوم'],['groups','users','المجموعات الذكية'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
+const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','activity','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
 let sTab = 'dash', tTab = 'today';
 const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
@@ -277,7 +277,7 @@ function viewTeacher(D, quiet){
   if(tTab !== 'today'){ if(quiet) return; const t = teacherDashboard(D, D.me), reload = async () => viewTeacher(await Store.portalData('teacher'));
     $('#app').innerHTML = `<div class="wrap"><section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1><p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))}</p></div></section>
       ${tabBar(tTabsOf(D), tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}<div id="tBody"></div></div>`;
-    const v = ({ cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings, groups:teacherGroups, profile:teacherProfile })[tTab](D, reload, k => { tTab = k; viewTeacher(D); }); $('#tBody').innerHTML = v.html; v.bind();
+    const v = ({ cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings, groups:teacherGroups, people:teacherPeople, profile:teacherProfile })[tTab](D, reload, k => { tTab = k; viewTeacher(D); }); $('#tBody').innerHTML = v.html; v.bind();
     $$('[data-tt]').forEach(b => b.onclick = () => { tTab = b.dataset.tt; viewTeacher(D); }); return; }
   const t = teacherDashboard(D, D.me), n = riyadhNow();
   const PH = { none:'لا توجد جلسة اليوم', before:'الجلسة لم تبدأ', live:'الجلسة جارية', after:'انتهت جلسة اليوم' };

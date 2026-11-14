@@ -8,7 +8,7 @@ import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy } from './features.js';
 import { SECTIONS, subStatus, planName } from './qudurat.js';
-import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen } from './learning_logic.js';
+import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen, attemptsLeft, attemptsOf, MAX_ATTEMPTS } from './learning_logic.js';
 
 const STATE_TXT = { new:'جديد', draft:'قيد الحل', submitted:'مُرسل', needs_revision:'يحتاج تعديلًا', graded:'مصحح', late:'متأخر' };
 const STATE_TONE = { new:'info', draft:'o', submitted:'ok', needs_revision:'warn', graded:'ok', late:'bad' };
@@ -29,6 +29,7 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
     </article>`).join('')}</div>` : emptyBox('لا توجد واجبات منشورة لك بعد')}</div>`,
   bind(){ clearInterval(QZ_TICK);
     $$('[data-qs]').forEach(b => b.onclick = () => confirmStart(async () => { try { await Store.startQuiz({ trainee_id:tr.id, assignment_id:b.dataset.qs }); } catch(x){ toast(x.message); } reload(); }));
+    $$('[data-qr]').forEach(b => b.onclick = () => confirmStart(async () => { try { await Store.startQuiz({ trainee_id:tr.id, assignment_id:b.dataset.qr, retry:true }); } catch(x){ toast(x.message); } reload(); }, true));
     if($('[data-qexp]')) setTimeout(async () => { for(const el of $$('[data-qexp]')){ try { await Store.submitAssignment({ trainee_id:tr.id, assignment_id:el.dataset.qexp, answers:{} }); } catch(_){} } reload(); }, 600);
     const forms = $$('[data-qz]'); forms.forEach(f => $$('input[type=radio]', f).forEach(r => r.onchange = () => Store.saveQuizAnswer({ trainee_id:tr.id, assignment_id:f.dataset.qz, question_id:r.dataset.q, value:+r.value }).catch(() => {})));
     if(forms.length){ const tick = () => { for(const f of forms){ if(!f.isConnected){ clearInterval(QZ_TICK); return; } const left = Math.max(0, Math.round((Date.parse(f.dataset.deadline) - Date.now()) / 1000)), el = $('[data-qt]', f);
@@ -50,7 +51,7 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
 /* واجب اختبار من بنك المدرب: قبل التسليم أسئلة بلا إجابات، وبعده مراجعة بالإجابة الصحيحة والتفسير */
 /* تجهيز واجب علاجي من مجموعة ذكية: يفتح نموذج الواجب بقائمة مستهدفين جاهزة، والنشر بيد المدرب */
 let HW_PRESET = null, QZ_TICK = null;
-function confirmStart(fn){ modal(`<h3>بدء الاختبار</h3><p>يُفتح الاختبار مرة واحدة ويبدأ الوقت الآن ولا يتوقف. هل أنت مستعد؟</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="qsNo">ليس الآن</button><button class="btn pri" id="qsGo">${ic('timer')} ابدأ</button></div>`);
+function confirmStart(fn, again){ modal(`<h3>${again ? 'محاولة جديدة' : 'بدء الاختبار'}</h3><p>${again ? 'تبدأ محاولة جديدة بوقت جديد، وتُحتسب أعلى درجة بين محاولاتك. يبدأ الوقت الآن ولا يتوقف. هل أنت مستعد؟' : 'يُفتح الاختبار مرة واحدة ويبدأ الوقت الآن ولا يتوقف. هل أنت مستعد؟'}</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="qsNo">ليس الآن</button><button class="btn pri" id="qsGo">${ic('timer')} ابدأ</button></div>`);
   $('#qsNo').onclick = closeModal; $('#qsGo').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ البدء'); closeModal(); await fn(); }; }
 export const setHwPreset = p => { HW_PRESET = p; };
 /* نص السؤال أو صورته (البنك المشترك مصوَّر)، ورابط صفحة القطعة عند وجودها. base يضبطه setBankAssets عند تحميل البوابة */
@@ -62,6 +63,10 @@ export function qStem(q, thumb){
 }
 function quizHtml(a){
   const sb = a.submission, done = sb?.status === 'graded' && sb.review;
+  const left = attemptsLeft(a, sb);
+  if(left) return `<div class="alert t-info" style="margin:8px 0 0"><span class="aic">${ic('check')}</span><div style="flex:1"><span>سُلّم الاختبار: ${esc(sb.feedback || '')} · درجتك ${fmtNum(sb.score ?? 0)} من ${fmtNum(a.max_score)}.</span>
+      <p style="margin:6px 0 8px">بقيت لك ${fmtNum(left)} ${left === 1 ? 'محاولة' : 'محاولتان'} من ${fmtNum(attemptsOf(a))}؛ تُحتسب أعلى درجة، وتظهر الإجابات الصحيحة بعد آخر محاولة.</p>
+      <button type="button" class="btn sm" data-qr="${a.id}">${ic('timer')} محاولة جديدة</button></div></div>`;
   if(sb?.status === 'graded' && !sb.review) return `<p class="alert t-info" style="margin:8px 0 0"><span class="aic">${ic('check')}</span><span>سُلّم الاختبار: ${esc(sb.feedback || '')}. ${a.reveal === 'after_due' ? `تظهر الإجابات الصحيحة بعد ${fmtShort(a.due_date)}.` : 'الإجابات الصحيحة لا تُعرض في هذا الاختبار.'}</span></p>`;
   if(done){ const rv = Object.fromEntries((sb.review || []).map(x => [x.id, x]));
     return `<ol class="qres">${a.quiz.map(q => { const c = rv[q.id]?.correct, mine = sb.answers?.[q.id];
@@ -147,7 +152,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
   const students = (D.trainees || []).length;
   return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('form')}واجباتي</h3><button class="btn pri sm" id="hwAdd">${ic('plus')} واجب</button></div>
     ${list.length ? list.map(a => { const subs = (D.submissions || []).filter(s => s.assignment_id === a.id), done = subs.filter(s => ['submitted', 'graded', 'needs_revision'].includes(s.status));
-      return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> ${a.type && a.type !== 'homework' ? `<span class="pill ${a.type === 'exam' ? 'warn' : 'g'}">${HW_TYPES[a.type]}</span> ` : ''}${a.kind === 'quiz' ? `<span class="pill info">اختبار · ${fmtNum(a.quiz?.length || 0)} أسئلة</span> ` : ''}${Array.isArray(a.targets) ? `<span class="pill g">${esc(a.target_label || '')}</span> ` : ''}<span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(Array.isArray(a.targets) ? a.targets.length : students)}</span></summary>
+      return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> ${a.type && a.type !== 'homework' ? `<span class="pill ${a.type === 'exam' ? 'warn' : 'g'}">${HW_TYPES[a.type]}</span> ` : ''}${a.kind === 'quiz' ? `<span class="pill info">اختبار · ${fmtNum(a.quiz?.length || 0)} أسئلة${attemptsOf(a) > 1 ? ` · ${fmtNum(attemptsOf(a))} محاولات` : ''}</span> ` : ''}${Array.isArray(a.targets) ? `<span class="pill g">${esc(a.target_label || '')}</span> ` : ''}<span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(Array.isArray(a.targets) ? a.targets.length : students)}</span></summary>
         ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
           <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${a.kind === 'quiz' ? esc(s.feedback || '') : esc(s.answer || '')}</td>
           <td>${a.kind === 'quiz' ? `<b class="num">${fmtNum(s.score ?? 0)} / ${fmtNum(a.max_score)}</b> <span class="hint">آلي</span>` : ['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
@@ -158,9 +163,10 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
         <fieldset class="field" style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">نوع الواجب</legend><div style="display:flex;gap:14px;flex-wrap:wrap">
           <label class="chk"><input type="radio" name="kind" value="text" checked> واجب كتابي</label><label class="chk"><input type="radio" name="kind" value="quiz"> اختبار من بنك أسئلتي (يُصحَّح آليًا)</label></div></fieldset>
         <div class="field"><label for="hf-ty">النوع</label><select class="inp" id="hf-ty" name="type">${Object.entries(HW_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-        <div class="field"><label for="hf-tg">المستهدفون</label><select class="inp" id="hf-tg"><option value="all">كل متدربي المقرر</option><option value="plan">باقة معينة</option><option value="pick">أفراد بعينهم</option></select></div>
-        <div data-tgp hidden style="grid-column:1/-1"><div class="field" id="hfTgPlanF" hidden><label for="hf-tp">الباقة</label><select class="inp" id="hf-tp"></select></div><div class="qpick" id="hfTgList" hidden></div><p class="hint" id="hfTgN" style="margin:6px 0 0"></p></div>
+        <div class="field"><label for="hf-tg">المستهدفون</label><select class="inp" id="hf-tg"><option value="all">كل متدربي المقرر</option><option value="plan">باقة معينة</option>${(D.groups || []).length ? '<option value="group">مجموعة محفوظة</option>' : ''}<option value="pick">أفراد بعينهم</option></select></div>
+        <div data-tgp hidden style="grid-column:1/-1"><div class="field" id="hfTgPlanF" hidden><label for="hf-tp">الباقة</label><select class="inp" id="hf-tp"></select></div><div class="field" id="hfTgGrpF" hidden><label for="hf-gp">المجموعة</label><select class="inp" id="hf-gp">${(D.groups || []).map(g => `<option value="${g.id}">${esc(g.name)} (${fmtNum(g.trainee_ids.length)})</option>`).join('')}</select></div><div class="qpick" id="hfTgList" hidden></div><p class="hint" id="hfTgN" style="margin:6px 0 0"></p></div>
         <div class="field" data-qk hidden><label for="hf-rv">إظهار الإجابات الصحيحة للمتدرب</label><select class="inp" id="hf-rv" name="reveal">${Object.entries(REVEAL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="field" data-qk hidden><label for="hf-at">عدد المحاولات المسموحة</label><select class="inp" id="hf-at" name="max_attempts">${Array.from({ length:MAX_ATTEMPTS }, (_, i) => `<option value="${i + 1}">${i === 0 ? 'محاولة واحدة' : i === 1 ? 'محاولتان' : fmtNum(i + 1) + ' محاولات'}</option>`).join('')}</select></div>
         <div class="field" data-qk hidden><label for="hf-u">الوحدة أو النموذج</label><select class="inp" id="hf-u" name="unit"></select></div>
         <div class="field" data-qk hidden><label for="hf-m">طريقة اختيار الأسئلة</label><select class="inp" id="hf-m"><option value="rand">عشوائي بعدد محدد</option><option value="pick">أنتقي الأسئلة بنفسي</option></select></div>
         <div data-qpk hidden style="grid-column:1/-1"><div class="field"><label for="hf-k">القسم داخل الوحدة</label><select class="inp" id="hf-k"></select></div><div class="qpick" id="hfPick"></div><p class="hint" id="hfPn" style="margin:6px 0 0"></p></div>
@@ -179,14 +185,14 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
           $('#hf-u').innerHTML = `<option value="">كل الوحدات (${fmtNum(pub.filter(q => q.subject === sub).length)})</option>` + Object.entries(us).map(([u, n]) => `<option value="${esc(u)}">${esc(u)} (${fmtNum(n)})</option>`).join(''); };
       /* المستهدفون: قائمة ثابتة وقت الإرسال (باقة أو أفراد)، من متدربي القسم والمقرر باشتراك قائم */
       const tgPicked = new Set(), eligible = () => { const sub = $('#hf-s').value; return (D.trainees || []).map(t => ({ t, subs:(D.subscriptions || []).filter(s => s.trainee_id === t.id && (s.subjects || []).includes(sub) && ['pending', 'active'].includes(subStatus(s))) })).filter(x => x.subs.length); };
-      const tgIds = () => { const m = $('#hf-tg').value; return m === 'all' ? null : m === 'plan' ? eligible().filter(x => x.subs.some(s => s.plan_id === $('#hf-tp').value)).map(x => x.t.id) : eligible().filter(x => tgPicked.has(x.t.id)).map(x => x.t.id); };
-      const tgDraw = () => { const m = $('#hf-tg').value, el = eligible(); $('[data-tgp]').hidden = m === 'all'; $('#hfTgPlanF').hidden = m !== 'plan'; $('#hfTgList').hidden = m !== 'pick';
+      const tgIds = () => { const m = $('#hf-tg').value; const gp = m === 'group' ? (D.groups || []).find(g => g.id === $('#hf-gp').value) : null; return m === 'all' ? null : m === 'group' ? eligible().filter(x => gp?.trainee_ids.includes(x.t.id)).map(x => x.t.id) : m === 'plan' ? eligible().filter(x => x.subs.some(s => s.plan_id === $('#hf-tp').value)).map(x => x.t.id) : eligible().filter(x => tgPicked.has(x.t.id)).map(x => x.t.id); };
+      const tgDraw = () => { const m = $('#hf-tg').value, el = eligible(); $('[data-tgp]').hidden = m === 'all'; $('#hfTgPlanF').hidden = m !== 'plan'; $('#hfTgGrpF').hidden = m !== 'group'; $('#hfTgList').hidden = m !== 'pick';
         if(m === 'plan'){ const ps = [...new Set(el.flatMap(x => x.subs.map(s => s.plan_id)))], cur = $('#hf-tp').value; $('#hf-tp').innerHTML = ps.map(id => { const p = (D.plans || []).find(y => y.id === id); return `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(p ? planName(p) : id)}</option>`; }).join(''); }
         if(m === 'pick'){ $('#hfTgList').innerHTML = el.map(x => `<label class="qp"><input type="checkbox" value="${x.t.id}" ${tgPicked.has(x.t.id) ? 'checked' : ''}><span>${esc(x.t.full_name)}</span></label>`).join('') || '<p class="hint">لا متدربين في هذا المقرر.</p>';
           $$('#hfTgList input').forEach(c => c.onchange = () => { c.checked ? tgPicked.add(c.value) : tgPicked.delete(c.value); tgN(); }); }
         tgN(); };
       const tgN = () => { const ids = tgIds(); $('#hfTgN').textContent = ids ? `سيُرسل إلى ${fmtNum(ids.length)} متدربًا، وتُثبَّت القائمة عند النشر.` : ''; };
-      $('#hf-tg').onchange = tgDraw; $('#hf-tp').onchange = tgN; $('#hf-s').addEventListener('change', tgDraw);
+      $('#hf-tg').onchange = tgDraw; $('#hf-tp').onchange = tgN; $('#hf-gp').onchange = tgN; $('#hf-s').addEventListener('change', tgDraw);
       if(HW_PRESET){ const P = HW_PRESET; HW_PRESET = null; $('#hf-t').value = P.title || ''; $('#hf-ty').value = 'practice'; $('#hf-tg').value = 'pick'; P.ids.forEach(id => tgPicked.add(id)); tgDraw(); }
       const chosen = [], pickOn = () => !$('[data-qk]').hidden && $('#hf-m').value === 'pick';
       const pool = () => pub.filter(q => q.subject === $('#hf-s').value && (!$('#hf-u').value || q.unit === $('#hf-u').value)).sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -199,7 +205,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
       $('#hf-m').onchange = mode; $('#hf-u').addEventListener('change', () => { if(pickOn()) skills(); }); $('#hf-k').onchange = drawPick;
       const kind = () => { const q = $('#hf [name=kind]:checked').value === 'quiz'; $$('[data-qk]').forEach(x => x.hidden = !q); if(q) units(); mode(); };
       $$('#hf [name=kind]').forEach(r => r.onchange = kind); $('#hf-s').addEventListener('change', () => { if(!$('[data-qk]').hidden) units(); });
-      $('#hf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), b = $('#hfS'); { const ids = tgIds(); if(ids){ if(!ids.length){ $('#hfE').textContent = 'اختر متدربًا واحدًا على الأقل'; return; } f.targets = ids; f.target_label = $('#hf-tg').value === 'plan' ? $('#hf-tp').selectedOptions[0]?.textContent || '' : `${fmtNum(ids.length)} متدربًا بعينهم`; } }
+      $('#hf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), b = $('#hfS'); { const ids = tgIds(); if(ids){ if(!ids.length){ $('#hfE').textContent = 'اختر متدربًا واحدًا على الأقل'; return; } f.targets = ids; f.target_label = $('#hf-tg').value === 'plan' ? $('#hf-tp').selectedOptions[0]?.textContent || '' : $('#hf-tg').value === 'group' ? 'مجموعة: ' + ((D.groups || []).find(g => g.id === $('#hf-gp').value)?.name || '') : `${fmtNum(ids.length)} متدربًا بعينهم`; } }
         if(f.kind === 'quiz' && $('#hf-m').value === 'pick'){ if(!chosen.length){ $('#hfE').textContent = 'انتقِ سؤالًا واحدًا على الأقل'; return; } f.question_ids = chosen.slice(); } setBusy(b, true, 'جارٍ النشر');
         try { await Store.saveAssignment(f); closeModal(); toast('نُشر الواجب'); reload(); } catch(x){ setBusy(b, false); $('#hfE').textContent = x.message; } }; };
     $$('[data-gr]').forEach(b => b.onclick = () => { const s = D.submissions.find(x => x.id === b.dataset.gr), a = D.assignments.find(x => x.id === s.assignment_id);
