@@ -25,6 +25,8 @@ const before = (await data()).trainees.length;
 await p.fill('#im-t', 'كلام بلا جدول'); await p.click('#imGo'); await p.waitForTimeout(200);
 ok(/العناوين|غير موجود/.test(await text('#imE2')), 'جدول بلا عناوين يُرفض برسالة واضحة');
 await p.fill('#im-t', TSV); await p.click('#imGo'); await p.waitForSelector('#imOk');
+await p.click('#imGo'); await p.waitForTimeout(200);   // ضغط «معاينة» ثانيةً والحقل فارغ لا يمسح المعاينة ولا يرسل استيرادًا فارغًا
+ok(/المعاينة معروضة/.test(await text('#imE2')) && !!(await p.$('#imOk')), 'إعادة ضغط المعاينة بحقل فارغ تُبقي المعاينة صالحة للاستيراد');
 const pv = await text('#dBody');
 ok(/اعتماد استيراد ٣ متدرب/.test(await text('#imOk')) && /رقم الهوية غير صحيح/.test(pv) && (await p.$$('#dBody .row-bad')).length === 1, 'المعاينة: 3 جاهزة وصف مرفوض، والصف الفارغ يُتجاهل');
 ok(/تحويل بين الباقات/.test(pv) && /رسوم مخفّضة \(1150 بدل 1190\)/.test(pv) && /جوال ولي الأمر ناقص/.test(pv) && /انتهت مدة الاشتراك/.test(pv), 'تُستخرج ملاحظات كل صف: تحويل الباقة، الخصم، الجوال الناقص، انتهاء المدة');
