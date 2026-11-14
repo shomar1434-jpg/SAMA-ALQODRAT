@@ -33,6 +33,10 @@ export const HW_TYPES = { homework:'واجب', practice:'تدريب', exam:'اخ
 export const REVEAL = { after_submit:'بعد التسليم مباشرة', after_due:'بعد موعد الاستحقاق', never:'لا تُعرض' };
 /* targets = null يعني كل متدربي القسم والمقرر؛ وإلا قائمة ثابتة وقت الإرسال */
 export const isTargeted = (a, trainee_id) => !Array.isArray(a.targets) || a.targets.includes(trainee_id);
+/* حد المحاولات: يحدده المدرب للاختبار (1 افتراضيًا، حتى 3)؛ تُحتسب أعلى درجة، وتظهر الإجابات بعد آخر محاولة */
+export const MAX_ATTEMPTS = 3;
+export const attemptsOf = a => Math.min(MAX_ATTEMPTS, Math.max(1, +a?.max_attempts || 1));
+export const attemptsLeft = (a, s) => a?.kind === 'quiz' && s?.status === 'graded' ? Math.max(0, attemptsOf(a) - (s.attempt_no || 1)) : 0;
 export const canReveal = (a, today) => (a.reveal || 'after_submit') === 'after_submit' || (a.reveal === 'after_due' && today > a.due_date);
 /* نسخة الواجب للمتدرب: بلا مفاتيح وبلا معرّفات زملائه في قائمة المستهدفين */
 export const assignmentPublic = (a, ids, started) => { let x = quizPublic(a); if(Array.isArray(x.targets)) x = { ...x, targets:x.targets.filter(t => (ids || []).includes(t)) };
@@ -44,7 +48,7 @@ export const quizDeadline = (started_at, a) => new Date(Date.parse(started_at) +
 export const quizOpen = (sb, now = Date.now()) => !!sb && sb.status === 'draft' && !!sb.deadline && now <= Date.parse(sb.deadline) + QUIZ_GRACE_SEC * 1000;
 export const quizExpired = (sb, now = Date.now()) => !!sb && sb.status === 'draft' && !!sb.deadline && now > Date.parse(sb.deadline) + QUIZ_GRACE_SEC * 1000;   // يبقى من القائمة أبناء هذا الحساب فقط
 /* تسليم المتدرب: تُحجب المراجعة (الإجابات الصحيحة) حتى تسمح سياسة الواجب */
-export const submissionPublic = (s, a, today) => !a || a.kind !== 'quiz' || canReveal(a, today) ? s : (({ review, ...x }) => ({ ...x, review_hidden:true }))(s);
+export const submissionPublic = (s, a, today) => !a || a.kind !== 'quiz' || (canReveal(a, today) && !attemptsLeft(a, s)) ? s : (({ review, ...x }) => ({ ...x, review_hidden:true }))(s);
 /* التحقق من المستهدفين: كلهم ضمن نطاق المدرب (قسمه ومقرر الواجب باشتراك قائم) */
 export function checkTargets(D, teacher, subject, targets){
   if(targets == null) return null; if(!Array.isArray(targets) || !targets.length) throw new Error('اختر متدربًا واحدًا على الأقل'); const ids = [...new Set(targets)];
@@ -55,7 +59,7 @@ export function checkTargets(D, teacher, subject, targets){
 export function checkExamKeys(D, quiz){ const bad = (quiz || []).filter(q => { const x = (D.questions || []).find(y => y.id === q.id); return x?.shared && x.key_status !== 'approved'; });
   if(bad.length) throw new Error(`الاختبار الرسمي يحتاج مفاتيح معتمدة: ${bad.length} سؤالًا مفتاحه غير معتمد. اطلب اعتماد المفاتيح من الإدارة أو اختر «واجب» أو «تدريب».`); }
 export function validateAssignment(a){
-  if(a.type && !HW_TYPES[a.type]) throw new Error('نوع غير صالح'); if(a.reveal && !REVEAL[a.reveal]) throw new Error('سياسة إظهار الإجابات غير صالحة');
+  if(a.type && !HW_TYPES[a.type]) throw new Error('نوع غير صالح'); if(a.max_attempts != null && a.max_attempts !== '' && !(Number.isInteger(+a.max_attempts) && +a.max_attempts >= 1 && +a.max_attempts <= MAX_ATTEMPTS)) throw new Error(`عدد المحاولات من 1 إلى ${MAX_ATTEMPTS}`); if(a.reveal && !REVEAL[a.reveal]) throw new Error('سياسة إظهار الإجابات غير صالحة');
   if(!a.title || a.title.trim().length < 3) throw new Error('اكتب عنوان الواجب');
   if(!SUBJECTS.includes(a.subject)) throw new Error('اختر المقرر');
   if(!a.publish_date || !a.due_date || a.due_date < a.publish_date) throw new Error('تاريخ الاستحقاق يجب أن يكون بعد تاريخ النشر');
