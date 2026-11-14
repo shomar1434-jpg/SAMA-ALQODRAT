@@ -1,3 +1,5 @@
+import { editTraineeModal } from './import_views.js';
+import { statementModal } from './statement_views.js';
 import { LOGO } from './assets/logo.js';
 import { pageAdmins, pageAudit, changePasswordModal, logoutAllBox } from './admins_views.js';
 import { canSeePage, ADMIN_ROLES } from './admin_logic.js';
@@ -418,12 +420,14 @@ export function pageTrainees(){
      <td dir="ltr" style="text-align:right">${esc(t.national_id)}</td><td dir="ltr" style="text-align:right">${esc(t.phone)}</td><td>${esc(t.city||'')}</td>
      <td style="min-width:260px"><div style="display:flex;flex-direction:column;gap:4px">${ensOf(t).map(e=>{ const c=AD.cohorts.find(x=>x.id===e.cohort_id); if(!c) return ''; const ds=sessionDays(c,riyadhNow().date).filter(d=>d>=e.created_at.slice(0,10)), n=attendance.filter(a=>a.enrollment_id===e.id).length, r=ds.length?Math.round(n/ds.length*100):null;
        return `<button class="enr" data-cv="${c.id}"><span class="pill dot ${e.status==='ملغى'?'bad':STATE_PILL[cohortState(c)]}">${e.status==='ملغى'?'ملغى':STATE_TXT[cohortState(c)]}</span><span style="flex:1;text-align:right">${esc(short(progName(e.program_id)))} · د${fmtNum(c.number)}</span><span class="hint num">${r===null?'—':fmtNum(r)+'٪'}</span></button>`; }).join('')}</div></td>
-     <td><button class="btn sm danger soft" data-del="${t.id}" title="حذف المتدرب">${ic('trash')}</button></td></tr>`).join('')}
+     <td style="white-space:nowrap"><button class="btn sm" data-ted="${t.id}" title="تعديل بيانات المتدرب" aria-label="تعديل بيانات ${esc(t.full_name)}">${ic('edit')}</button> <button class="btn sm" data-tst="${t.id}" title="كشف الحساب" aria-label="كشف حساب ${esc(t.full_name)}">${ic('receipt')}</button> <button class="btn sm danger soft" data-del="${t.id}" title="حذف المتدرب" aria-label="حذف ${esc(t.full_name)}">${ic('trash')}</button></td></tr>`).join('')}
    </tbody></table></div>${list.length>400?`<p class="hint">تظهر أول ٤٠٠ نتيجة. استخدم البحث لتضييق القائمة.</p>`:''}` : emptyBox('لا يوجد متدربون مطابقون','غيّر البحث أو المرشح.')}`;
   $('#tq').oninput=e=>{ trQ=e.target.value; clearTimeout(window._tq); window._tq=setTimeout(()=>{ pageTrainees(); const el=$('#tq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); };
   $('#tp').onchange=e=>{ trP=e.target.value; pageTrainees(); };
   $('#csvx').onclick=()=>exportCSV('المتدربون-وتسجيلاتهم', traineesRows());
   $$('[data-cv]').forEach(b=>b.onclick=()=>{ cohortView=b.dataset.cv; location.hash='#admin-cohorts'; });
+  $$('[data-ted]').forEach(b=>b.onclick=()=>editTraineeModal(b.dataset.ted, pageTrainees));
+  $$('[data-tst]').forEach(b=>b.onclick=()=>statementModal(b.dataset.tst));
   $$('[data-del]').forEach(b=>b.onclick=()=>confirmBox('حذف المتدرب','يُحذف المتدرب إذا لم يكن له حضور أو شهادات. من له سجلات يُلغى تسجيله ولا يُحذف حفاظًا على التاريخ.', async()=>{ await Store.deleteTrainee(b.dataset.del); await reloadAD(); toast('حُذف المتدرب'); pageTrainees(); }));
   $('#csv').onclick=()=>{ const head=['الاسم','السجل المدني','الجوال','البريد','الجنس','المدينة','المؤهل','جهة العمل','البرنامج','الدفعة','رقم الطلب','حالة التسجيل'];
     const rows=list.flatMap(t=>ensOf(t).map(e=>{ const c=AD.cohorts.find(x=>x.id===e.cohort_id); return [t.full_name,t.national_id,t.phone,t.email,t.gender,t.city,t.education,t.employer,progName(e.program_id),c?c.number:'',e.ref,e.status]; }));

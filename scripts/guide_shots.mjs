@@ -57,6 +57,10 @@ await step('order modal', async () => { await admin('admin-orders'); await p.sel
 await step('invoices', async () => { await admin('admin-invoices'); await shot('a15_invoices');
   const io = await p.$('[data-io]'); if (io) { await io.click(); await p.waitForSelector('.modal'); await shot('a16_invoice_modal'); await closeM(); }
   await p.click('[data-it=cash]'); await shot('a17_cash_close'); });
+await step('statement', async () => { await admin('admin-trainees'); await p.fill('#tq', 'ماجد سعيد'); await W(800);
+  const tid = await S(() => window.__SAMA__.LocalStore.data.trainees.find(t => t.full_name === 'ماجد سعيد علي العتيبي')?.id);
+  await p.click(`[data-tst="${tid}"]`); await p.waitForSelector('.modal'); await shot('a36_statement'); await closeM();
+  await p.click(`[data-ted="${tid}"]`); await p.waitForSelector('#fxF'); await shot('a37_edit_trainee'); await closeM(); });
 const pages = [['admin-attendance', 'a18_attendance'], ['admin-cohorts', 'a19_cohorts'], ['admin-followup', 'a20_followup'], ['admin-rules', 'a21_rules'], ['admin-users', 'a22_users'], ['admin-bank', 'a23_bank'], ['admin-data', 'a24_data'], ['admin-access', 'a25_access'], ['admin-daily', 'a26_daily'], ['admin-policies', 'a27_policies'], ['admin-notify', 'a28_notify'], ['admin-programs', 'a29_programs'], ['admin-trainees', 'a30_trainees'], ['admin-reports', 'a31_reports'], ['admin-partners', 'a32_partners'], ['admin-admins', 'a33_admins'], ['admin-audit', 'a34_audit'], ['admin-settings', 'a35_settings']];
 for (const [r, n] of pages) await step(r, async () => { await admin(r); await shot(n, { wait: 900 }); });
 await step('access issue', async () => { await admin('admin-access'); });
@@ -87,7 +91,12 @@ await mtab('data-tt', 'profile'); await mshot('t12_profile');
 const Sx = await m.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4'));
   const s = D.subscriptions.find(s => s.section === 'boys' && s.status === 'active' && (s.subjects || []).includes('كمي')) || D.subscriptions.find(s => s.status === 'active');
   return D.trainees.find(t => t.id === s.trainee_id); });
+await m.evaluate(sx => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const s = D.subscriptions.find(x => x.trainee_id === sx.id);
+  const n = new Date(Date.now() + 3 * 3600e3), date = n.toISOString().slice(0, 10), mm = n.getUTCHours() * 60 + n.getUTCMinutes(), at = v => { const t = Math.max(0, Math.min(1439, mm + v)); return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+  D.schedule_exceptions = (D.schedule_exceptions || []).filter(x => !(x.section === s.section && x.date === date)); D.schedule_exceptions.push({ id: 'guide', section: s.section, date, type: 'makeup', start: at(-10), end: at(80), note: '' });
+  D.sub_attendance = D.sub_attendance.filter(a => !(a.subscription_id === s.id && a.att_date === date)); localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); localStorage.setItem('sama_welcome_force', '1'); }, Sx);
 await login('student', Sx.phone, 's01_login');
+await mshot('s00_welcome', 900); try { await m.click('#wlGo'); await mshot('s00_welcome_done', 900); await m.click('#wlSkip'); await m.waitForTimeout(600); } catch (e) { console.log('WLFAIL', e.message.split('\n')[0]); }
 await mshot('s02_dash'); await m.evaluate(() => scrollTo(0, 800)); await mshot('s03_dash_more');
 await mtab('data-st', 'hw'); await mshot('s04_hw');
 try { const q = await m.$('[data-qs]'); if (q) { await q.click(); await mshot('s05_quiz_start'); await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); } } catch {}
