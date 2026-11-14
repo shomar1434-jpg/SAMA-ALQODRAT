@@ -20,7 +20,8 @@ export function adminRules(actor, target){
     canInviteFull: isOwner(actor.role),
     canSetRole: isOwner(actor.role) && !self && !owner && !pending,
     canToggle: !pending && !self && !owner && (isOwner(actor.role) || (actor.role === 'full' && target.role === 'staff')),
-    canCancelInvite: pending && isFull(actor.role) && (isOwner(actor.role) || target.role === 'staff')
+    canCancelInvite: pending && isFull(actor.role) && (isOwner(actor.role) || target.role === 'staff'),
+    canResetPassword: isOwner(actor.role) && !self && !owner && !pending && target.active !== false
   };
 }
 export function checkRole(actor, role, reason, recent){

@@ -24,13 +24,25 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "طريقة غير مدعومة" }, 405);
   const auth = req.headers.get("Authorization") || "";
   const url = Deno.env.get("SUPABASE_URL")!, anon = Deno.env.get("SUPABASE_ANON_KEY")!, service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  let body: { email?: string; name?: string; role?: string; redirect?: string };
+  let body: { email?: string; name?: string; role?: string; redirect?: string; action?: string; user_id?: string };
   try { body = await req.json(); } catch { return json({ error: "طلب غير صالح" }, 400); }
   const email = String(body.email || "").trim().toLowerCase(), name = String(body.name || "").trim(), role = body.role === "full" ? "full" : "staff";
   const redirect = ALLOWED_REDIRECT.test(String(body.redirect || "")) ? String(body.redirect) : undefined;
 
   // التفويض يُحسم في قاعدة البيانات بصلاحيات المتصل لا بمفتاح الخدمة
   const asCaller = createClient(url, anon, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
+
+  // إعادة تعيين كلمة مرور مسؤول (المالك وحده؛ يُحسم في admin_password_reset_target): كلمة مؤقتة تظهر مرة واحدة ويُلزم صاحبها بتغييرها
+  if (body.action === "reset_password") {
+    const t = await asCaller.rpc("admin_password_reset_target", { p_id: String(body.user_id || "") });
+    if (t.error) return json({ error: /permission denied/i.test(t.error.message) ? "إعادة تعيين كلمات المرور للمالك الأساسي وحده" : t.error.message }, 400);
+    const svc = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+    const cur = await svc.auth.admin.getUserById(String(body.user_id));
+    const pass = tempPassword();
+    const up = await svc.auth.admin.updateUserById(String(body.user_id), { password: pass, user_metadata: { ...(cur.data?.user?.user_metadata || {}), must_change_password: true } });
+    if (up.error) return json({ error: "تعذّرت إعادة التعيين: " + up.error.message }, 400);
+    return json({ ok: true, mode: "password", temp_password: pass, email: t.data });
+  }
   const added = await asCaller.rpc("admin_add", { p_email: email, p_name: name, p_role: role });
   if (added.error) return json({ error: /permission denied/i.test(added.error.message) ? "إدارة المسؤولين لمدير النظام فقط" : added.error.message }, /permission denied/i.test(added.error.message) ? 403 : 400);
   if (added.data && added.data.pending === false) return json({ ok: true, mode: "existing" });

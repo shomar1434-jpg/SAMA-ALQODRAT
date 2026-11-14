@@ -1,7 +1,7 @@
 import { sessionReminders, inboxOf, adminRecipients } from './inbox_logic.js';
 import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './policy_logic.js';
 import { catalogPrograms, computeEnd } from './catalog.js';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, adminBase } from './config.js';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, adminBase, PAGE } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
@@ -383,6 +383,13 @@ export const LocalStore = {
   async isAdmin(){ return this.admin; },
   async login(user, pass){ if(pass===this.data.settings.admin_pin){ this.admin=true; try{sessionStorage.setItem(this.key+'_adm','1');}catch(e){} return true; } throw new Error('رمز الدخول غير صحيح'); },
   async logout(){ this.admin=false; try{sessionStorage.removeItem(this.key+'_adm');}catch(e){} },
+  async logoutAll(){ return this.logout(); },
+  async changePassword(){ throw new Error('تغيير كلمة المرور يعمل مع قاعدة البيانات؛ في التجربة غيّر رمز الدخول من الإعدادات'); },
+  async requestPasswordReset(){ return {ok:true}; },
+  async resetAdminPassword(id){ const me=await this.adminMe(); await this.listAdmins(); const a=this.data.admins.find(x=>x.id===id&&!x.pending);
+    if(me?.role!=='owner') throw new Error('إعادة تعيين كلمات المرور للمالك الأساسي وحده'); if(!a) throw new Error('الحساب غير موجود');
+    if(a.id===me.id) throw new Error('غيّر كلمة مرورك من «تغيير كلمة المرور»'); if(a.role==='owner') throw new Error('لا تُعاد كلمة مرور المالك الأساسي'); if(a.active===false) throw new Error('فعّل الحساب أولًا');
+    this.audit('admins.password_reset', a.email); this.save(); return {ok:true, mode:'password', temp_password:'demo'+String(Math.floor(Math.random()*9e5)+1e5), email:a.email}; },
   async adminData(){ this.autoArchive(); this.autoReport(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
   /* تقرير اليوم: محليًا يُولَّد عند أول فتح للإدارة بعد 20:30 (لا خادم مجدول في الوضع التجريبي). سحابيًا: pg_cron */
   autoReport(){ const n=riyadhNow(), D=this.data; D.daily_reports=D.daily_reports||[]; if(isPastReportTime(n) && !D.daily_reports.some(r=>r.date===n.date)){ const r=makeReport(D, n.date, 'snapshot', '', n); if(!r.existing){ r.report.auto=true; D.daily_reports.push(r.report); } } },
@@ -523,7 +530,7 @@ export const LocalStore = {
     checkRole(me, role, reason, this._recent()); a.role=role; a.role_reason=String(reason).trim(); this.audit('admins.update', a.email, {before:{role:a.role}, after:{role, role_reason:a.role_reason}}); this.save(); return {ok:true}; },
   async setAdminActive(id, active, reason=''){ const D=this.data, me=await this.adminMe(); await this.listAdmins(); const a=D.admins.find(x=>x.id===id&&!x.pending); if(!a) throw new Error('الحساب غير موجود');
     if(!['owner','full'].includes(me.role)) throw new Error('إدارة المسؤولين لمدير النظام فقط'); if(a.id===me.id) throw new Error('لا تعطّل حسابك الحالي'); if(a.role==='owner') throw new Error('لا يُعطَّل المالك الأساسي');
-    if(a.role==='full'&&me.role!=='owner') throw new Error('تعطيل مدير النظام الكامل للمالك الأساسي وحده'); a.active=!!active; this.audit('admins.update', a.email, {after:{active:!!active, role_reason:reason}}); this.save(); return {ok:true}; },
+    if(a.role==='full'&&me.role!=='owner') throw new Error('تعطيل مدير النظام الكامل للمالك الأساسي وحده'); a.active=!!active; if(active) a.removed=false; this.audit('admins.update', a.email, {after:{active:!!active, role_reason:reason}}); this.save(); return {ok:true}; },
   async adminAudit(f={}){ const me=await this.adminMe(); if(me?.role!=='owner') throw new Error('أرشيف الحركات للمالك الأساسي وحده'); const all=auditFilter(this.data.audit_logs||[], f), lim=f.export?20000:Math.min(500, f.limit||200);
     const rows=all.slice(f.offset||0, (f.offset||0)+lim); if(f.export){ this.audit('audit.export', '', {rows:rows.length}); this.save(); }
     return {total:all.length, rows:JSON.parse(JSON.stringify(rows)), actors:(await this.listAdmins()).filter(a=>!a.pending).map(a=>({id:a.id, name:a.name, role:a.role}))}; },
@@ -532,7 +539,7 @@ export const LocalStore = {
     if(!/^\S+@\S+\.\S+$/.test(e)) throw new Error('اكتب بريدًا صحيحًا'); if(String(name||'').trim().length<3) throw new Error('اكتب اسم المسؤول');
     if(D.admins.some(a=>a.email===e)) throw new Error('هذا البريد له حساب مسؤول؛ فعّله أو عدّل دوره من القائمة'); D.admins.push({id:uid(), email:e, name:String(name).trim(), role, active:true, pending:true, created_by:me.name, created_at:new Date().toISOString()}); this.audit('admin_invites.insert', e, {after:{email:e, role}}); this.save(); return {ok:true, pending:true, mode:'local'}; },
   async removeAdmin(id){ const D=this.data; await this.listAdmins(); const a=D.admins.find(x=>x.id===id); if(!a) throw new Error('غير موجود');
-    if(a.pending){ D.admins.splice(D.admins.indexOf(a),1); this.audit('admin_invites.delete', a.email); this.save(); return {ok:true}; } return this.setAdminActive(id, false, 'إزالة من قائمة المسؤولين'); },
+    if(a.pending){ D.admins.splice(D.admins.indexOf(a),1); this.audit('admin_invites.delete', a.email); this.save(); return {ok:true}; } await this.setAdminActive(id, false, 'إزالة من قائمة المسؤولين'); a.removed=true; this.save(); return {ok:true}; },
   async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role);
       if(!ph){ const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); this.load(); if(d && (this.data.devices||[]).some(x=>x.id===d.id && x.phone===d.phone && x.role===role && !x.revoked_at)) ph=d.phone; else if(d) localStorage.removeItem(this.key+'_dev_'+role); } }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); localStorage.removeItem(this.key+'_dev_'+role);
@@ -757,7 +764,8 @@ export const CloudStore = {
   mode:'cloud', sb:null,
   init(){ const h=location.hash||'';   // رابط من بريد Supabase (دعوة، تأكيد، استعادة) يحمل الجلسة في الجزء بعد #؛ يُلتقط قبل أن تقرأه المكتبة
     if(/access_token=|error_description=|[#&]type=(invite|recovery|signup|magiclink)/.test(h)){ const q=new URLSearchParams(h.replace(/^#/,'')); this.authEvent={type:q.get('type')||'', error:q.get('error_description')||''}; }
-    this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); },
+    // جلسة لوحة الإدارة محفوظة منفصلة عن جلسات البوابات في المتصفح نفسه، فلا تحلّ إحداهما محل الأخرى
+    this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PAGE==='admin' ? {auth:{storageKey:'sama-admin-auth'}} : undefined); },
   async authReady(){ const {data:{session}}=await this.sb.auth.getSession(); if(session) await this.sb.rpc('claim_admin'); return !!session; },
   async mustChangePassword(){ const {data:{session}}=await this.sb.auth.getSession(); return !!session?.user?.user_metadata?.must_change_password; },
   async setPassword(p){ if(String(p||'').length<8) throw new Error('كلمة المرور 8 أحرف على الأقل'); const r=await this.sb.auth.updateUser({password:p, data:{must_change_password:false}}); if(r.error) throw new Error(/same|different/i.test(r.error.message)?'اختر كلمة مرور مختلفة عن المؤقتة':'تعذّر حفظ كلمة المرور: '+r.error.message); await this.sb.rpc('claim_admin'); return true; },
@@ -781,7 +789,14 @@ export const CloudStore = {
   async setAdminActive(id, active, reason=''){ return this._e(await this.sb.rpc('admin_set_active',{p_id:id, p_active:!!active, p_reason:reason})); },
   async adminAudit(f={}){ return this._e(await this.sb.rpc('admin_audit',{p:f})); },
   async login(email, pass){ const r=await this.sb.auth.signInWithPassword({email,password:pass}); if(r.error) throw new Error('بيانات الدخول غير صحيحة'); await this.sb.rpc('claim_admin'); if(!(await this.isAdmin())){ await this.sb.auth.signOut(); throw new Error('هذا الحساب ليس مديرًا للنظام'); } return true; },
-  async logout(){ await this.sb.auth.signOut(); },
+  async logout(){ await this.sb.auth.signOut({scope:'local'}); },   // هذا الجهاز فقط
+  async logoutAll(){ await this.sb.auth.signOut({scope:'global'}); },   // كل أجهزة الحساب (عند فقد جهاز)
+  async changePassword(cur, next){ if(String(next||'').length<8) throw new Error('كلمة المرور الجديدة 8 أحرف على الأقل'); if(cur===next) throw new Error('اختر كلمة مرور مختلفة عن الحالية');
+    await this.reauth(cur); return this.setPassword(next); },
+  async requestPasswordReset(email){ const e=String(email||'').trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(e)) throw new Error('اكتب بريدك الإلكتروني');
+    try{ await this.sb.auth.resetPasswordForEmail(e,{redirectTo:adminBase()}); }catch(x){} return {ok:true}; },   // رد واحد سواء وُجد الحساب أم لا
+  async resetAdminPassword(id){ const {data, error}=await this.sb.functions.invoke('admin-invite',{body:{action:'reset_password', user_id:id}});
+    if(error){ let m=''; try{ m=(await error.context.json()).error||''; }catch(e){} throw new Error(m||'تعذّرت إعادة التعيين؛ حاول مرة أخرى'); } return data; },
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
@@ -852,7 +867,7 @@ export const CloudStore = {
   /* إنشاء حساب مسؤول مدعوّ: يسجّل ببريده وكلمة مرور يختارها، ثم يُمنح الصلاحية إن كان بريده في قائمة المدعوين */
   async adminSignup(email, pass){ const r=await this.sb.auth.signUp({email, password:pass, options:{emailRedirectTo:adminBase()+'#admin'}}); if(r.error) throw new Error(r.error.message.includes('registered')?'هذا البريد له حساب؛ ادخل بكلمة مرورك':'تعذّر إنشاء الحساب: '+r.error.message);
     if(!r.data.session) return {confirm:true}; const c=await this.sb.rpc('claim_admin'); if(c.error||!c.data) { await this.sb.auth.signOut(); throw new Error('هذا البريد غير مدعوّ كمسؤول. اطلب من مدير النظام إضافتك.'); } return {ok:true}; },
-  async portalLogout(){ try{ await this.sb.rpc('device_logout'); }catch(e){} await this.sb.auth.signOut(); },
+  async portalLogout(){ try{ await this.sb.rpc('device_logout'); }catch(e){} await this.sb.auth.signOut({scope:'local'}); },
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },
   async teacherNotify(p){ return this._e(await this.sb.rpc('teacher_notify',{p})); },
   runReminders(){ return 0; },   // في السحابة: run_session_reminders() عبر pg_cron كل دقيقة

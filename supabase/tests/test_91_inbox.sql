@@ -11,6 +11,7 @@ begin
   insert into teachers(full_name, phone, section, subjects) values ('مدرب التنبيهات', '0501009999', 'boys', '{كمي}');
   insert into schedule_exceptions(date, section, type, start_time, end_time) values (d, 'boys', 'makeup', st, st + interval '1 hour');
   update settings set soon_minutes = 10 where id = 1;
+  insert into schedule_exceptions(date, section, type) values (d, 'girls', 'cancel');   -- جلسة البنات الحقيقية قد تقع في نافذة التنبيه وقت تشغيل الاختبار
 
   n1 := run_session_reminders();
   assert n1 > 0, 'إنشاء تنبيهات بدء الجلسة';
@@ -51,5 +52,5 @@ begin
   delete from notifications where kind = 'session_soon';
   insert into schedule_exceptions(date, section, type) values (d, 'boys', 'cancel');
   assert run_session_reminders() = 0 or not exists (select 1 from notifications where kind = 'session_soon' and dedupe_key like '%:boys:%'), 'لا تنبيه لجلسة ملغاة';
-  delete from schedule_exceptions where date = d and section = 'boys';   -- تنظيف حتى لا يتأثر غيره
+  delete from schedule_exceptions where date = d and section in ('boys', 'girls');   -- تنظيف حتى لا يتأثر غيره
 end $$;
