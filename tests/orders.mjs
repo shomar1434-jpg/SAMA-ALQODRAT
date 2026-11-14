@@ -40,9 +40,9 @@ ok(/سبب/.test(await text('#omE')), 'الرفض يحتاج سببًا');
 await p.click('[data-od=approved]'); await p.waitForTimeout(600);
 D = await data(); o = D.orders.find(x => x.id === o.id);
 ok(o.approval === 'approved' && o.payment === 'claimed', 'الموافقة لا تثبت وصول التحويل');
-await p.click(`[data-oo="${o.id}"]`); await p.waitForSelector('#om-a'); await p.fill('#om-a', '100'); await p.click('#om-pay'); await p.waitForTimeout(300);
+await p.click(`[data-oo="${o.id}"]`); await p.waitForSelector('#opl-a0'); await p.fill('#opl-a0', '100'); await p.click('#om-recv'); await p.waitForTimeout(300);
 ok(/أقل من المطلوب/.test(await text('#omE')), 'مبلغ أقل من المطلوب لا يُعد سدادًا');
-await p.fill('#om-a', '690'); await p.click('#om-pay'); await p.waitForTimeout(600);
+await p.fill('#opl-a0', '690'); await p.click('#om-recv'); await p.waitForTimeout(600);
 D = await data(); o = D.orders.find(x => x.id === o.id);
 ok(o.payment === 'confirmed' && o.paid_amount === 690 && o.events.length >= 4, 'تأكيد السداد بعد المطابقة، وكل قرار في سجل الطلب');
 

@@ -1196,3 +1196,11 @@ img,svg,video,canvas{max-width:100%}
 #people .linkbtn{min-height:44px;display:inline-flex;align-items:center}
 
 .dg.pre{background:var(--surface-sunken);color:var(--ink-subtle);border:1px dashed var(--border-strong,var(--border))}
+/* سطور السداد المتعددة (الخطوة AH) */
+.pl{display:grid;gap:8px}
+.pl-row{display:grid;grid-template-columns:minmax(90px,1fr) minmax(110px,1fr) minmax(120px,1.4fr) auto;gap:8px;align-items:end}
+.pl-row .field{margin:0;min-width:0}
+.pl-x{min-width:44px;min-height:44px}
+.pl-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.pl-sum{font-size:15px}
+@media (max-width:560px){.pl-row{grid-template-columns:1fr 1fr;padding-bottom:8px;border-bottom:1px dashed var(--border)}.pl-row .field:nth-child(3){grid-column:1/-1}.pl-x{grid-column:1/-1;justify-self:end}}
