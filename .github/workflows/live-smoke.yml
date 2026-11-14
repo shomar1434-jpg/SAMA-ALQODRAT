@@ -8,8 +8,6 @@ jobs:
           U: https://rivemywlarsfeeffylao.supabase.co
           K: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdmVteXdsYXJzZmVlZmZ5bGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODQ3NjMsImV4cCI6MjExMDE2MDc2M30.5ts3rFDsEaw7XOgDrV6ywF5JQ0oKVswi2lEIyRLthMc
         run: |
-          c(){ curl -sS -m 30 -X POST "$U/rest/v1/rpc/$1" -H "apikey: $K" -H "Authorization: Bearer $K" -H "Content-Type: application/json" -d "$2"; echo; }
-          echo "echo array:"; c _echo '{"p":[{"a":1},{"a":2}]}'
-          echo "echo object:"; c _echo '{"p":{"a":1}}'
-          python3 -c "import json;print(json.dumps({'p':[{'full_name':'x'*400,'i':i} for i in range(122)]}))" > /tmp/big.json
-          echo "echo big:"; curl -sS -m 30 -X POST "$U/rest/v1/rpc/_echo" -H "apikey: $K" -H "Authorization: Bearer $K" -H "Content-Type: application/json" --data-binary @/tmp/big.json; echo
+          echo "invite anon:"; curl -sS -m 30 -X POST "$U/functions/v1/admin-invite" -H "apikey: $K" -H "Authorization: Bearer $K" -H "Content-Type: application/json" -d '{"email":"x@example.com","name":"تجربة","role":"full"}'; echo
+          echo "invite noauth:"; curl -sS -m 30 -o /dev/null -w "%{http_code}" -X POST "$U/functions/v1/admin-invite" -H "Content-Type: application/json" -d '{}'; echo
+          echo "options:"; curl -sS -m 30 -o /dev/null -w "%{http_code}" -X OPTIONS "$U/functions/v1/admin-invite" -H "Origin: https://shomar1434-jpg.github.io" -H "Access-Control-Request-Method: POST"; echo
