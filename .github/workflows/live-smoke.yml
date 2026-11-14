@@ -9,12 +9,7 @@ jobs:
           K: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdmVteXdsYXJzZmVlZmZ5bGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODQ3NjMsImV4cCI6MjExMDE2MDc2M30.5ts3rFDsEaw7XOgDrV6ywF5JQ0oKVswi2lEIyRLthMc
         run: |
           c(){ curl -sS -m 30 -X POST "$U/rest/v1/rpc/$1" -H "apikey: $K" -H "Authorization: Bearer $K" -H "Content-Type: application/json" -d "$2"; echo; }
-          echo "catalog:"; c public_catalog '{}' | head -c 300; echo
-          echo "plans:"; c public_plans '{}' | head -c 300; echo
-          echo "settings:"; c public_settings '{}'
-          echo "site:"; c public_site '{}' | head -c 200; echo
-          echo "code_for (must be denied):"; c code_for '{"d":"2026-11-14"}'
-          echo "bootstrap (must be denied):"; c _bootstrap_exec '{"p_name":"x","p_sql":"select 1"}'
-          echo "checkin bad:"; c checkin '{"p_nid":"1000000000","p_code":"","p_program":"","p_device":"t","p_choice":""}' | head -c 300; echo
-          echo "anon signup:"; curl -sS -m 30 -X POST "$U/auth/v1/signup" -H "apikey: $K" -H "Content-Type: application/json" -d '{}' | head -c 200; echo
-          echo "auth settings:"; curl -sS -m 30 "$U/auth/v1/settings" -H "apikey: $K" | head -c 600; echo
+          echo "echo array:"; c _echo '{"p":[{"a":1},{"a":2}]}'
+          echo "echo object:"; c _echo '{"p":{"a":1}}'
+          python3 -c "import json;print(json.dumps({'p':[{'full_name':'x'*400,'i':i} for i in range(122)]}))" > /tmp/big.json
+          echo "echo big:"; curl -sS -m 30 -X POST "$U/rest/v1/rpc/_echo" -H "apikey: $K" -H "Authorization: Bearer $K" -H "Content-Type: application/json" --data-binary @/tmp/big.json; echo
