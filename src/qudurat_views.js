@@ -15,6 +15,7 @@ import { AD, reloadAD } from './views2_admin.js';
 import { setBusy, toLatin } from './features.js';
 import { shrinkImage } from './partners.js';
 import { exportCSV } from './print.js';
+import { absenceModal } from './absence_notify.js';
 
 const TIER_TONE = { basic:'basic', silver:'silver', gold:'gold', diamond:'diamond', custom:'custom' };
 const priceLine = p => p.tier === 'custom' && p.installments === 1 ? `على دفعتين: ${fmtNum(p.reg_fee)} ريال كل شهر` : p.installments ? `${fmtNum(p.reg_fee)} تسجيل + ${fmtNum(p.installments)} ${p.installments === 2 ? 'قسطان' : 'أقساط'} × ${fmtNum(p.installment_amount)}` : `${fmtNum(p.reg_fee)} ريال`;
@@ -238,13 +239,14 @@ function tabToday(){
       .map(s => ({ s, t:D.trainees.find(x => x.id === s.trainee_id), a:(D.sub_attendance || []).find(a => a.subscription_id === s.id && a.att_date === n.date) }));
     const done = ses && n.hm >= ses.end;
     return `<div class="card pad rv" style="--i:${i};margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-      <h3 class="ctitle">${ic('users')}${SECTIONS[sec]}</h3><span class="pill ${ses ? 'info' : 'g'}">${ses ? `جلسة اليوم ${t12(ses.start)} – ${t12(ses.end)}` : 'لا توجد جلسة اليوم'}</span></div>
+      <h3 class="ctitle">${ic('users')}${SECTIONS[sec]}</h3><span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="pill ${ses ? 'info' : 'g'}">${ses ? `جلسة اليوم ${t12(ses.start)} – ${t12(ses.end)}` : 'لا توجد جلسة اليوم'}</span>${ses && n.hm >= ses.start ? `<button class="btn sm" data-abs="${sec}:${done ? 1 : 0}">${ic('send')} إبلاغ أولياء أمور الغائبين</button>` : ''}</span></div>
       ${!ses ? '' : list.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>الحالة</th><th>وقت الحضور</th><th>تعديل</th></tr></thead><tbody>
         ${list.sort((a, b) => (a.t?.full_name || '').localeCompare(b.t?.full_name || '', 'ar')).map(({ s, t, a }) => `<tr><td>${esc(t?.full_name || '—')}</td><td>${esc(planName(D.plans.find(p => p.id === s.plan_id)))}</td>
           <td>${a ? `<span class="pill dot ${a.status === 'متأخر' ? 'warn' : 'ok'}">${a.status}</span>${a.manual ? ' <span class="hint">يدوي</span>' : ''}` : `<span class="pill dot ${done ? 'bad' : 'g'}">${done ? 'غائب' : 'لم يسجل بعد'}</span>`}</td>
           <td class="num">${a ? t12(a.time.slice(0, 5)) : '—'}</td>
           <td style="white-space:nowrap"><button class="btn sm" data-mk="${s.id}" data-st="حاضر">حاضر</button> <button class="btn sm" data-mk="${s.id}" data-st="متأخر">متأخر</button>${a ? ` <button class="btn sm danger soft" data-mk="${s.id}" data-st="">إلغاء</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : emptyBox('لا يوجد مشتركون في هذا القسم')}</div>`; }).join('');
+  $$('[data-abs]').forEach(b => b.onclick = () => { const [sec, e] = b.dataset.abs.split(':'); absenceModal(AD, 'pkg', sec, riyadhNow().date, e === '1'); });
   $$('[data-mk]').forEach(b => b.onclick = async () => { await Store.setSubAttendance(b.dataset.mk, riyadhNow().date, b.dataset.st || null); await reloadAD(); toast('حُدّث الحضور'); tabToday(); });
 }
 

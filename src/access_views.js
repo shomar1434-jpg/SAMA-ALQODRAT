@@ -14,6 +14,8 @@ import { publicBase } from './config.js';
 import { ROLE_TXT } from './portal_logic.js';
 import { subStatus } from './qudurat.js';
 import { ACT_ST, ACT_TTL_DAYS, actStatus, actMessage } from './device_logic.js';
+import { waTo } from './absence_notify.js';
+import { CENTER } from './catalog.js';
 
 let aRole = 'student', aQ = '', aOnly = 'all', issued = [], X = { devices:[], activations:[], requests:[] };
 const PATH = { student:'student/', guardian:'guardian/', teacher:'teacher/' };
@@ -25,6 +27,12 @@ function people(role){
     if(subs.length || (AD.enrollments || []).some(e => e.trainee_id === t.id && e.status !== 'ملغى')) add(t.phone, t.full_name, live ? 'اشتراك سارٍ' : subs.length ? 'اشتراك منتهٍ' : 'برنامج'); });
   else (AD.trainees || []).forEach(t => { if(t.guardian_phone && t.guardian_phone !== t.phone) add(t.guardian_phone, 'ولي أمر ' + t.full_name, ''); });
   return [...m.values()].map(p => ({ ...p, name:p.names.join('، ') })).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+}
+/* رمز طلب الدخول عبر واتساب: يُطابَق الطلب بصاحبه من أسماء الحسابات، ويظهر الزر عند تطابق واحد فقط */
+function reqLink(r){
+  const m = people(r.role).filter(p => r.name && p.names.some(n => n === r.name || n.endsWith(' ' + r.name) || n.endsWith(r.name)));
+  if(m.length !== 1) return '';
+  return waTo(m[0].phone, `السلام عليكم\nرمز الدخول إلى ${({ student:'بوابة المتدرب', teacher:'بوابة المدرب', guardian:'بوابة ولي الأمر' })[r.role] || 'البوابة'}: ${r.code}\nيعمل على جهازك الذي يظهر فيه رمز الجهاز ${r.device}، وصالح ربع ساعة. لا تشاركه مع أحد.\n${CENTER.name}`);
 }
 const stateOf = p => { const dev = X.devices.filter(d => d.phone === p.phone && d.role === aRole && !d.revoked_at).length, act = X.activations.filter(a => a.phone === p.phone && a.role === aRole).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   return { dev, st:dev ? 'on' : act && actStatus(act) === 'active' ? 'wait' : 'none', act }; };
@@ -39,7 +47,7 @@ function draw(){
   $('#acBody').removeAttribute('aria-busy');
   const RQ = X.requests || [];
   $('#acBody').innerHTML = `${RQ.length ? `<div class="card pad rv" id="acReq" style="margin-bottom:14px"><h3 class="ctitle">${ic('bell')}طلبات دخول الآن (${fmtNum(RQ.length)})</h3><p class="hint" style="margin:-4px 0 10px">كتب صاحب الحساب رقم هويته على جهاز جديد فصدر له رمز تحقق. تأكد من هويته ومن رمز الجهاز الظاهر عنده، ثم أبلغه الرمز. الرمز صالح ربع ساعة ولهذا الجهاز وحده.</p>
-      <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الدور</th><th>رمز الجهاز</th><th>رمز التحقق</th><th>الوقت</th></tr></thead><tbody>${RQ.map(r => `<tr><td>${esc(r.name || '—')}</td><td>${ROLE_TXT[r.role] || ''}</td><td class="num" dir="ltr"><b>${esc(r.device)}</b></td><td class="num" dir="ltr"><b class="ac-code">${esc(r.code)}</b></td><td class="num">${esc(String(r.created_at).slice(11, 16))}</td></tr>`).join('')}</tbody></table></div></div>` : ''}<div class="tabs" style="margin-bottom:12px">${Object.entries({ student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' }).map(([k, v]) => `<button class="tab" data-ar="${k}" aria-selected="${aRole === k}">${v}</button>`).join('')}</div>
+      <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الدور</th><th>رمز الجهاز</th><th>رمز التحقق</th><th>الوقت</th><th></th></tr></thead><tbody>${RQ.map(r => { const l = reqLink(r); return `<tr><td>${esc(r.name || '—')}</td><td>${ROLE_TXT[r.role] || ''}</td><td class="num" dir="ltr"><b>${esc(r.device)}</b></td><td class="num" dir="ltr"><b class="ac-code">${esc(r.code)}</b></td><td class="num">${esc(String(r.created_at).slice(11, 16))}</td><td>${l ? `<a class="btn sm" target="_blank" rel="noopener" href="${l}">${ic('send')} واتساب</a>` : ''}</td></tr>`; }).join('')}</tbody></table></div></div>` : ''}<div class="tabs" style="margin-bottom:12px">${Object.entries({ student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' }).map(([k, v]) => `<button class="tab" data-ar="${k}" aria-selected="${aRole === k}">${v}</button>`).join('')}</div>
     <div class="ord-amt" style="margin:0 0 12px"><span>الحسابات <b>${fmtNum(all.length)}</b></span><span>جهاز مفعَّل <b>${fmtNum(n('on'))}</b></span><span>رمز بانتظار الاستخدام <b>${fmtNum(n('wait'))}</b></span><span>بلا رمز <b>${fmtNum(n('none'))}</b></span></div>
     <div class="filters"><label class="sr-only" for="ac-q">بحث</label><input class="inp" id="ac-q" type="search" placeholder="الاسم أو الجوال" value="${esc(aQ)}" style="flex:1;min-width:200px">
       <label class="sr-only" for="ac-o">الحالة</label><select class="inp" id="ac-o">${[['all', 'الكل'], ['none', 'بلا رمز'], ['wait', 'رمز بانتظار الاستخدام'], ['on', 'جهاز مفعَّل']].map(([k, v]) => `<option value="${k}" ${aOnly === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
