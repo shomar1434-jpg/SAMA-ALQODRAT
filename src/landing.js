@@ -113,7 +113,7 @@ export async function viewHome(){
         <ul class="cover-stats" data-reveal style="--i:5">
           <li><b data-count="${P.length}">0</b><span>برنامجًا معتمدًا</span></li>
           <li><b data-count="${cats.length}">0</b><span>مجالات تدريبية</span></li>
-          <li><b data-count="${open.length}">0</b><span>دفعات مفتوحة الآن</span></li>
+          <li><b data-count="${P.length}">0</b><span>برنامجًا متاحًا للتسجيل</span></li>
           <li><b data-count="${hours}">0</b><span>ساعة تدريبية</span></li>
         </ul>
         <svg class="chev" viewBox="0 0 260 300" aria-hidden="true"><path d="M260 0v300L120 220l70-70-70-70z" fill="#C1E1DC" opacity=".55"/><path d="M200 60l-80 90 80 90" fill="none" stroke="#59A598" stroke-width="34" stroke-linejoin="round" opacity=".5"/></svg>

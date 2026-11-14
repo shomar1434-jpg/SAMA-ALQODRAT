@@ -5,6 +5,7 @@ begin
   assert not has_function_privilege('authenticated', 'code_for(date)', 'execute'), 'code_for مغلقة عن الداخل';
   assert not has_function_privilege('anon', '_issue_certificates(uuid)', 'execute'), 'الإصدار الداخلي مغلق';
   assert not has_function_privilege('authenticated', 'register_trainee_noorder(jsonb)', 'execute'), 'النسخ القديمة مغلقة';
+  assert not has_function_privilege('anon', 'register_trainee_direct(jsonb)', 'execute'), 'التسجيل المباشر داخلي';
   assert not has_function_privilege('anon', 'admin_add(text,text,text)', 'execute'), 'دوال الإدارة ليست للزائر';
   assert has_function_privilege('authenticated', 'admin_add(text,text,text)', 'execute'), 'دوال الإدارة للداخل';
   assert has_function_privilege('anon', 'public_catalog()', 'execute'), 'الدليل العام متاح';

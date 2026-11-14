@@ -10,7 +10,7 @@ import { viewAdmin } from './views2_admin.js';
 import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
-import { planOpen } from './qudurat.js';
+import { planOpen, sessionOn, SECTIONS, subStatus } from './qudurat.js';
 import { ageOn, isMinor, isChild, MIN_AGE } from './identity_logic.js';
 import { waLink, WA_LOGO, viewContact } from './landing.js';
 import { orderPanelHtml, bindOrderPanel } from './order_panel.js';
@@ -39,7 +39,7 @@ export function centerFooter(){
 }
 /* حالة الدفعة كما يراها المتدرب */
 export function cohortPublicState(c, today=riyadhNow().date){
-  if(!c) return {k:'none', pill:'g', txt:'لا توجد دفعة حالية'};
+  if(!c) return {k:'none', pill:'info', txt:'التسجيل المبدئي متاح'};
   const full = (c.taken||0) >= c.seats;
   if(c.reg_open && !full) return {k:'open', pill:'ok', txt:`التسجيل مفتوح · ${cohortLabel(c)}`};
   if(c.start_date<=today) return {k:'running', pill:'info', txt:`${cohortLabel(c)} منعقدة`};
@@ -105,7 +105,7 @@ export async function viewCatalog(){
       <span class="hero-pill">${ic('award')}برامج معتمدة من ${CENTER.accreditor}</span>
       <h1>سجّل في برامج مركز سما القدرات، <em>وابدأ مسارك المهني</em></h1>
       <p>${CENTER.vision}.</p>
-      <ul class="stats"><li>${ic('book')}<b data-count="${programs.length}">0</b><span>برنامجًا معتمدًا</span></li><li>${ic('grid')}<b data-count="${nCats}">0</b><span>مجالات تدريبية</span></li><li>${ic('form')}<b data-count="${nOpen}">0</b><span>دفعات مفتوحة للتسجيل</span></li></ul></div></section>
+      <ul class="stats"><li>${ic('book')}<b data-count="${programs.length}">0</b><span>برنامجًا معتمدًا</span></li><li>${ic('grid')}<b data-count="${nCats}">0</b><span>مجالات تدريبية</span></li><li>${ic('form')}<b data-count="${programs.length}">0</b><span>برنامجًا متاحًا للتسجيل</span></li></ul></div></section>
     <div style="height:18px"></div>
     <div class="card pad rv"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px"><h2 class="sec-title" style="margin:0">اختر البرنامج للتسجيل في دفعته</h2><a class="btn acc sm" href="#enroll">${ic('form')} نموذج التسجيل الموحّد</a>
       <div class="seg" style="margin:0"><button data-k="program" class="${cat.kind==='program'?'on':''}">${ic('book')}البرامج</button><button data-k="package" class="${cat.kind==='package'?'on':''}">${ic('layers')}الباقات</button></div></div>
@@ -129,7 +129,7 @@ export function programCard(p, i){
     <div class="meta"><span>${ic('hourglass')}${hoursTxt(p.hours)}</span><span>${ic('calendar')}${daysTxt(p.duration_days)}</span>${p.accreditation_no?`<span>${ic('award')}اعتماد ${esc(p.accreditation_no)}</span>`:''}</div>
     ${c?`<div class="meta"><span>${ic('calendar')}${fmtShort(c.start_date)} – ${fmtShort(c.end_date)}</span><span>${ic('clock')}${t12(c.start_time)}</span></div>`:'<div class="hint">يُعلن عن الدفعة القادمة قريبًا.</div>'}
     <div class="price ${priceTxt(p.price)==='السعر عند التواصل'?'tbd':''}" style="margin-top:auto">${priceTxt(p.price)}</div>
-    ${st.k==='open'?`<div class="bar"><i class="${pc>80?'hot':''}" style="width:${pc}%"></i></div><div class="hint" style="display:flex;justify-content:space-between"><span>متبقٍ ${fmtNum(left)} مقعد</span><span style="color:var(--brand);font-weight:500">التسجيل ${ic('next')}</span></div>`:`<div class="hint" style="text-align:left;color:var(--brand);font-weight:500">صفحة البرنامج ${ic('next')}</div>`}</a>`;
+    ${st.k==='open'?`<div class="bar"><i class="${pc>80?'hot':''}" style="width:${pc}%"></i></div><div class="hint" style="display:flex;justify-content:space-between"><span>متبقٍ ${fmtNum(left)} مقعد</span><span style="color:var(--brand);font-weight:500">التسجيل ${ic('next')}</span></div>`:`<div class="hint" style="text-align:left;color:var(--brand);font-weight:500">${st.k==='running'?'صفحة البرنامج':'تسجيل مبدئي'} ${ic('next')}</div>`}</a>`;
 }
 export function renderCatalogCards(){
   const {programs, packages} = cat.data; const box=$('#choices'); if(!box) return;
@@ -160,27 +160,29 @@ export function renderCatalogCards(){
 export async function viewEnroll(pre=''){
   const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`; let cd, pd;
   try{ [cd, pd] = await Promise.all([Store.catalog(), Store.publicPlans()]); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل نموذج التسجيل', esc(e.message))}</div>`; return; }
-  const progs=cd.programs.filter(p=>cohortPublicState(p.cohort).k==='open').sort((a,b)=>catSort(a.category,b.category)||a.name.localeCompare(b.name,'ar'));
+  const isOpen=p=>cohortPublicState(p.cohort).k==='open';   // كل البرامج النشطة متاحة: المفتوحة دفعتها تسجيل مباشر، والبقية تسجيل مبدئي
+  const progs=[...cd.programs].sort((a,b)=>(isOpen(b)-isOpen(a))||catSort(a.category,b.category)||a.name.localeCompare(b.name,'ar'));
   const plans=pd.plans.filter(p=>p.mode!=='remote' && p.status!=='coming_soon' && planOpen(p));
   let kind = pre.startsWith('q-') ? 'plan' : pre.startsWith('p-') ? 'program' : (progs.length ? 'program' : 'plan');
   let item = pre.startsWith('q-') ? pre.slice(2) : pre.startsWith('p-') ? (progs.find(p=>p.code===pre.slice(2))?.id||'') : '';
   const opts=()=> kind==='program'
-    ? `<option value="">اختر البرنامج</option>`+progs.map(p=>`<option value="${p.id}" ${item===p.id?'selected':''}>${esc(p.name)} · ${cohortLabel(p.cohort)} · تبدأ ${fmtShort(p.cohort.start_date)}</option>`).join('')
+    ? `<option value="">اختر البرنامج</option>`+progs.map(p=>`<option value="${p.id}" ${item===p.id?'selected':''}>${esc(p.name)} · ${isOpen(p)?`${cohortLabel(p.cohort)} · تبدأ ${fmtShort(p.cohort.start_date)}`:'تسجيل مبدئي'}</option>`).join('')
     : `<option value="">اختر الباقة</option>`+plans.map(p=>`<option value="${p.id}" ${item===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
   const chooser=`<fieldset class="en-kind" style="grid-column:1/-1"><legend>أريد التسجيل في <i>*</i></legend>
-      <label class="en-opt"><input type="radio" name="en_kind" id="en-kind-program" value="program" ${kind==='program'?'checked':''}><span>${ic('book')}<b>برنامج تدريبي</b><small>${fmtNum(progs.length)} دفعة مفتوحة للتسجيل</small></span></label>
+      <label class="en-opt"><input type="radio" name="en_kind" id="en-kind-program" value="program" ${kind==='program'?'checked':''}><span>${ic('book')}<b>برنامج تدريبي</b><small>${fmtNum(progs.length)} برنامجًا متاحًا</small></span></label>
       <label class="en-opt"><input type="radio" name="en_kind" id="en-kind-plan" value="plan" ${kind==='plan'?'checked':''}><span>${ic('award')}<b>باقات القدرات والتحصيلي</b><small>${fmtNum(plans.length)} باقات حضورية</small></span></label></fieldset>
     <div class="field" style="grid-column:1/-1"><label for="en-item" id="en-lbl">${kind==='program'?'البرنامج التدريبي':'الباقة'} <i>*</i></label><select class="inp" id="en-item" name="en_item">${opts()}</select>
       <span class="hint" id="en-info"></span><div class="errtxt" data-e="en_item"></div></div>`;
   app.innerHTML=`<div class="wrap" style="max-width:920px">${regFormHtml('التسجيل في مركز سما القدرات','نموذج واحد للبرامج التدريبية وباقات القدرات والتحصيلي', chooser)}
     <p class="hint" style="text-align:center;margin-top:12px">تريد التفاصيل أولًا؟ <a href="#register" style="color:var(--brand);font-weight:500">دليل البرامج</a> · <a href="#home" style="color:var(--brand);font-weight:500">الباقات</a></p></div>${siteFooter()}`;
   const sel=$('#en-item'), info=()=>{ const x=kind==='program'?progs.find(p=>p.id===item):plans.find(p=>p.id===item);
-    $('#en-info').innerHTML = !x ? (kind==='program'&&!progs.length ? 'لا توجد دفعات مفتوحة للتسجيل الآن.' : kind==='plan'&&!plans.length ? 'لا توجد باقات متاحة الآن.' : '')
+    $('#en-info').innerHTML = !x ? (kind==='program'&&!progs.length ? 'لا توجد برامج متاحة الآن.' : kind==='plan'&&!plans.length ? 'لا توجد باقات متاحة الآن.' : '')
+      : kind==='program' && !isOpen(x) ? `لا توجد دفعة مفتوحة الآن: سجّل مبدئيًا ويتواصل معك المركز عند فتح الدفعة، ولا يُطلب منك سداد قبل ذلك · ${priceTxt(x.price)} · <a href="#${x.code}" style="color:var(--brand)">صفحة البرنامج</a>`
       : kind==='program' ? `${fmtShort(x.cohort.start_date)} – ${fmtShort(x.cohort.end_date)} · ${t12(x.cohort.start_time)} · ${priceTxt(x.price)} · <a href="#${x.code}" style="color:var(--brand)">صفحة البرنامج</a>`
       : `يبدأ اشتراكك من أول يوم تحضر فيه · <a href="#plan-${x.id}" style="color:var(--brand)">صفحة الباقة</a>`; };
   $$('[name=en_kind]').forEach(r=>r.onchange=()=>{ kind=r.value; item=''; sel.innerHTML=opts(); $('#en-lbl').innerHTML=`${kind==='program'?'البرنامج التدريبي':'الباقة'} <i>*</i>`; info(); });
   sel.onchange=()=>{ item=sel.value; $('[data-e=en_item]').textContent=''; info(); }; info();
-  bindRegForm(()=> !item ? null : kind==='program' ? {program_id:item} : {plan_id:item}, ()=>{ const p=progs.find(x=>x.id===item); return p?[p.cohort]:[]; });
+  bindRegForm(()=> !item ? null : kind==='program' ? {program_id:item} : {plan_id:item}, ()=>{ const p=progs.find(x=>x.id===item); return p&&isOpen(p)?[p.cohort]:[]; });
 }
 
 /* =====================================================================
@@ -273,6 +275,13 @@ export function bindRegForm(target, cohortsFn){
         liveSay('اكتمل اشتراكك. رقم تسجيلك '+r.ref+(r.order?'، ورقم طلب الشراء '+r.order.number:'')); return;
       }
       const r = await Store.register({...F, ...tg});
+      if(r.request){
+        $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك المبدئي</h2>
+          <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم طلبك:</p><div class="refbox">${esc(r.ref)}</div>
+          <div class="pill info" style="justify-content:center;padding:6px 12px;max-width:460px;margin:0 auto 12px">${esc(r.program)}</div>
+          <p class="hint" style="max-width:480px;margin:0 auto">لا توجد دفعة مفتوحة الآن. حين يفتح المركز الدفعة القادمة يُنقل طلبك إليها ويصلك رقم طلب الشراء وموعد البدء، ولا يُطلب منك سداد قبل ذلك.</p>${gNote}${manarNote}${waBtn(r.ref, 'برنامج '+r.program+' (تسجيل مبدئي)')}</div>`;
+        liveSay('اكتمل تسجيلك المبدئي. رقم طلبك '+r.ref); return;
+      }
       const cs = r.cohorts || cohortsFn().map(c=>({number:c.number, start:c.start_date}));
       $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل تسجيلك</h2>
         <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم تسجيلك:</p><div class="refbox">${esc(r.ref)}</div>
@@ -387,8 +396,7 @@ export async function viewProgramPage(code, tab){
   const body=$('#pBody');
   if(tab==='att'){ body.innerHTML=attendanceBoxHtml(st); bindAttendance(st, code, ()=>viewProgramPage(code,'att')); return; }
   if(ps.k==='open'){ body.innerHTML=regFormHtml(`التسجيل في ${cohortLabel(c)}`, `تبدأ ${fmtDate(c.start_date)}`); bindRegForm({program_id:p.id}, ()=>[c]); }
-  else body.innerHTML = emptyBox(ps.k==='none'?'التسجيل غير مفتوح حاليًا':ps.k==='running'?`${cohortLabel(c)} منعقدة الآن`:'التسجيل مغلق',
-      ps.k==='none'?'يُعلن عن الدفعة القادمة لهذا البرنامج قريبًا. تابعنا أو تواصل مع المركز.':ps.k==='running'?'انتهى التسجيل في هذه الدفعة. إذا كنت مسجّلًا فاختر «تسجيل الحضور».':'اكتمل التسجيل في هذه الدفعة. تُفتح دفعة جديدة بعد انتهائها.');
+  else { body.innerHTML = regFormHtml('التسجيل المبدئي في البرنامج', ps.k==='running'?`${cohortLabel(c)} منعقدة الآن؛ سجّل مبدئيًا للدفعة القادمة ويتواصل معك المركز عند فتحها`:'لا توجد دفعة مفتوحة الآن؛ سجّل مبدئيًا ويتواصل معك المركز عند فتح الدفعة، ولا يُطلب منك سداد قبل ذلك'); bindRegForm({program_id:p.id}, ()=>[]); }
 }
 export async function viewGeneralCheckin(){
   const app=$('#app'); let st={require_code:false}; try{ st=await Store.publicSettings(); }catch(e){}
@@ -462,19 +470,37 @@ export async function viewQR(code){
     $('#feed').innerHTML = att.slice(0,8).map((a,i)=>{ const t=d.trainees.find(x=>x.id===a.trainee_id); return `<div class="f" style="animation-delay:${i*60}ms"><b style="font-weight:600">${esc(t?.full_name.split(' ').slice(0,2).join(' ')||'—')}</b><span class="pill dot ${a.status==='متأخر'?'warn':'ok'} num">${t12(a.time.slice(0,5))}</span></div>`; }).join('') || emptyBox('لم يُسجَّل حضور اليوم بعد'); };
   refresh(); timers.push(setInterval(refresh,8000));
 }
-/* شاشة محاضرات اليوم: باركود كل برنامج منعقد */
+/* جلسات اليوم: باقات القدرات والتحصيلي (لكل قسم جلسته من الجدول بعد الاستثناءات) ثم دفعات البرامج */
+export function todaySessions(D, today=riyadhNow().date){
+  const subs = D.subscriptions||[], sa = (D.sub_attendance||[]).filter(a=>a.att_date===today);
+  const pk = Object.keys(SECTIONS).map(sec=>{ const ses=sessionOn(D, sec, today); if(!ses) return null;
+    const live = subs.filter(x=>x.section===sec && ['active','pending'].includes(subStatus(x, today)));
+    const ids = new Set(live.map(x=>x.id)), subj=[...new Set(live.flatMap(x=>x.subjects||[]))];
+    return {kind:'pkg', key:sec, start:ses.start, end:ses.end, title:`القدرات والتحصيلي · ${SECTIONS[sec]}`, sub:subj.join(' · '), note:ses.kind==='regular'?'':(ses.kind==='makeup'?'جلسة تعويضية':'تغيير وقت'), expected:live.length, present:sa.filter(a=>ids.has(a.subscription_id)).length}; }).filter(Boolean);
+  const co = D.cohorts.filter(c=>!cohortArchived(c,today) && isSessionDay(c,today)).map(c=>{ const p=D.programs.find(x=>x.id===c.program_id);
+    return {kind:'cohort', key:c.id, start:String(c.start_time).slice(0,5), end:String(c.end_time).slice(0,5), title:p?.name||'', sub:`${cohortLabel(c)}${c.hall?` · ${c.hall}`:''}`, cat:p?.category, code:p?progCode(p):'', expected:takenOf(D,c.id), present:D.attendance.filter(a=>a.cohort_id===c.id&&a.att_date===today).length}; });
+  return [...pk, ...co].sort((a,b)=>toMin(a.start)-toMin(b.start));
+}
+/* شاشة محاضرات اليوم: الباركود الموحد (للباقات والدورات معًا) وقائمة جلسات اليوم */
 export async function viewDisplay(){
-  const app=$('#app'); const D=await Store.adminData(); const today=riyadhNow().date;
-  const todays = D.cohorts.filter(c=>!cohortArchived(c,today) && isSessionDay(c,today)).sort((a,b)=>toMin(a.start_time)-toMin(b.start_time));
-  app.innerHTML = `<div class="wrap">${titleBar(`${ic('calendar')}${fmtDate(today)}`,'محاضرات اليوم، <em>وباركود كل برنامج</em>','افتح باركود البرنامج على شاشة القاعة، أو اطبعه وعلّقه. الباركود ثابت للبرنامج ويخدم كل دفعاته.',`<a class="btn sm" href="#admin-cohorts">${ic('prev')} الدفعات</a>`)}
-    <div class="grid g3">${todays.map((c,i)=>{ const p=D.programs.find(x=>x.id===c.program_id); const n=D.attendance.filter(a=>a.cohort_id===c.id&&a.att_date===today).length;
-      return `<div class="card pad rv" style="--i:${i+1};display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center">
-        <span class="pill dot ${catPill(p.category)}">${esc(p.category)}</span><h3 style="font-size:17px;font-weight:600">${esc(p.name)}</h3>
-        <div class="hint">${cohortLabel(c)} · ${t12(c.start_time)} – ${t12(c.end_time)}${c.hall?` · ${esc(c.hall)}`:''}</div>
-        <div class="qrmini" data-qr="${esc(programUrl(p,D.settings))}"></div>
-        <span class="pill dot ok">${fmtNum(n)} من ${fmtNum(takenOf(D,c.id))} حاضر</span>
-        <a class="btn pri sm" href="#qr-${progCode(p)}">${ic('expand')} عرض على الشاشة</a></div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد محاضرات اليوم','تظهر هنا الدفعات المنعقدة في أيام محاضراتها.')}</div>`}</div></div>`;
-  $$('[data-qr]').forEach(el=>makeQR(el, el.dataset.qr, 150));
+  const app=$('#app'); const D=await Store.adminData(); const today=riyadhNow().date, url=baseUrl(D.settings)+'#checkin';
+  const L=todaySessions(D, today), now=toMin(riyadhNow().hm);
+  app.innerHTML = `<div class="wrap">${titleBar(`${ic('calendar')}${fmtDate(today)}`,'محاضرات اليوم، <em>بباركود حضور واحد</em>','باركود واحد ثابت لكل الدورات وباقات القدرات والتحصيلي: يفتح صفحة «تسجيل الحضور»، ويتعرف النظام من السجل المدني على جلسة المتدرب الآن. اطبعه مرة واحدة وعلّقه، أو اعرضه على شاشة القاعة.',`<a class="btn sm" href="#admin-attendance">${ic('prev')} الحضور اليومي</a>`)}
+    <div class="card pad rv" style="--i:1;display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;margin-bottom:16px">
+      <div class="qrmini" id="uQR"></div>
+      <div style="flex:1;min-width:220px;display:grid;gap:8px"><span class="hero-pill" style="justify-self:start;color:var(--brand)">${ic('qr')}باركود الحضور الموحد</span>
+        <p class="hint" style="margin:0">امسح الباركود ثم أدخل رقم السجل المدني. إن كان للمتدرب أكثر من جلسة الآن يُطلب منه الاختيار.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn pri sm" href="#qr-checkin">${ic('expand')} عرض على الشاشة</a><button class="btn sm" id="uCp">${ic('copy')} نسخ الرابط</button></div>
+        <div class="hint" dir="ltr" style="word-break:break-all">${esc(url)}</div></div></div>
+    <h2 class="sec-title rv" style="--i:2">جلسات اليوم <span class="pill g">${fmtNum(L.length)}</span></h2>
+    <div class="grid g3">${L.map((x,i)=>{ const live=toMin(x.start)<=now && now<toMin(x.end), done=now>=toMin(x.end);
+      return `<div class="card pad rv" style="--i:${i+3};display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill dot ${x.kind==='pkg'?'info':catPill(x.cat)}">${x.kind==='pkg'?'باقات':esc(x.cat||'')}</span><span class="pill dot ${live?'ok':done?'g':'warn'}">${live?'منعقدة الآن':done?'انتهت':'لم تبدأ'}</span>${x.note?`<span class="pill dot warn">${x.note}</span>`:''}</div>
+        <h3 style="font-size:17px;font-weight:600">${esc(x.title)}</h3>
+        <div class="hint">${t12(x.start)} – ${t12(x.end)}${x.sub?` · ${esc(x.sub)}`:''}</div>
+        <span class="pill dot ok" style="align-self:flex-start">${fmtNum(x.present)} من ${fmtNum(x.expected)} حاضر</span>
+        ${x.kind==='pkg'?`<a class="btn sm" href="#admin-qudurat" style="margin-top:auto">${ic('users')} المشتركون</a>`:`<a class="btn sm" href="#qr-${x.code}" style="margin-top:auto">${ic('qr')} باركود البرنامج (اختياري)</a>`}</div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد جلسات اليوم','تظهر هنا جلسات باقات القدرات والتحصيلي حسب جدول كل قسم، ودفعات البرامج في أيام محاضراتها.')}</div>`}</div></div>`;
+  makeQR($('#uQR'), url, 200); $('#uCp').onclick=()=>copyText(url,'نُسخ رابط التحضير');
 }
 
 /* =====================================================================

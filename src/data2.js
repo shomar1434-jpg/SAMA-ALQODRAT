@@ -29,6 +29,8 @@ export const STATE_TXT = {archived:'مؤرشفة', running:'منعقدة', upcom
 export const STATE_PILL = {archived:'g', running:'ok', upcoming:'info'};
 export function isSessionDay(c, d){ return !!c && !!(c.start_date && c.end_date) && d>=c.start_date && d<=c.end_date && (c.days||[]).includes(dowOf(d)); }
 export const activeCohortOf = (D, pid, today) => D.cohorts.filter(c=>c.program_id===pid && !cohortArchived(c,today)).sort((a,b)=>b.number-a.number)[0] || null;
+/* دفعة يُسجَّل فيها الآن (↔ program_open_cohort) */
+export const openCohortOf = (D, pid, today) => { const c=activeCohortOf(D, pid, today); return c && c.reg_open && takenOf(D, c.id) < c.seats ? c : null; };
 export const cohortsOfProgram = (D, pid) => D.cohorts.filter(c=>c.program_id===pid).sort((a,b)=>b.number-a.number);
 export const enrollsOf = (D, cid, all=false) => D.enrollments.filter(e=>e.cohort_id===cid && (all || e.status!=='ملغى'));
 export const takenOf = (D, cid) => enrollsOf(D,cid).length;
@@ -298,7 +300,7 @@ export const LocalStore = {
     const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.orders=D.orders||[]; D.invoices=D.invoices||[]; (D.trainees||[]).forEach(t=>{ if(t.imported && !t.import_notes) t.import_notes=[]; }); if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
     if(!D.plans.some(p=>p.tier==='custom')) D.plans.push(...customPlans());       // باقة «خصصناها لك» للبيانات المحفوظة قبل إضافتها
-    D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || [];
+    D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || []; D.program_requests = D.program_requests || [];
     if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
@@ -313,6 +315,7 @@ export const LocalStore = {
     const D=this.data, today=riyadhNow().date;
     if(!validSaudiId(f.national_id)) throw new Error('رقم السجل المدني غير صحيح');
     const pids = f.package_id ? (D.packages.find(k=>k.id===f.package_id)?.program_ids||[]) : [f.program_id];
+    if(!f.package_id && !openCohortOf(D, f.program_id, today)) return this._programRequest(f);   // لا دفعة مفتوحة: تسجيل مبدئي (↔ register_program_request)
     const targets = pids.map(pid=>({p:D.programs.find(x=>x.id===pid), c:activeCohortOf(D,pid,today)}));
     for(const {p,c} of targets){
       if(!p) throw new Error('البرنامج غير موجود');
@@ -331,6 +334,37 @@ export const LocalStore = {
     const order=this._newOrder({trainee_id:t.id, kind:'program', enrollment_ids:D.enrollments.filter(e=>e.ref===ref).map(e=>e.id), title:targets.map(({p})=>p.name).join('، '), total, due_now:total});
     this.save();
     return {ok:true, ref, order, cohorts:targets.map(({p,c})=>({program:p.name, number:c.number, start:c.start_date}))};
+  },
+  _programRequest(f){
+    const D=this.data, today=riyadhNow().date, p=D.programs.find(x=>x.id===f.program_id && x.active!==false);
+    if(!p) throw new Error('البرنامج غير متاح');
+    if(!/^05\d{8}$/.test(f.phone||'')) throw new Error('رقم الجوال غير صحيح');
+    checkAcceptance(D.policies, today, f.accepted_policies);
+    let t = D.trainees.find(x=>x.national_id===f.national_id);
+    if(t && D.program_requests.some(r=>r.program_id===p.id && r.trainee_id===t.id && r.status==='pending')) throw new Error(`سبق تسجيلك المبدئي في «${p.name}»؛ يتواصل معك المركز عند فتح الدفعة`);
+    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, today)};
+    if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    acceptPolicies(D, f, t.id, 'registration');
+    const ref = 'SR-'+String(Math.floor(Math.random()*900000)+100000);
+    D.program_requests.push({id:uid(), ref, program_id:p.id, trainee_id:t.id, status:'pending', cohort_id:null, enrollment_id:null, note:'', created_at:new Date().toISOString()});
+    this.save(); return {ok:true, ref, request:true, program:p.name, cohorts:[]};
+  },
+  async placeRequests(ids){
+    const D=this.data, today=riyadhNow().date; let placed=0, skipped=0;
+    for(const r of D.program_requests.filter(x=>ids.includes(x.id) && x.status==='pending').sort((a,b)=>a.created_at.localeCompare(b.created_at))){
+      const p=D.programs.find(x=>x.id===r.program_id), c=openCohortOf(D, r.program_id, today);
+      if(!c){ if(!placed && !skipped) throw new Error(`لا توجد دفعة مفتوحة للتسجيل في «${p?.name||''}»؛ افتح دفعة أولًا`); skipped++; continue; }
+      let e=D.enrollments.find(x=>x.cohort_id===c.id && x.trainee_id===r.trainee_id);
+      if(e) e.status='مسجل'; else { e={id:uid(), ref:'SQ-'+String(Math.floor(Math.random()*900000)+100000), cohort_id:c.id, program_id:r.program_id, trainee_id:r.trainee_id, package_id:null, status:'مسجل', created_at:new Date().toISOString()}; D.enrollments.push(e); }
+      if(!(D.orders||[]).some(o=>(o.enrollment_ids||[]).includes(e.id))) this._newOrder({trainee_id:r.trainee_id, kind:'program', enrollment_ids:[e.id], title:p.name, total:Number(p.price)||0, due_now:Number(p.price)||0});
+      Object.assign(r, {status:'placed', cohort_id:c.id, enrollment_id:e.id, decided_at:new Date().toISOString()}); this.audit('program_requests.update', r.id, {after:{status:'placed'}}); placed++;
+    }
+    this.save(); return {ok:true, placed, skipped};
+  },
+  async cancelRequest(id, reason){
+    if(String(reason||'').trim().length<3) throw new Error('اكتب سبب الإلغاء');
+    const r=this.data.program_requests.find(x=>x.id===id && x.status==='pending'); if(!r) throw new Error('الطلب غير موجود أو سبق البت فيه');
+    Object.assign(r, {status:'cancelled', note:String(reason).trim().slice(0,300), decided_at:new Date().toISOString()}); this.audit('program_requests.update', id, {after:{status:'cancelled'}}); this.save(); return {ok:true};
   },
   dayCode(date){ return String(hash32(this.data.settings.daily_secret + date) % 10000).padStart(4,'0'); },
   async todayCode(){ return this.dayCode(riyadhNow().date); },
@@ -736,6 +770,8 @@ export const CloudStore = {
   async publicProgram(code){ return this._e(await this.sb.rpc('public_program',{p_code:code})); },
   async publicSettings(){ return this._e(await this.sb.rpc('public_settings')) || {}; },
   async register(f){ return this._e(await this.sb.rpc('register_trainee',{p:f})); },
+  async placeRequests(ids){ return this._e(await this.sb.rpc('admin_place_requests',{p_ids:ids})); },
+  async cancelRequest(id, reason){ return this._e(await this.sb.rpc('admin_cancel_request',{p_id:id, p_reason:reason})); },
   async checkin(nid, code, programCode, opts={}){ return this._e(await this.sb.rpc('checkin',{p_nid:nid, p_code:code||null, p_program:programCode||null, p_device:opts.device||'', p_choice:opts.choice||null})); },
   async todayCode(){ return this._e(await this.sb.rpc('daily_code')); },
   async isAdmin(){ const {data:{session}} = await this.sb.auth.getSession(); if(!session) return false; return !!(await this.adminMe()); },
@@ -749,17 +785,17 @@ export const CloudStore = {
   async adminData(){
     await this.sb.rpc('archive_ended_cohorts');
     const since = addDays(riyadhNow().date,-400), q=(t,f)=>f(this.sb.from(t).select('*'));
-    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa,pcr,qs,ord,oev,inv] = await Promise.all([
+    const [p,k,t,c,e,a,s,ce,pt,pl,tp,ex,su,sa,at,cr,te,gl,nt,dr,po,pa,pcr,qs,ord,oev,inv,prq] = await Promise.all([
       q('programs',x=>x.order('created_at')), q('packages',x=>x), q('trainees',x=>x.limit(10000)), q('cohorts',x=>x),
       q('enrollments',x=>x.limit(20000)), q('attendance',x=>x.gte('att_date',since).limit(50000)), this.sb.from('settings').select('*').eq('id',1).single(), q('certificates',x=>x.limit(20000)), q('partners',x=>x.order('sort_order')),
       q('plans',x=>x.order('sort')), q('schedule_templates',x=>x), q('schedule_exceptions',x=>x.gte('date',since)), q('subscriptions',x=>x.limit(20000)),
       q('sub_attendance',x=>x.gte('att_date',since).limit(100000)), q('checkin_attempts',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(20000)), q('custom_requests',x=>x.order('created_at',{ascending:false}).limit(500)),
-      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000)), q('profile_change_requests',x=>x.order('created_at',{ascending:false}).limit(500)), q('questions',x=>x.neq('status','deleted').limit(20000)), q('orders',x=>x.order('created_at',{ascending:false}).limit(5000)), q('order_events',x=>x.order('at').limit(50000)), q('invoices',x=>x.order('created_at',{ascending:false}).limit(20000))]);
+      q('teachers',x=>x.order('full_name')), q('guardian_links',x=>x), q('notifications',x=>x.gte('date',addDays(riyadhNow().date,-30)).limit(5000)), q('daily_reports',x=>x.gte('date',addDays(riyadhNow().date,-60)).order('date',{ascending:false})), q('policies',x=>x.order('created_at')), q('policy_acceptances',x=>x.limit(50000)), q('profile_change_requests',x=>x.order('created_at',{ascending:false}).limit(500)), q('questions',x=>x.neq('status','deleted').limit(20000)), q('orders',x=>x.order('created_at',{ascending:false}).limit(5000)), q('order_events',x=>x.order('at').limit(50000)), q('invoices',x=>x.order('created_at',{ascending:false}).limit(20000)), q('program_requests',x=>x.order('created_at').limit(5000))]);
     const hm = v => String(v||'').slice(0,5), tm = r => ({...r, time:new Date(r.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})});
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs), orders:this._e(ord).map(o=>({...o, events:this._e(oev).filter(e=>e.order_id===o.id)})), invoices:this._e(inv).map(i=>({...i, total:+i.total, paid:+i.paid, remaining:+i.remaining}))};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs), orders:this._e(ord).map(o=>({...o, events:this._e(oev).filter(e=>e.order_id===o.id)})), invoices:this._e(inv).map(i=>({...i, total:+i.total, paid:+i.paid, remaining:+i.remaining})), program_requests:this._e(prq)};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
