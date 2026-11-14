@@ -2,7 +2,7 @@ import { CATEGORIES, CAT_ICON, CAT_TONE } from './catalog.js';
 import { STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortState, cohortsOfProgram, priceTxt, progCode, takenOf } from './data2.js';
 import { setBusy } from './features.js';
 import { catalogHtml, printDocs } from './print.js';
-import { $, $$, esc, fmtMoney, fmtNum, fmtShort, riyadhNow } from './utils.js';
+import { $, $$, esc, fmtMoney, fmtNum, fmtShort, riyadhNow, matchQ } from './utils.js';
 import { AD, allCats, bindCohortActions, cohortModal, reloadAD, setAD, setCohortView } from './views2_admin.js';
 import { countUp, emptyBox, ic, toast } from './views2_head.js';
 import { catSort, cohortLabel, daysTxt, hoursTxt, kpiCard, short, titleBar } from './views2_main.js';
@@ -35,7 +35,7 @@ export function pagePrograms(){
       <div style="display:flex;gap:6px;margin-top:auto;padding-top:6px"><button class="btn sm" data-ek="${k.id}">${ic('edit')} تعديل</button><button class="btn sm danger soft" data-dk="${k.id}">${ic('trash')} حذف</button></div></div>`; }).join('') || `<div style="grid-column:1/-1">${emptyBox('لا توجد باقات بعد','اجمع برنامجين أو أكثر في باقة، وحدّد سعرها الخاص.')}<div style="text-align:center;margin-top:12px"><button class="btn pri" id="addK2">${ic('layers')} إنشاء باقة</button></div></div>`}</div>`;
   countUp(m);
   renderProgramList();
-  $('#pq').oninput=e=>{ pgQ=e.target.value.trim(); clearTimeout(window._pq); window._pq=setTimeout(renderProgramList,200); };
+  $('#pq').oninput=e=>{ pgQ=e.target.value; clearTimeout(window._pq); window._pq=setTimeout(renderProgramList,200); };
   $('#pc').onchange=e=>{ pgC=e.target.value; renderProgramList(); }; $('#ps').onchange=e=>{ pgS=e.target.value; renderProgramList(); };
   $('#prCat').onclick=()=>printDocs([catalogHtml()],'دليل البرامج المعتمدة');
   $('#addP').onclick=()=>programModal(); $('#impP').onclick=importModal; $('#addK').onclick=()=>packageModal(); $('#addK2')&&($('#addK2').onclick=()=>packageModal());
@@ -44,7 +44,7 @@ export function pagePrograms(){
 }
 export function renderProgramList(){
   const {programs}=AD, today=riyadhNow().date, act=p=>activeCohortOf(AD,p.id,today);
-  const list = programs.filter(p=>(pgC==='all'||p.category===pgC) && (!pgQ||p.name.includes(pgQ)||(p.accreditation_no||'').includes(pgQ))
+  const list = programs.filter(p=>(pgC==='all'||p.category===pgC) && matchQ(pgQ,p.name,p.accreditation_no,p.code)
     && (pgS==='all' || (pgS==='open'&&act(p)?.reg_open) || (pgS==='active'&&act(p)) || (pgS==='none'&&!act(p)) || (pgS==='noprice'&&!(Number(p.price)>0)) || (pgS==='off'&&!p.active)));
   const groups = [...new Set(list.map(p=>p.category))].sort(catSort);
   $('#pgList').innerHTML = groups.length ? groups.map((c,gi)=>{ const ps=list.filter(p=>p.category===c); const tone=CAT_TONE[c]||'brand';
@@ -148,10 +148,10 @@ export function packageModal(k){
   const f=$('#km');
   const summary=()=>{ const ps=AD.programs.filter(p=>sel.has(p.id)), sum=ps.reduce((s,p)=>s+Number(p.price||0),0), hrs=ps.reduce((s,p)=>s+(p.hours||0),0), price=+f.price.value||0, unpriced=ps.filter(p=>!(Number(p.price)>0)).length;
     $('#kSum').innerHTML=`<span class="aic">${ic('layers')}</span><span><b>${fmtNum(ps.length)}</b> برامج مختارة · ${hoursTxt(hrs)}${sum?` · مجموع أسعارها منفردة ${fmtMoney(sum)}`:''}${sum&&price&&price<sum?` · <b>توفير ${fmtNum(Math.round((1-price/sum)*100))}٪</b> للمتدرب`:''}${unpriced?`<span class="hint" style="display:block">${fmtNum(unpriced)} منها بلا سعر منفرد، فلا تدخل في حساب التوفير.</span>`:''}</span>`; };
-  const list=()=>{ const ps=AD.programs.filter(p=>(mc==='all'||p.category===mc)&&(!mq||p.name.includes(mq))).sort((a,b)=>(sel.has(b.id)-sel.has(a.id))||catSort(a.category,b.category));
+  const list=()=>{ const ps=AD.programs.filter(p=>(mc==='all'||p.category===mc)&&matchQ(mq,p.name)).sort((a,b)=>(sel.has(b.id)-sel.has(a.id))||catSort(a.category,b.category));
     $('#kList').innerHTML=ps.map(p=>`<label class="check" style="margin:0;border:1px solid ${sel.has(p.id)?'var(--brand)':'var(--border)'};background:${sel.has(p.id)?'var(--brand-tint)':'transparent'};border-radius:var(--radius-md);padding:8px 12px;align-items:center"><input type="checkbox" value="${p.id}" ${sel.has(p.id)?'checked':''} style="margin:0"><span style="flex:1;min-width:0">${esc(p.name)}<span class="hint" style="display:block">${esc(p.category)} · ${hoursTxt(p.hours)}</span></span><span class="hint">${Number(p.price)>0?fmtMoney(p.price):'بلا سعر'}</span></label>`).join('')||'<div class="hint" style="padding:10px">لا نتائج</div>';
     $$('#kList input').forEach(x=>x.onchange=()=>{ x.checked?sel.add(x.value):sel.delete(x.value); list(); summary(); }); };
-  $('#kq').oninput=e=>{ mq=e.target.value.trim(); list(); }; $('#kc').onchange=e=>{ mc=e.target.value; list(); }; f.price.oninput=summary;
+  $('#kq').oninput=e=>{ mq=e.target.value; list(); }; $('#kc').onchange=e=>{ mc=e.target.value; list(); }; f.price.oninput=summary;
   list(); summary(); $('#kmC').onclick=closeModal;
   f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f);
     const o={...k, name:fd.get('name').trim(), description:fd.get('description').trim(), price:+fd.get('price')||0, program_ids:[...sel], active:!!fd.get('active')};

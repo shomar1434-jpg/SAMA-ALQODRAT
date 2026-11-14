@@ -1,7 +1,7 @@
 /* =====================================================================
    الإدارة: «طلبات الشراء» (#admin-orders): مراجعة، تأكيد سداد، قبول مؤقت، وإعدادات الحساب البنكي.
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
@@ -19,7 +19,7 @@ export const openOrdersCount = D => (D.orders || []).filter(o => o.approval === 
 export function pageOrders(){
   const m = $('#main'), D = AD, all = (D.orders || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)), tr = id => (D.trainees || []).find(t => t.id === id);
   const match = o => oF.st === 'all' ? true : oF.st === 'open' ? (o.approval === 'pending_review' || o.approval === 'needs_information' || (o.approval !== 'rejected' && o.payment !== 'confirmed')) : oF.st === 'claimed' ? o.payment === 'claimed' : oF.st === 'ready' ? orderReady(o) : o.approval === oF.st;
-  const q = oF.q.trim(), list = all.filter(o => match(o) && (!q || o.number.includes(q.toUpperCase()) || (tr(o.trainee_id)?.full_name || '').includes(q) || (tr(o.trainee_id)?.phone || '').includes(q) || o.title.includes(q)));
+  const list = all.filter(o => match(o) && matchQ(oF.q, o.number, tr(o.trainee_id)?.full_name, tr(o.trainee_id)?.phone, tr(o.trainee_id)?.national_id, o.title));
   const bank = D.settings?.bank || {}, n = k => all.filter(o => k(o)).length;
   m.innerHTML = titleBar(`${ic('wallet')}طلبات الشراء`, 'طلبات الشراء <em>للمراجعة</em>', 'لكل تسجيل طلب برقم فريد. المراجعة وتأكيد السداد قراران مستقلان: الموافقة لا تثبت وصول التحويل، وتأكيد السداد يكون بعد مطابقة كشف البنك.') +
     `<div class="grid g4" style="margin-bottom:14px">${[['بانتظار المراجعة', n(o => o.approval === 'pending_review'), 'warn'], ['تحويلات قيد المطابقة', n(o => o.payment === 'claimed'), 'info'], ['مستوفية (موافقة + سداد)', n(o => orderReady(o) && !o.provisional), 'ok'], ['قبول مؤقت', n(o => o.provisional), 'g']].map(([t, v, c]) => `<div class="card pad ostat"><span class="hint"><span class="pill dot ${c}" aria-hidden="true" style="padding:0 0 0 6px"></span>${t}</span><b class="num">${fmtNum(v)}</b></div>`).join('')}</div>

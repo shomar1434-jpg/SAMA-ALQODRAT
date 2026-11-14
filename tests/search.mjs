@@ -1,0 +1,34 @@
+// الخطوة AF: البحث يقبل المسافات والكلمات المتعددة، وشريط بحث في «حضور اليوم» للقدرات والتحصيلي
+import { chromium } from 'playwright';
+import { serveDist, reporter } from './_server.mjs';
+import { matchQ } from '../src/utils.js';
+const { ok, failed } = reporter();
+ok(matchQ('محمد علي', 'أحمد محمد علي الحكمي') && matchQ('علي محمد', 'أحمد محمد علي الحكمي') && !matchQ('محمد سعد', 'أحمد محمد علي'), 'كلمات متعددة بأي ترتيب');
+ok(matchQ('احمد  ', 'أحمد علي') && matchQ('  ', 'أي شيء') && matchQ('', 'x'), 'المسافات الزائدة لا تُفسد البحث');
+ok(matchQ('فاطمه', 'فاطمة') && matchQ('مصطفي', 'مصطفى') && matchQ('١٠٥٢', '1052234567'), 'تطبيع الهمزات والتاء والألف المقصورة والأرقام العربية');
+const { server, origin: U } = serveDist();
+const b = await chromium.launch(); const p = await (await b.newContext({ viewport:{ width:1280, height:900 } })).newPage();
+const errs = []; p.on('pageerror', e => errs.push(e.message));
+await p.goto(U + 'admin/#admin'); await p.waitForSelector('#lf'); await p.fill('[name=p]', '1234'); await p.click('#lfGo'); await p.waitForTimeout(1200);
+const typeSlow = async (sel, s) => { await p.click(sel); for (const ch of s) { await p.keyboard.type(ch); await p.waitForTimeout(400); } await p.waitForTimeout(600); };
+await p.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const dow = new Date(Date.now() + 3 * 3600e3).getUTCDay(); D.schedule_exceptions = []; D.schedule_templates = [{ id:'t1', section:'boys', dow, start:'00:00', end:'23:59' }]; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
+await p.reload(); await p.waitForTimeout(500);
+await p.goto(U + 'admin/#admin-qudurat'); await p.waitForTimeout(900);
+for (const t of await p.$$('[data-qt]')) if (/حضور اليوم/.test(await t.textContent())) { await t.click(); break; }
+await p.waitForSelector('#tdq');
+const name = await p.$eval('#qBody tbody tr td', td => td.textContent.trim());
+const two = name.split(/\s+/).slice(0, 2).join(' ');
+await typeSlow('#tdq', two);
+ok((await p.inputValue('#tdq')) === two, 'شريط البحث في «حضور اليوم» يقبل المسافة بين الكلمات');
+const rows = await p.$$eval('#qBody tbody tr td:first-child', tds => tds.map(x => x.textContent.trim()));
+ok(rows.length >= 1 && rows.every(r => two.split(' ').every(w => r.includes(w))), 'النتائج تطابق الكلمتين');
+await p.selectOption('#tds', 'absent'); await p.waitForTimeout(300);
+ok(!!(await p.$('#tds')) && (await p.inputValue('#tdq')) === two, 'تصفية الحاضرين والغائبين مع بقاء نص البحث');
+await p.goto(U + 'admin/#admin-trainees'); await p.waitForTimeout(900);
+await typeSlow('#tq', two);
+ok((await p.inputValue('#tq')) === two, 'بحث المتدربين يقبل المسافة');
+await p.goto(U + 'admin/#admin-access'); await p.waitForTimeout(900);
+await typeSlow('#ac-q', two);
+ok((await p.inputValue('#ac-q')) === two, 'بحث تفعيل الأجهزة يقبل المسافة');
+ok(!errs.length, 'لا أخطاء' + (errs.length ? ': ' + errs[0] : ''));
+await b.close(); server.close(); process.exit(failed() ? 1 : 0);

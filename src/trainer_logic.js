@@ -3,7 +3,7 @@
    العتبات من إعدادات المركز (حد الشهادة، الغياب المتتالي) لا أرقامًا ثابتة؛ ولا يُرسل شيء تلقائيًا:
    المجموعة تجهّز قائمة مستهدفين لواجب علاجي يعتمده المدرب. مطابق لـ …_trainer_portal.sql (الملف فقط).
    ===================================================================== */
-import { addDays } from './utils.js';
+import { addDays, matchQ } from './utils.js';
 import { subStatus } from './qudurat.js';
 import { teacherTeaches } from './learning_logic.js';
 
@@ -61,7 +61,7 @@ export function peopleRows(D, teacher, dash, today){
     if(r.achievement?.overall != null && r.achievement.overall < LOW_ACH) flags.push('low_ach'); if(live && end && end <= lim) flags.push('ending');
     return { ...r, overdue, end, flags }; });
 }
-export const peopleFilter = (rows, f) => { const q = String(f?.q || '').trim(); return rows.filter(r => (!q || r.name.includes(q)) && (!f?.plan || r.plan === f.plan) && (!f?.flag || f.flag === 'all' || r.flags.includes(f.flag))); };
+export const peopleFilter = (rows, f) => { return rows.filter(r => matchQ(f?.q, r.name) && (!f?.plan || r.plan === f.plan) && (!f?.flag || f.flag === 'all' || r.flags.includes(f.flag))); };
 export function traineeCard(D, teacher, row, today){
   const id = row.trainee_id, mine = (D.assignments || []).filter(a => a.teacher_id === teacher.id && a.publish_date <= today && (!Array.isArray(a.targets) || a.targets.includes(id)));
   const sub = a => (D.submissions || []).find(s => s.assignment_id === a.id && s.trainee_id === id), done = mine.filter(a => ['submitted', 'graded', 'needs_revision'].includes(sub(a)?.status));
