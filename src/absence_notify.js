@@ -17,7 +17,7 @@ export function absenceText(t, toGuardian, what, date, time){
   const girl = t.gender === 'أنثى', first = String(t.full_name || '').trim();
   const head = toGuardian ? `السلام عليكم ورحمة الله وبركاته\nولي أمر ${girl ? 'المتدربة' : 'المتدرب'}: ${first}\nنفيدكم بغياب ${girl ? 'ابنتكم' : 'ابنكم'} اليوم ${fmtDate(date)} عن ${what}${time ? ` (${time})` : ''}.`
     : `السلام عليكم ورحمة الله وبركاته\n${girl ? 'المتدربة' : 'المتدرب'}: ${first}\nلم يُسجَّل حضورك اليوم ${fmtDate(date)} في ${what}${time ? ` (${time})` : ''}.`;
-  return `${head}\nنأمل الحرص على الانتظام، وللاستفسار التواصل معنا على ${CENTER.phones[0]}.\n${CENTER.name}`;
+  return `${head}\nنأمل الحرص على الانتظام، وللاستفسار التواصل معنا عبر واتساب المركز:\n${CENTER.whatsappLink}\n${CENTER.name}`;
 }
 
 /* الغائبون في جلسة يوم: باقات قسم (kind='pkg', key=القسم) أو دفعة برنامج (kind='cohort', key=معرّفها) */

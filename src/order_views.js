@@ -53,7 +53,7 @@ export function pageOrders(){
 /* تذكير بالسداد عبر واتساب: رسالة جاهزة للمتدرب أو لولي أمره، والإرسال بيد المسؤول */
 function remindHtml(o, t){
   const rem = orderRemaining(o); if(!t || !(rem > 0) || o.approval === 'rejected') return '';
-  const msg = to => `السلام عليكم ورحمة الله وبركاته\n${to === 'g' ? `ولي أمر ${t.gender === 'أنثى' ? 'المتدربة' : 'المتدرب'}: ${t.full_name}` : `${t.gender === 'أنثى' ? 'المتدربة' : 'المتدرب'}: ${t.full_name}`}\nنذكّركم بالمبلغ المتبقي على طلب ${o.number} (${o.title}): ${fmtNum(rem)} ريال.\nللسداد أو الاستفسار تواصلوا معنا على ${CENTER.phones[0]}.\n${CENTER.name}`;
+  const msg = to => `السلام عليكم ورحمة الله وبركاته\n${to === 'g' ? `ولي أمر ${t.gender === 'أنثى' ? 'المتدربة' : 'المتدرب'}: ${t.full_name}` : `${t.gender === 'أنثى' ? 'المتدربة' : 'المتدرب'}: ${t.full_name}`}\nنذكّركم بالمبلغ المتبقي على طلب ${o.number} (${o.title}): ${fmtNum(rem)} ريال.\nللسداد أو الاستفسار تواصلوا معنا عبر واتساب المركز:\n${CENTER.whatsappLink}\n${CENTER.name}`;
   const a = waTo(t.phone, msg('t')), g = t.guardian_phone && t.guardian_phone !== t.phone ? waTo(t.guardian_phone, msg('g')) : '';
   return a || g ? `<div class="ord-acts" style="margin-top:10px"><span class="hint" style="flex:1;min-width:160px">تذكير بالمتبقي (${sar(rem)}) عبر واتساب:</span>${a ? `<a class="btn sm" target="_blank" rel="noopener" href="${a}">${ic('send')} للمتدرب</a>` : ''}${g ? `<a class="btn sm" target="_blank" rel="noopener" href="${g}">${ic('send')} لولي الأمر</a>` : ''}</div>` : '';
 }
