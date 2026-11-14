@@ -3,6 +3,7 @@
    والبيانات محصورة بالدور من الخادم (portalData). الحساب من portal_logic.js.
    ===================================================================== */
 import { mountGuide } from './guide_link.js';
+import { showWelcome, shouldWelcome, welcomeState } from './welcome.js';
 import { CENTER } from './catalog.js';
 import { waLink, WA_LOGO } from './landing.js';
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, DAYS } from './utils.js';
@@ -22,7 +23,7 @@ import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersC
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','chat','المراسلة'],['rate','award','تقييم المدرب']];
 const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','chat','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
-let sTab = 'dash', tTab = 'today';
+let sTab = 'dash', tTab = 'today', welcomed = false;
 const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
 const TITLES = { student:'بوابة المتدرب', teacher:'بوابة المدرب', guardian:'بوابة ولي الأمر' };
@@ -195,10 +196,13 @@ function viewStudent(D){
   if(!pr) return ($('#app').innerHTML = `<div class="wrap">${emptyBox('لا يوجد اشتراك مرتبط بهذا الرقم', 'راجع إدارة المعهد.')}</div>`);
   const U = unifiedItems(D, pr.trainee.id, pr.items), u = U[Math.min(sIdx, U.length - 1)], it = u?.kind === 'sub' ? u.it : null, px = u?.kind === 'prog' ? u.x : null;
   if(!pr.items.length && sTab !== 'dash') sTab = 'dash';
+  const wst = welcomeState(it, riyadhNow(), D.settings?.early_minutes ?? 60), openWelcome = () => showWelcome({ trainee:pr.trainee, it, prog:px, onClose:async changed => { if(changed) viewStudent(await Store.portalData('student')); } });
   $('#app').innerHTML = `<div class="wrap">
     ${profiles.length > 1 ? `<div class="tabs" style="margin-bottom:12px">${profiles.map((x, i) => `<button class="tab" data-pi="${i}" aria-selected="${i === pIdx}">${ic('user')}${esc(x.trainee.first_name)}</button>`).join('')}</div>` : ''}
     <section class="hero portal-hero rv"><div><span class="hero-pill">${ic('user')}${TITLES.student}</span><h1>أهلًا ${esc(pr.trainee.first_name)}</h1>
       ${it ? `<p>${esc(it.plan)} · قسم ${esc(it.section)}${it.subjects.length ? ' · ' + esc(it.subjects.join('، ')) : ''}</p>` : px ? `<p>${esc(px.program)} · الدفعة ${fmtNum(px.number)}</p>` : ''}</div>
+      ${wst.kind === 'now' || (!it && px) ? `<button class="btn pri hero-checkin" id="sCheckin">${ic('check')} تسجيل الحضور</button>` : ''}
+      ${wst.kind === 'done' ? `<span class="hero-pill hero-done">${ic('check')} سُجّل حضورك اليوم</span>` : ''}
       ${it?.upcoming[0] ? `<div class="next-ses"><span>جلستي القادمة</span><b>${DAYS[new Date(it.upcoming[0].date + 'T12:00:00Z').getUTCDay()]} ${fmtShort(it.upcoming[0].date)}</b><span class="num">${t12(it.upcoming[0].start)}</span></div>` : ''}</section>
     ${tabBar(pr.items.length ? S_TABS : S_TABS.slice(0, 1), sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length })}
     <div id="sBody"></div></div>`;
@@ -210,6 +214,8 @@ function viewStudent(D){
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
   $$('[data-pi]').forEach(b => b.onclick = () => { pIdx = +b.dataset.pi; sIdx = 0; viewStudent(D); });
   if(pr.notifications.some(x => !x.read_at)) Store.markRead('student');
+  if($('#sCheckin')) $('#sCheckin').onclick = openWelcome;
+  if(u && !welcomed && shouldWelcome(pr.trainee.id, wst)){ welcomed = true; openWelcome(); }
 }
 
 /* ---------- ولي الأمر ---------- */
