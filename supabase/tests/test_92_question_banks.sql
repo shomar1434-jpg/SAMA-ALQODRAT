@@ -17,7 +17,7 @@ begin
   perform set_config('app.phone', '', true); perform set_config('app.uid', '', true);
   begin perform admin_import_questions(t1, '[]'::jsonb); ok := false; exception when others then ok := sqlerrm like '%غير مصرح%'; end;
   assert ok, 'الاستيراد للإدارة فقط';
-  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'bank-admin@test'); insert into admins(user_id) values (v_admin);
+  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'bank-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
 
   -- استيراد: الكل أو لا شيء، برقم السطر

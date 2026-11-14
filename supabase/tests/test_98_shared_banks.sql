@@ -12,7 +12,7 @@ begin
     jsonb_build_object('code','KT-03','unit','واجب 2','order',3,'image','quant/KT-03.webp','correct',0,'status','draft')));
   begin perform admin_import_shared_bank(b); ok := false; exception when others then ok := true; end;
   assert ok, 'الاستيراد للمسؤول فقط';
-  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'bank-admin@test'); insert into admins(user_id) values (v_admin);
+  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'bank-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   r := admin_import_shared_bank(b);
   assert (r->>'added')::int = 3 and (r->>'updated')::int = 0, 'استيراد الحزمة';

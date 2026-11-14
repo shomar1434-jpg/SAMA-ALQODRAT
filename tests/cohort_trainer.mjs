@@ -21,7 +21,7 @@ const T = D.teachers.find(t => t.phone === '0501000003');
 // مدرب جديد للبرامج فقط (بلا مقررات)، ثم إسناد الدفعة
 await p.goto(U + 'admin/#admin-users'); await p.waitForTimeout(900);
 if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200); }
-await p.click('#tAdd'); await p.waitForTimeout(300); await p.fill('#tf-name', 'سلطان فهد علي الدوسري'); await p.fill('#tf-phone', '0501000077'); await p.click('#tfS'); await p.waitForTimeout(800);
+await p.click('#tAdd'); await p.waitForTimeout(300); await p.check('#tf [name=kind][value=programs]'); await p.fill('#tf-name', 'سلطان فهد علي الدوسري'); await p.fill('#tf-phone', '0501000077'); await p.click('#tfS'); await p.waitForTimeout(800);
 D = await data(); const PT = D.teachers.find(t => t.phone === '0501000077');
 ok(PT && PT.active !== false && !PT.subjects.length, 'إضافة مدرب برامج بلا مقررات');
 await p.goto(U + 'admin/#admin-cohorts'); await p.waitForTimeout(900);

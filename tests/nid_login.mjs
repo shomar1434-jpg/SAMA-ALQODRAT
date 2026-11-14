@@ -59,16 +59,16 @@ ok(tr && tr.phone === D.teachers[0].phone, 'المدرب يطلب الدخول �
 await p.fill('#pl-code', tr.code); await p.click('#plB'); await p.waitForTimeout(900);
 ok(!!(await p.$('[data-tt]')), 'المدرب يدخل بوابته بالهوية والرمز');
 
-// تعدد المسؤولين
-await a.reload(); await a.waitForSelector('#acAdmins #adF');
-await a.fill('#ad-n', 'مسؤول التسجيل'); await a.fill('#ad-e', 'bad'); await a.click('#adF button'); await a.waitForTimeout(300);
+// تعدد المسؤولين: صفحة «إدارة المسؤولين»، والإزالة تعطيل
+await a.goto(U + 'admin/#admin-admins'); await a.waitForSelector('#adF');
+await a.fill('#ad-n', 'مسؤول التسجيل'); await a.fill('#ad-e', 'bad'); await a.click('#adS'); await a.waitForTimeout(300);
 ok(/بريد/.test(await text('#adE', a)), 'بريد غير صحيح يُرفض');
-await a.fill('#ad-e', 'Registrar@Example.com'); await a.click('#adF button'); await a.waitForTimeout(600);
+await a.fill('#ad-e', 'Registrar@Example.com'); await a.click('#adS'); await a.waitForTimeout(700);
 D = await data(a);
-ok(D.admins.length === 2 && D.admins.some(x => x.email === 'registrar@example.com' && x.active) && /مسؤول التسجيل/.test(await text('#acAdmins', a)), 'إضافة مسؤول ثانٍ للنظام');
-await a.click('#acAdmins [data-adr]'); await a.waitForTimeout(300); await a.click('#mo'); await a.waitForTimeout(600);
+ok(D.admins.length === 2 && D.admins.some(x => x.email === 'registrar@example.com' && x.active && x.role === 'staff') && /مسؤول التسجيل/.test(await text('#adList', a)), 'دعوة مسؤول ثانٍ بدور «مسؤول عادي» افتراضيًا');
+await a.click('#adList [data-ai]'); await a.waitForTimeout(300); await a.click('#mo'); await a.waitForTimeout(700);
 D = await data(a);
-ok(D.admins.filter(x => x.active).length === 1 && !(await a.$('#acAdmins [data-adr]')), 'إزالة مسؤول، ولا يُزال الحساب الحالي');
+ok(D.admins.length === 1 && !(await a.$('#adList [data-ai]')) && !(await a.$('#adList [data-aa]')), 'إلغاء الدعوة، ولا يُعطَّل الحساب الحالي ولا المالك');
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
 if (failed()) process.exit(1);

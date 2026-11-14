@@ -1,7 +1,7 @@
 import { sessionReminders, inboxOf, adminRecipients } from './inbox_logic.js';
 import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './policy_logic.js';
 import { catalogPrograms, computeEnd } from './catalog.js';
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config.js';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, adminBase } from './config.js';
 import { DEFAULT_ABOUT, defaultPartners } from './partners.js';
 import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, planName, planOpen, sectionOfGender, SECTIONS, subCheckin, subEnd, subsInSession, subStats, subStatus, sessionOn, sessionsBetween } from './qudurat.js';
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
@@ -11,6 +11,7 @@ import { keepNote } from './import_logic.js';
 import { ACT_TTL_DAYS, newActCode, checkActivation, resolveIdent, deviceShort, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL } from './device_logic.js';
 import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
+import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
@@ -476,10 +477,27 @@ export const LocalStore = {
     (D.activations||[]).forEach(a=>{ if(a.phone===ph && a.role===role && !a.used_at) a.revoked=true; }); this.audit('activation.revoke', ph, {role}); this.save(); return {ok:true}; },
   async accessData(){ const D=this.data; return JSON.parse(JSON.stringify({devices:D.devices||[], activations:(D.activations||[]).map(({code, ...a})=>a), requests:(D.login_requests||[]).filter(r=>reqLive(r)).map(r=>({...r, device:deviceShort(r.device)}))})); },
   /* مسؤولو النظام (تجريبيًا: قائمة للعرض، والدخول بالرمز المشترك) */
-  async listAdmins(){ const D=this.data; D.admins=D.admins||[{id:'demo-admin', email:'admin@demo.local', name:'مدير النظام', active:true, pending:false, self:true}]; return JSON.parse(JSON.stringify(D.admins)); },
-  async addAdmin(email, name){ const D=this.data, e=String(email||'').trim().toLowerCase(); await this.listAdmins(); if(!/^\S+@\S+\.\S+$/.test(e)) throw new Error('اكتب بريدًا صحيحًا'); if(String(name||'').trim().length<3) throw new Error('اكتب اسم المسؤول');
-    if(D.admins.some(a=>a.email===e && a.active)) throw new Error('هذا البريد مسؤول بالفعل'); D.admins.push({id:uid(), email:e, name:String(name).trim(), active:true, pending:true, created_at:new Date().toISOString()}); this.audit('admin.add', e); this.save(); return {ok:true}; },
-  async removeAdmin(id){ const D=this.data; await this.listAdmins(); const act=D.admins.filter(a=>a.active); if(act.length<=1) throw new Error('لا يُحذف آخر مسؤول'); const a=D.admins.find(x=>x.id===id); if(!a) throw new Error('غير موجود'); if(a.id==='demo-admin') throw new Error('لا تحذف حسابك الحالي'); a.active=false; this.audit('admin.remove', a.email); this.save(); return {ok:true}; },
+  async listAdmins(){ const D=this.data; D.admins=D.admins||[{id:'demo-admin', email:'admin@demo.local', name:'مدير النظام', role:'owner', active:true, pending:false, self:true}];
+    D.admins.forEach(a=>{ if(!a.role) a.role=a.id==='demo-admin'?'owner':'staff'; }); return JSON.parse(JSON.stringify(D.admins)); },
+  async adminSignup(){ throw new Error('حسابات المسؤولين تعمل مع قاعدة البيانات فقط؛ ادخل هنا برمز الدخول التجريبي'); },
+  async adminMe(){ if(!this.admin) return null; const a=(await this.listAdmins()).find(x=>x.id==='demo-admin'); return {id:a.id, email:a.email, name:a.name, role:a.role}; },
+  async reauth(pass){ if(pass!==this.data.settings.admin_pin) throw new Error('كلمة المرور غير صحيحة'); this._reauthAt=Date.now(); return true; },
+  _recent(){ return !!this._reauthAt && Date.now()-this._reauthAt < 600000; },
+  async setAdminRole(id, role, reason){ const D=this.data, me=await this.adminMe(); await this.listAdmins(); const a=D.admins.find(x=>x.id===id&&!x.pending); if(!a) throw new Error('الحساب غير موجود');
+    if(me.role!=='owner') throw new Error('تغيير الأدوار للمالك الأساسي وحده'); if(a.id===me.id||a.role==='owner') throw new Error('لا يُغيَّر دور المالك الأساسي');
+    checkRole(me, role, reason, this._recent()); a.role=role; a.role_reason=String(reason).trim(); this.audit('admins.update', a.email, {before:{role:a.role}, after:{role, role_reason:a.role_reason}}); this.save(); return {ok:true}; },
+  async setAdminActive(id, active, reason=''){ const D=this.data, me=await this.adminMe(); await this.listAdmins(); const a=D.admins.find(x=>x.id===id&&!x.pending); if(!a) throw new Error('الحساب غير موجود');
+    if(!['owner','full'].includes(me.role)) throw new Error('إدارة المسؤولين لمدير النظام فقط'); if(a.id===me.id) throw new Error('لا تعطّل حسابك الحالي'); if(a.role==='owner') throw new Error('لا يُعطَّل المالك الأساسي');
+    if(a.role==='full'&&me.role!=='owner') throw new Error('تعطيل مدير النظام الكامل للمالك الأساسي وحده'); a.active=!!active; this.audit('admins.update', a.email, {after:{active:!!active, role_reason:reason}}); this.save(); return {ok:true}; },
+  async adminAudit(f={}){ const me=await this.adminMe(); if(me?.role!=='owner') throw new Error('أرشيف الحركات للمالك الأساسي وحده'); const all=auditFilter(this.data.audit_logs||[], f), lim=f.export?20000:Math.min(500, f.limit||200);
+    const rows=all.slice(f.offset||0, (f.offset||0)+lim); if(f.export){ this.audit('audit.export', '', {rows:rows.length}); this.save(); }
+    return {total:all.length, rows:JSON.parse(JSON.stringify(rows)), actors:(await this.listAdmins()).filter(a=>!a.pending).map(a=>({id:a.id, name:a.name, role:a.role}))}; },
+  async addAdmin(email, name, role='staff'){ const D=this.data, e=String(email||'').trim().toLowerCase(), me=await this.adminMe(); await this.listAdmins();
+    if(!['owner','full'].includes(me?.role)) throw new Error('إدارة المسؤولين لمدير النظام فقط'); checkRole(me, role, null, this._recent());
+    if(!/^\S+@\S+\.\S+$/.test(e)) throw new Error('اكتب بريدًا صحيحًا'); if(String(name||'').trim().length<3) throw new Error('اكتب اسم المسؤول');
+    if(D.admins.some(a=>a.email===e)) throw new Error('هذا البريد له حساب مسؤول؛ فعّله أو عدّل دوره من القائمة'); D.admins.push({id:uid(), email:e, name:String(name).trim(), role, active:true, pending:true, created_by:me.name, created_at:new Date().toISOString()}); this.audit('admin_invites.insert', e, {after:{email:e, role}}); this.save(); return {ok:true, pending:true}; },
+  async removeAdmin(id){ const D=this.data; await this.listAdmins(); const a=D.admins.find(x=>x.id===id); if(!a) throw new Error('غير موجود');
+    if(a.pending){ D.admins.splice(D.admins.indexOf(a),1); this.audit('admin_invites.delete', a.email); this.save(); return {ok:true}; } return this.setAdminActive(id, false, 'إزالة من قائمة المسؤولين'); },
   async portalSession(role){ let ph=null; try{ ph=sessionStorage.getItem(this.key+'_p_'+role);
       if(!ph){ const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); this.load(); if(d && (this.data.devices||[]).some(x=>x.id===d.id && x.phone===d.phone && x.role===role && !x.revoked_at)) ph=d.phone; else if(d) localStorage.removeItem(this.key+'_dev_'+role); } }catch(e){} return ph && rolesOfPhone(this.data, ph).includes(role) ? {phone:ph, role} : null; },
   async portalLogout(role){ try{ sessionStorage.removeItem(this.key+'_p_'+role); const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); localStorage.removeItem(this.key+'_dev_'+role);
@@ -694,7 +712,7 @@ export const LocalStore = {
     rows.forEach(q=>{ if(!same(q)&&!fresh.some(y=>y.subject===q.subject&&y.text.trim()===q.text.trim())) fresh.push(q); }); const skipped=rows.length-fresh.length; rows=fresh;
     rows.forEach(q=>L.push({id:uid(), teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:st, version:1, created_at:at}));
     this.audit('question.import', t.id, String(rows.length)); this.save(); return {count:rows.length, skipped}; },
-  audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'admin', action, entity:String(entity), detail:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
+  audit(action, entity, detail){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'demo-admin', actor_role:'owner', actor_name:'مدير النظام', action, entity:String(entity), detail:detail&&typeof detail==='object'?{before:auditRedact(detail.before), after:auditRedact(detail.after??(detail.before?undefined:detail))}:detail||null}); if(this.data.audit_logs.length>5000) this.data.audit_logs.shift(); },
   async resetDemo(){ this.data = makeDemo(); this.autoArchive(); this.save(); },
   async clearPeople(){ const D=this.data; D.trainees=[]; D.enrollments=[]; D.attendance=[]; D.cohorts=[]; D.certificates=[]; D.subscriptions=[]; D.sub_attendance=[]; D.checkin_attempts=[]; this.save(); }
 };
@@ -714,7 +732,12 @@ export const CloudStore = {
   async register(f){ return this._e(await this.sb.rpc('register_trainee',{p:f})); },
   async checkin(nid, code, programCode, opts={}){ return this._e(await this.sb.rpc('checkin',{p_nid:nid, p_code:code||null, p_program:programCode||null, p_device:opts.device||'', p_choice:opts.choice||null})); },
   async todayCode(){ return this._e(await this.sb.rpc('daily_code')); },
-  async isAdmin(){ const {data:{session}} = await this.sb.auth.getSession(); if(!session) return false; const r=await this.sb.from('admins').select('user_id').eq('user_id',session.user.id); return !!(r.data&&r.data.length); },
+  async isAdmin(){ const {data:{session}} = await this.sb.auth.getSession(); if(!session) return false; return !!(await this.adminMe()); },
+  async adminMe(){ const r=await this.sb.rpc('admin_me'); return r.error?null:(r.data||null); },
+  async reauth(pass){ const {data:{session}}=await this.sb.auth.getSession(); const r=await this.sb.auth.signInWithPassword({email:session?.user?.email||'', password:pass}); if(r.error) throw new Error('كلمة المرور غير صحيحة'); return true; },
+  async setAdminRole(id, role, reason){ return this._e(await this.sb.rpc('admin_set_role',{p_id:id, p_role:role, p_reason:String(reason||'').trim()})); },
+  async setAdminActive(id, active, reason=''){ return this._e(await this.sb.rpc('admin_set_active',{p_id:id, p_active:!!active, p_reason:reason})); },
+  async adminAudit(f={}){ return this._e(await this.sb.rpc('admin_audit',{p:f})); },
   async login(email, pass){ const r=await this.sb.auth.signInWithPassword({email,password:pass}); if(r.error) throw new Error('بيانات الدخول غير صحيحة'); await this.sb.rpc('claim_admin'); if(!(await this.isAdmin())){ await this.sb.auth.signOut(); throw new Error('هذا الحساب ليس مديرًا للنظام'); } return true; },
   async logout(){ await this.sb.auth.signOut(); },
   async adminData(){
@@ -751,7 +774,7 @@ export const CloudStore = {
   async publicSite(){ const d=this._e(await this.sb.rpc('public_site'))||{}; return { about:d.about||DEFAULT_ABOUT, partners:(d.partners||[]).map(p=>({...p, order:p.sort_order})) }; },
   async savePartner(p){ const {id,order,created_at,...row}=p; row.sort_order=order||0; this._e(id ? await this.sb.from('partners').update(row).eq('id',id) : await this.sb.from('partners').insert(row)); },
   async deletePartner(id){ this._e(await this.sb.from('partners').delete().eq('id',id)); },
-  async saveSettings(s){ const {admin_pin,...rest}=s; this._e(await this.sb.from('settings').update(rest).eq('id',1)); },
+  async saveSettings(s){ const {admin_pin,...rest}=s; const d=this._e(await this.sb.from('settings').update(rest).eq('id',1).select('id')); if(!d||!d.length) throw new Error('تعديل الإعدادات لمدير النظام فقط'); },
   /* ---- باقات القدرات والتحصيلي ---- */
   async publicPlans(){ const d=this._e(await this.sb.rpc('public_plans'))||{}; return {plans:d.plans||[], schedule:d.schedule||[]}; },
   async registerSubscription(f){ return this._e(await this.sb.rpc('register_subscription',{p:f})); },
@@ -779,10 +802,10 @@ export const CloudStore = {
   async accessData(){ const [d,a]=await Promise.all([this.sb.from('device_sessions').select('uid,phone,role,label,created_at,revoked_at').order('created_at',{ascending:false}).limit(5000), this.sb.from('activation_codes').select('id,phone,role,expires_at,used_at,revoked,created_at').order('created_at',{ascending:false}).limit(5000)]);
     const q=await this.sb.rpc('admin_login_requests'); return {devices:this._e(d).map(x=>({...x, id:x.uid})), activations:this._e(a), requests:this._e(q)||[]}; },
   async listAdmins(){ return this._e(await this.sb.rpc('admin_list')); },
-  async addAdmin(email, name){ return this._e(await this.sb.rpc('admin_add',{p_email:String(email||'').trim().toLowerCase(), p_name:String(name||'').trim()})); },
+  async addAdmin(email, name, role='staff'){ return this._e(await this.sb.rpc('admin_add',{p_email:String(email||'').trim().toLowerCase(), p_name:String(name||'').trim(), p_role:role})); },
   async removeAdmin(id){ return this._e(await this.sb.rpc('admin_remove',{p_id:id})); },
   /* إنشاء حساب مسؤول مدعوّ: يسجّل ببريده وكلمة مرور يختارها، ثم يُمنح الصلاحية إن كان بريده في قائمة المدعوين */
-  async adminSignup(email, pass){ const r=await this.sb.auth.signUp({email, password:pass}); if(r.error) throw new Error(r.error.message.includes('registered')?'هذا البريد له حساب؛ ادخل بكلمة مرورك':'تعذّر إنشاء الحساب: '+r.error.message);
+  async adminSignup(email, pass){ const r=await this.sb.auth.signUp({email, password:pass, options:{emailRedirectTo:adminBase()+'#admin'}}); if(r.error) throw new Error(r.error.message.includes('registered')?'هذا البريد له حساب؛ ادخل بكلمة مرورك':'تعذّر إنشاء الحساب: '+r.error.message);
     if(!r.data.session) return {confirm:true}; const c=await this.sb.rpc('claim_admin'); if(c.error||!c.data) { await this.sb.auth.signOut(); throw new Error('هذا البريد غير مدعوّ كمسؤول. اطلب من مدير النظام إضافتك.'); } return {ok:true}; },
   async portalLogout(){ try{ await this.sb.rpc('device_logout'); }catch(e){} await this.sb.auth.signOut(); },
   async portalData(role){ return this._e(await this.sb.rpc('portal_data',{p_role:role})); },

@@ -41,7 +41,7 @@ begin
   perform set_config('app.phone', '', true);
   begin perform admin_approve_keys('كمي'); ok := false; exception when others then ok := true; end;
   assert ok, 'اعتماد المفاتيح للمسؤول فقط';
-  insert into auth.users(id, email) values (v_admin, 'keys-admin@test'); insert into admins(user_id) values (v_admin);
+  insert into auth.users(id, email) values (v_admin, 'keys-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   r := admin_approve_keys('كمي');
   assert (r->>'count')::int >= 3 and (select key_status from questions where code = 'KT-01') = 'approved' and (select key_approved_by from questions where code = 'KT-01') = v_admin, 'اعتماد مفاتيح المقرر';

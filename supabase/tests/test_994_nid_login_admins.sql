@@ -24,7 +24,7 @@ begin
   assert ok, 'طلبات الدخول للمسؤول فقط';
   -- تعدد المسؤولين
   insert into auth.users(id, email, email_confirmed_at) values (a1, 'first-admin@test.local', now()), (a2, 'second-admin@test.local', now());
-  insert into admins(user_id, email, name) values (a1, 'first-admin@test.local', 'المسؤول الأول');
+  insert into admins(user_id, email, name, role) values (a1, 'first-admin@test.local', 'المسؤول الأول', 'full');
   perform set_config('app.uid', a2::text, true);
   assert claim_admin() = false and not is_admin(), 'غير المدعوّ لا ينال الصلاحية';
   begin perform admin_add('x@test.local', 'اسم'); ok := false; exception when others then ok := true; end;
@@ -37,11 +37,14 @@ begin
   perform set_config('app.uid', a2::text, true);
   assert is_admin(), 'صاحب الحساب القائم يصير مسؤولًا فورًا';
   begin perform admin_remove(a2::text); ok := false; exception when others then ok := true; end;
-  assert ok, 'المسؤول لا يحذف نفسه';
-  perform admin_remove(a1::text);
-  assert not exists (select 1 from admins where user_id = a1), 'مسؤول يزيل مسؤولًا آخر';
-  begin perform admin_remove(a1::text); perform admin_remove('00000000-0000-0000-0000-000000000000'); ok := (select count(*) from admins where user_id = a2) = 1; exception when others then ok := true; end;
-  assert ok, 'يبقى مسؤول واحد على الأقل';
+  assert ok, 'المسؤول لا يزيل نفسه';
+  begin perform admin_remove(a1::text); ok := false; exception when others then ok := true; end;
+  assert ok, 'المسؤول العادي لا يزيل غيره';
+  perform set_config('app.uid', a1::text, true);
+  perform admin_remove(a2::text);
+  assert exists (select 1 from admins where user_id = a2 and not active), 'الإزالة تعطيل لا حذف';
+  perform set_config('app.uid', a2::text, true);
+  assert not is_admin() and claim_admin() = false, 'المعطَّل لا يعود مسؤولًا';
   perform set_config('app.uid', '', true);
   delete from admins where user_id in (a1, a2); delete from admin_invites where email = 'third-admin@test.local'; delete from auth.users where id in (a1, a2);
 end $$;
