@@ -8,10 +8,10 @@ export const AP_TXT = { pending_review:'بانتظار المراجعة', needs_
 export const AP_TONE = { pending_review:'warn', needs_information:'info', approved:'ok', rejected:'bad' };
 export const PAY_TXT = { unpaid:'غير مسدد', claimed:'تحويل قيد المطابقة', confirmed:'تم تأكيد السداد' };
 export const PAY_TONE = { unpaid:'g', claimed:'warn', confirmed:'ok' };
-export const EV_TXT = { created:'إنشاء الطلب', transfer_reported:'إبلاغ بتحويل', approved:'موافقة', needs_information:'طلب استكمال معلومات', rejected:'رفض', payment_confirmed:'تأكيد السداد', payment_unconfirmed:'إلغاء تأكيد السداد', payment_added:'تسجيل دفعة', imported:'استيراد من سجل سابق', edited:'تعديل الرسوم', provisional_on:'قبول مؤقت', provisional_off:'إلغاء القبول المؤقت' };
+export const EV_TXT = { created:'إنشاء الطلب', transfer_reported:'إبلاغ بتحويل', approved:'موافقة', needs_information:'طلب استكمال معلومات', rejected:'رفض', payment_confirmed:'تأكيد السداد', payment_unconfirmed:'إلغاء تأكيد السداد', payment_added:'تسجيل دفعة', imported:'استيراد من سجل سابق', edited:'تعديل الرسوم', provisional_on:'قبول مؤقت', provisional_off:'إلغاء القبول المؤقت', plan_changed:'تغيير الباقة', cancelled:'إلغاء وانسحاب', refunded:'استرداد', refund_voided:'إلغاء إشعار استرداد' };
 /* بيانات الحساب البنكي المقدمة من المالك (القسم 7)؛ لا تُعرض للعملاء حتى يفعّلها المسؤول */
 export const PAY_METHODS = { transfer:'تحويل بنكي', pos:'شبكة', cash:'نقدًا', other:'أخرى' };
-export const orderRemaining = o => Math.max(0, Math.round(((+o.total || 0) - (+o.paid_amount || 0)) * 100) / 100);
+export const orderRemaining = o => o.cancelled_at ? 0 : Math.max(0, Math.round(((+o.total || 0) - (+o.paid_amount || 0)) * 100) / 100);
 export const BANK_DEFAULT = { enabled:false, bank:'البنك الأهلي', beneficiary:'مركز سما القدرات', iban:'SA1210000001400012583008', account:'01400012583008' };
 export const orderNumber = (seq, year) => `SAMA-${year}-${String(seq).padStart(6, '0')}`;
 /* الطلب مستوفٍ: موافقة المسؤول + سداد مؤكد للمطلوب الآن، أو قبول مؤقت من الإدارة */
@@ -25,7 +25,7 @@ export const validIban = v => { const s = String(v || '').replace(/\s/g, '').toU
 export const waTransferText = (o, name, amount) => `السلام عليكم، بخصوص طلب الشراء رقم ${o.number}.\nالاسم: ${name}\nالبرنامج/الخدمة: ${o.title}\nالمبلغ المحول: ${amount ?? o.due_now} ريال.\nأرغب في متابعة مطابقة التحويل واعتماد الطلب، وسأرفق إثبات السداد.`;
 /* ما يراه صاحب الطلب: بلا هوية المراجع */
 export const orderPublic = (o, bank) => ({ id:o.id, number:o.number, title:o.title, kind:o.kind, total:o.total, due_now:o.due_now, approval:o.approval, payment:o.payment, provisional:!!o.provisional,
-  note:o.note || '', paid_amount:o.paid_amount || 0, discount_note:o.discount_note || '', claim:o.claim ? { amount:o.claim.amount, reference:o.claim.reference, date:o.claim.date } : null, created_at:o.created_at, trainee_id:o.trainee_id,
+  note:o.note || '', paid_amount:o.paid_amount || 0, discount_note:o.discount_note || '', claim:o.claim ? { amount:o.claim.amount, reference:o.claim.reference, date:o.claim.date } : null, created_at:o.created_at, trainee_id:o.trainee_id, cancelled:!!o.cancelled_at, refunded:+o.refunded || 0,
   bank: bank?.enabled ? { bank:bank.bank, beneficiary:bank.beneficiary, iban:bank.iban, account:bank.account } : null });
 export function checkTransfer(f, today){
   const amount = Math.round(+f.amount * 100) / 100;

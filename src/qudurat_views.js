@@ -11,6 +11,7 @@ import { initMarquee } from './marquee.js';
 import { regFormHtml, bindRegForm, titleBar, kpiCard } from './views2_main.js';
 import { siteFooter } from './landing.js';
 import { modal, closeModal, confirmBox } from './views2_programs.js';
+import { receiveModal } from './billing_views.js';
 import { AD, reloadAD } from './views2_admin.js';
 import { setBusy, toLatin } from './features.js';
 import { shrinkImage } from './partners.js';
@@ -311,7 +312,7 @@ function subModal(s){
   $('#smF').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#smE').textContent = '';
     if(!s){ if(!validSaudiId(f.national_id)) return $('#smE').textContent = 'رقم السجل المدني غير صحيح.'; if(f.full_name.trim().split(/\s+/).length < 3) return $('#smE').textContent = 'اكتب الاسم الثلاثي على الأقل.'; }
     const b = $('#smS'); setBusy(b, true, 'جارٍ الحفظ');
-    try { await Store.saveSubscription({ ...f, id:s?.id, trainee_id:s?.trainee_id, start_date:f.start_date || null }); await reloadAD(); closeModal(); toast(s ? 'حُفظ الاشتراك' : 'أُضيف المشترك'); pageQudurat(); }
+    try { const r = await Store.saveSubscription({ ...f, id:s?.id, trainee_id:s?.trainee_id, start_date:f.start_date || null }); await reloadAD(); closeModal(); toast(s ? 'حُفظ الاشتراك' : 'أُضيف المشترك'); pageQudurat(); if(!s && r?.order_id) receiveModal(r.order_id, () => pageQudurat()); }
     catch(x){ setBusy(b, false); $('#smE').textContent = x.message; } };
 }
 

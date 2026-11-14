@@ -7,11 +7,12 @@ import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
 import { modal, closeModal } from './views2_programs.js';
 import { AD, reloadAD } from './views2_admin.js';
-import { setBusy, toLatin } from './features.js';
+import { setBusy } from './features.js';
 import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, EV_TXT, PAY_METHODS, orderReady, orderRemaining } from './order_logic.js';
 import { sar, pills } from './order_panel.js';
 import { waTo } from './absence_notify.js';
 import { CENTER } from './catalog.js';
+import { payHtml, bindPay, opsHtml, bindOps, isFull } from './billing_views.js';
 
 /* ---------- الإدارة: طلبات الشراء ---------- */
 let oF = { st:'open', q:'' };
@@ -29,7 +30,7 @@ export function pageOrders(){
         return `<tr><td class="num" dir="ltr"><b>${esc(o.number)}</b></td><td>${fmtShort(o.created_at.slice(0, 10))}</td><td>${esc(t?.full_name || '—')}<div class="hint num" dir="ltr">${esc(t?.phone || '')}</div></td><td style="max-width:240px">${esc(o.title)}</td>
           <td class="num">${o.due_now > 0 ? fmtNum(o.due_now) : '—'}${o.total > o.due_now ? `<div class="hint">من ${fmtNum(o.total)}</div>` : ''}</td>
           <td class="num">${fmtNum(orderRemaining(o))}</td>
-          <td><span class="pill dot ${AP_TONE[o.approval]}">${AP_TXT[o.approval]}</span>${o.provisional ? '<div class="hint">قبول مؤقت</div>' : ''}</td>
+          <td><span class="pill dot ${AP_TONE[o.approval]}">${AP_TXT[o.approval]}</span>${o.provisional ? '<div class="hint">قبول مؤقت</div>' : ''}${o.cancelled_at ? '<div><span class="pill bad">ملغى</span></div>' : ''}</td>
           <td><span class="pill dot ${PAY_TONE[o.payment]}">${PAY_TXT[o.payment]}</span>${o.claim && o.payment !== 'confirmed' ? `<div class="hint num">${fmtNum(o.claim.amount)} · ${fmtShort(o.claim.date)}</div>` : ''}</td>
           <td><button class="btn sm pri" data-oo="${o.id}">فتح</button></td></tr>`; }).join('')}</tbody></table></div></div>` : emptyBox(all.length ? 'لا طلبات بهذه التصفية' : 'لا توجد طلبات بعد', all.length ? '' : 'يُنشأ طلب برقم فريد مع كل تسجيل جديد في برنامج أو باقة.')}
     <div class="grid g2" style="margin-top:18px;align-items:start">
@@ -59,8 +60,7 @@ function remindHtml(o, t){
 }
 function orderModal(o){
   const t = (AD.trainees || []).find(x => x.id === o.trainee_id), dup = (AD.orders || []).filter(x => x.trainee_id === o.trainee_id && x.id !== o.id && x.approval !== 'rejected').length;
-  const methOpts = Object.entries(PAY_METHODS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
-  modal(`<h3>طلب <span dir="ltr">${esc(o.number)}</span></h3><div class="ord-st" style="margin:-4px 0 10px">${pills(o)}</div>
+  modal(`<h3>طلب <span dir="ltr">${esc(o.number)}</span></h3><div class="ord-st" style="margin:-4px 0 10px">${pills(o)}${o.cancelled_at ? ' <span class="pill bad">ملغى</span>' : ''}</div>
     <dl class="ord-dl"><dt>المتدرب</dt><dd>${esc(t?.full_name || '—')} · <span dir="ltr" class="num">${esc(t?.phone || '')}</span>${t?.guardian_phone ? ` · ولي الأمر <span dir="ltr" class="num">${esc(t.guardian_phone)}</span>` : ''}</dd>
       <dt>البند</dt><dd>${esc(o.title)}</dd><dt>المطلوب الآن</dt><dd>${o.due_now > 0 ? sar(o.due_now) : 'غير محدد السعر'}${o.total > o.due_now ? ` من إجمالي ${sar(o.total)}` : ''}</dd>
       <dt>التحويل المُبلَّغ</dt><dd>${o.claim ? `${sar(o.claim.amount)} بتاريخ ${fmtShort(o.claim.date)}${o.claim.reference ? ` · مرجع <span dir="ltr">${esc(o.claim.reference)}</span>` : ''}` : 'لم يُبلَّغ بتحويل'}</dd>
@@ -72,22 +72,19 @@ function orderModal(o){
     <h4 class="ord-sec">1. مراجعة الطلب</h4>
     <div class="field"><label for="om-r">السبب أو المطلوب استكماله (إلزامي عند الرفض أو طلب الاستكمال)</label><input class="inp" id="om-r" maxlength="300" value="${esc(o.note || '')}"></div>
     <div class="ord-acts"><button class="btn pri sm" data-od="approved">${ic('check')} موافقة</button><button class="btn sm" data-od="needs_information">طلب استكمال معلومات</button><button class="btn sm danger soft" data-od="rejected">رفض مع السبب</button></div>
-    <h4 class="ord-sec">2. تأكيد السداد (بعد مطابقة كشف البنك)</h4>
-    ${o.payment === 'confirmed' ? `${orderRemaining(o) > 0 ? `<div class="ord-acts"><div class="field" style="flex:1;min-width:110px;margin:0"><label for="om-a2">دفعة جديدة (ريال)</label><input class="inp num" id="om-a2" inputmode="decimal"></div>
-        <div class="field" style="min-width:120px;margin:0"><label for="om-m2">طريقة السداد</label><select class="inp" id="om-m2">${methOpts}</select></div><div class="field" style="flex:1;min-width:110px;margin:0"><label for="om-f2">مرجع العملية (اختياري)</label><input class="inp num" id="om-f2" dir="ltr" maxlength="60"></div>
-        <button class="btn pri sm" id="om-add">${ic('plus')} تسجيل الدفعة وإصدار فاتورتها</button></div>` : ''}
-      <div class="ord-acts"><span class="pill ok">${ic('check')} مؤكَّد ${sar(o.paid_amount)}</span><button class="btn sm" id="om-un">إلغاء التأكيد (بسبب في الخانة أعلاه)</button><a class="btn sm" href="#admin-invoices">الفواتير</a></div>`
-      : `<div class="ord-acts"><div class="field" style="flex:1;min-width:140px;margin:0"><label for="om-a">المبلغ الواصل فعليًا (ريال)</label><input class="inp num" id="om-a" inputmode="decimal" value="${o.claim?.amount ?? ''}"></div><div class="field" style="min-width:130px;margin:0"><label for="om-m">طريقة السداد</label><select class="inp" id="om-m">${methOpts}</select></div><button class="btn pri sm" id="om-pay">${ic('wallet')} تأكيد وصول المبلغ</button></div>`}
+    <h4 class="ord-sec">2. استلام المبلغ وتأكيد السداد</h4>
+    ${payHtml(o)}
+    ${o.payment === 'confirmed' && isFull() ? `<div class="ord-acts"><span class="pill ok">${ic('check')} المدفوع ${sar(o.paid_amount)}</span>${o.refunded ? `<span class="pill bad">المسترد ${sar(o.refunded)}</span>` : ''}<button class="btn sm" id="om-un">إلغاء تأكيد السداد (بسبب في الخانة أعلاه)</button><a class="btn sm" href="#admin-invoices">الفواتير</a></div>` : ''}
     <h4 class="ord-sec">3. قبول مؤقت</h4>
     <div class="ord-acts"><span class="hint" style="flex:1;min-width:200px">يسمح بالحضور قبل اكتمال السداد أو المراجعة (لمن وعد بالسداد). يحتاج سببًا في الخانة أعلاه.</span><button class="btn sm" id="om-prov">${o.provisional ? 'إلغاء القبول المؤقت' : 'منح قبول مؤقت'}</button></div>
+    ${opsHtml(o)}
     <div class="errtxt" id="omE" role="alert"></div>
     <details class="ord-log"><summary>سجل الطلب (${fmtNum((o.events || []).length)})</summary><ol>${(o.events || []).map(e => `<li><b>${EV_TXT[e.action] || e.action}</b> · ${e.by === 'admin' || (e.by && e.by !== 'trainee') ? 'الإدارة' : 'صاحب الطلب'} · <span class="num">${fmtShort(String(e.at).slice(0, 10))}</span>${e.reason ? ` — ${esc(e.reason)}` : ''}</li>`).join('')}</ol></details>
     <div style="text-align:end;margin-top:12px"><button class="btn" id="om-x">إغلاق</button></div>`);
-  const E = x => { $('#omE').textContent = x; }, run = async (btn, fn, msg) => { E(''); setBusy(btn, true, 'جارٍ الحفظ'); try { await fn(); await reloadAD(); closeModal(); toast(msg); pageOrders(); } catch(x){ setBusy(btn, false); E(x.message); } };
+  const E = x => { $('#omE').textContent = x; }, run = async (btn, fn, msg, reopen) => { E(''); setBusy(btn, true, 'جارٍ الحفظ'); try { await fn(); await reloadAD(); closeModal(); toast(msg); pageOrders(); if(reopen) orderModal((AD.orders || []).find(x => x.id === o.id)); } catch(x){ setBusy(btn, false); E(x.message); } };
   $('#om-x').onclick = closeModal;
   $$('[data-od]').forEach(b => b.onclick = () => run(b, () => Store.reviewOrder(o.id, b.dataset.od, $('#om-r').value, o.version), { approved:'وُوفق على الطلب', needs_information:'طُلب استكمال المعلومات', rejected:'رُفض الطلب' }[b.dataset.od]));
-  if($('#om-pay')) $('#om-pay').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, toLatin($('#om-a').value), true, '', $('#om-m').value), 'تأكد السداد وصدرت الفاتورة');
   if($('#om-un')) $('#om-un').onclick = e => run(e.currentTarget, () => Store.confirmOrderPayment(o.id, 0, false, $('#om-r').value), 'أُلغي تأكيد السداد وأُلغيت فاتورته');
-  if($('#om-add')) $('#om-add').onclick = e => run(e.currentTarget, () => Store.addOrderPayment(o.id, { amount:toLatin($('#om-a2').value), method:$('#om-m2').value, reference:$('#om-f2').value }), 'سُجّلت الدفعة وصدرت فاتورتها');
+  bindPay(o, run); bindOps(o, run);
   $('#om-prov').onclick = e => run(e.currentTarget, () => Store.setOrderProvisional(o.id, !o.provisional, $('#om-r').value), o.provisional ? 'أُلغي القبول المؤقت' : 'مُنح قبول مؤقت');
 }

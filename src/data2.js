@@ -7,10 +7,11 @@ import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, pl
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
+import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
 import { ACT_TTL_DAYS, newActCode, checkActivation, resolveIdent, deviceShort, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL } from './device_logic.js';
 import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
-import { PAY_METHODS, BANK_DEFAULT, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
+import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf } from './learning_logic.js';
@@ -459,7 +460,11 @@ export const LocalStore = {
       this.audit('subscription.update', s.id); this.save(); return s; }
     if(D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`${t.full_name} مشترك مسبقًا في ${planName(plan)}`);
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:f.section||sectionOfGender(t.gender), subjects:f.subjects||[...(plan.subjects||[])], status:start?'active':'pending', start_date:start, end_date:start?subEnd(plan,start):null, start_manual:!!start, created_at:new Date().toISOString()};
-    D.subscriptions.push(s); this.audit('subscription.create', s.id); this.save(); return s;
+    D.subscriptions.push(s); this.audit('subscription.create', s.id);
+    /* المشترك الذي تضيفه الإدارة يُنشأ له طلب موافق عليه، فيُستلم مبلغه مباشرة («استلام المبلغ») ↔ admin_save_subscription */
+    let oid=null; if(!(D.orders||[]).some(o=>o.subscription_id===s.id)){ const op=this._newOrder({trainee_id:t.id, kind:'plan', subscription_id:s.id, title:'باقة '+planName(plan), total:planTotal(plan), due_now:+plan.reg_fee||0}), o=D.orders.find(x=>x.id===op.id);
+      o.approval='approved'; this._orderEvent(o,'approved','admin','إضافة من الإدارة'); oid=o.id; }
+    this.save(); return {...s, order_id:oid};
   },
   async cancelSubscription(id, on=true){ const s=this.data.subscriptions.find(x=>x.id===id); if(s){ s.status = on ? 'cancelled' : (s.start_date?'active':'pending'); this.audit(on?'subscription.cancel':'subscription.restore', id); this.save(); } },
   async setSubAttendance(subscription_id, date, status){ const D=this.data, s=D.subscriptions.find(x=>x.id===subscription_id); if(!s) return;
@@ -598,7 +603,7 @@ export const LocalStore = {
       o.paid_amount=Math.round((prior+a)*100)/100; o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
       const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date, prior, method:PAY_METHODS[method]}), created_at:new Date().toISOString()}; D.invoices.push(inv);
       this._orderEvent(o,'payment_confirmed','admin',`${a} ريال · فاتورة ${inv.number}`); }
-    else { const base=+(o.opening?.paid)||0; if(o.payment!=='confirmed' || !D.invoices.some(i=>i.order_id===o.id && i.status==='issued')) throw new Error('لا دفعات مؤكدة داخل النظام لإلغائها'); if(String(reason||'').trim().length<3) throw new Error('اكتب سبب إلغاء تأكيد السداد');
+    else { if(D.invoices.some(i=>i.order_id===o.id&&i.doc_type==='refund'&&i.status==='issued')) throw new Error('للطلب إشعار استرداد ساري؛ ألغِه أولًا قبل إلغاء تأكيد السداد'); const base=+(o.opening?.paid)||0; if(o.payment!=='confirmed' || !D.invoices.some(i=>i.order_id===o.id && i.status==='issued')) throw new Error('لا دفعات مؤكدة داخل النظام لإلغائها'); if(String(reason||'').trim().length<3) throw new Error('اكتب سبب إلغاء تأكيد السداد');
       D.invoices.filter(i=>i.order_id===o.id && i.status==='issued').forEach(i=>{ i.status='void'; i.void_reason=String(reason).trim().slice(0,300); i.voided_at=new Date().toISOString(); });
       o.payment=base>0?'confirmed':o.claim?'claimed':'unpaid'; o.paid_amount=base; this._orderEvent(o,'payment_unconfirmed','admin',reason); }
     this.audit('order.payment', o.id, {confirmed}); this.save(); return {ok:true}; },
@@ -612,6 +617,50 @@ export const LocalStore = {
     o.paid_amount=Math.round((prior+a)*100)/100; D.invoice_seq=(D.invoice_seq||0)+1;
     const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date, prior, method:PAY_METHODS[f.method], transfer_date:date, transfer_ref:String(f.reference||'').trim().slice(0,60)}), created_at:new Date().toISOString()}; D.invoices.push(inv);
     this._orderEvent(o,'payment_added','admin',`${a} ريال · ${PAY_METHODS[f.method]} · فاتورة ${inv.number}`); this.audit('order.payment_added', o.id); this.save(); return {ok:true, invoice:inv.number}; },
+  /* ---- عمليات الفوترة (الخطوة AH) ↔ …_billing_ops.sql ---- */
+  async _role(min){ const me=await this.adminMe(); if(min==='owner' ? me?.role!=='owner' : !['owner','full'].includes(me?.role)) throw new Error(min==='owner'?'هذه العملية يعتمدها المالك وحده':'تأكيد السداد لمدير النظام فقط'); },
+  /* استلام مبلغ بطريقة أو أكثر: فاتورة واحدة تُفصَّل فيها الطرق؛ أول استلام يؤكد السداد ↔ admin_receive_payment */
+  async receivePayment(id, f){ await this._role('full'); const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
+    if(o.approval==='rejected') throw new Error('الطلب مرفوض'); if(o.cancelled_at) throw new Error('الطلب ملغى');
+    const {lines, sum}=checkLines(f.lines), today=riyadhNow().date, date=f.date||(o.payment!=='confirmed'&&o.claim?.date)||today, prior=+o.paid_amount||0, first=o.payment!=='confirmed';
+    if(date>today) throw new Error('تاريخ السداد في المستقبل');
+    if(first && sum<o.due_now) throw new Error(`المبلغ أقل من المطلوب الآن (${o.due_now} ريال)؛ لا يُعد السداد مستوفيًا`);
+    if(o.total>0 && sum>r2(o.total-prior)) throw new Error(`المبلغ أكبر من المتبقي (${Math.max(0,r2(o.total-prior))} ريال)`);
+    o.paid_amount=r2(prior+sum); o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
+    const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:sum, seq:D.invoice_seq, date:today, prior, method:linesMethod(lines), transfer_date:date, transfer_ref:linesRef(lines)||(first?o.claim?.reference||'':''), lines}), created_at:new Date().toISOString()}; D.invoices.push(inv);
+    this._orderEvent(o, first?'payment_confirmed':'payment_added', 'admin', `${sum} ريال · ${linesText(lines)} · فاتورة ${inv.number}`); this.audit('order.receive', o.id); this.save(); return {ok:true, invoice:inv.number, id:inv.id}; },
+  /* ترقية أو تخفيض الباقة: يبقى تاريخ البداية (قرار المالك) وتُحسب النهاية للباقة الجديدة ↔ admin_change_plan */
+  async changePlan(id, f){ await this._role('owner'); const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود');
+    if(o.kind!=='plan'||!o.subscription_id) throw new Error('تغيير الباقة لطلبات الباقات فقط'); if(o.cancelled_at) throw new Error('الطلب ملغى'); if(o.approval==='rejected') throw new Error('الطلب مرفوض');
+    const s=D.subscriptions.find(x=>x.id===o.subscription_id), pl=D.plans.find(p=>p.id===f.plan_id), old=D.plans.find(p=>p.id===s?.plan_id);
+    if(!s||s.status==='cancelled') throw new Error('الاشتراك ملغى'); if(!pl||pl.active===false) throw new Error('اختر الباقة'); if(pl.mode==='remote'||pl.status==='coming_soon') throw new Error('هذه الباقة غير متاحة بعد');
+    if(pl.id===s.plan_id) throw new Error('هذه باقته الحالية'); if(String(f.reason||'').trim().length<3) throw new Error('اكتب سبب تغيير الباقة');
+    if(D.subscriptions.some(x=>x.id!==s.id && x.trainee_id===s.trainee_id && x.plan_id===pl.id && ['pending','active'].includes(subStatus(x)))) throw new Error('للمتدرب اشتراك قائم في هذه الباقة');
+    const total=f.total===''||f.total==null ? planTotal(pl) : r2(f.total); if(!(total>=0)) throw new Error('اكتب الإجمالي الجديد');
+    s.plan_id=pl.id; s.subjects=[...(pl.subjects||[])]; s.end_date=s.start_date?subEnd(pl,s.start_date):null; s.status=!s.start_date?'pending':(s.end_date<riyadhNow().date?'ended':'active');
+    o.title='باقة '+planName(pl); o.total=total; o.due_now=Math.min(o.due_now,total); const sur=Math.max(0,r2(o.paid_amount-total));
+    this._orderEvent(o,'plan_changed','admin',`من باقة ${planName(old)} إلى باقة ${planName(pl)} · الإجمالي ${total} ريال${sur?` · فائض ${sur} ريال`:''} · ${String(f.reason).trim()}`); this.audit('order.plan_change', o.id); this.save(); return {ok:true, surplus:sur}; },
+  /* إلغاء وانسحاب: يلغي الاشتراك أو التسجيل ويبقي الطلب وسجله؛ الاسترداد قرار مستقل ↔ admin_cancel_order */
+  async cancelOrder(id, reason){ await this._role('owner'); const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود');
+    if(o.cancelled_at) throw new Error('الطلب ملغى مسبقًا'); if(String(reason||'').trim().length<3) throw new Error('اكتب سبب الإلغاء');
+    o.cancelled_at=new Date().toISOString(); o.cancel_reason=String(reason).trim().slice(0,300); o.provisional=false;
+    if(o.subscription_id){ const s=D.subscriptions.find(x=>x.id===o.subscription_id); if(s) s.status='cancelled'; }
+    D.enrollments.filter(e=>(o.enrollment_ids||[]).includes(e.id)).forEach(e=>{ e.status='ملغى'; });
+    this._orderEvent(o,'cancelled','admin',reason); this.audit('order.cancel', o.id); this.save(); return {ok:true, refundable:refundable(o)}; },
+  /* الاسترداد بأمر المالك: إشعار استرداد بطرق الرد، مرتبط بآخر فاتورة للطلب ↔ admin_refund */
+  async refundOrder(id, f){ await this._role('owner'); const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
+    const max=refundable(o); if(!(max>0)) throw new Error('لا مبلغ قابل للاسترداد: يكون بعد إلغاء الطلب أو عند فائض بعد تخفيض الباقة');
+    const {lines, sum}=checkLines(f.lines); if(sum>max) throw new Error(`المبلغ أكبر من القابل للاسترداد (${max} ريال)`); if(String(f.reason||'').trim().length<3) throw new Error('اكتب سبب الاسترداد');
+    const today=riyadhNow().date, last=D.invoices.filter(i=>i.order_id===o.id&&i.status==='issued'&&i.doc_type!=='refund').sort((a,b)=>b.number.localeCompare(a.number))[0];
+    D.refund_seq=(D.refund_seq||0)+1; const prior=+o.paid_amount||0; o.paid_amount=r2(prior-sum); o.refunded=r2((+o.refunded||0)+sum);
+    const doc={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:sum, seq:0, date:today, prior:0, method:linesMethod(lines), transfer_date:today, transfer_ref:linesRef(lines), lines}),
+      number:refundNumber(D.refund_seq, today.slice(0,4)), remaining:orderRemaining(o), doc_type:'refund', ref_invoice:last?.number||'', reason:String(f.reason).trim().slice(0,300), created_at:new Date().toISOString()}; D.invoices.push(doc);
+    this._orderEvent(o,'refunded','admin',`${sum} ريال · ${linesText(lines)} · ${doc.number} · ${doc.reason}`); this.audit('order.refund', o.id); this.save(); return {ok:true, number:doc.number, id:doc.id}; },
+  /* إلغاء إشعار استرداد صدر خطأً: يعيد المبلغ إلى المدفوع ↔ admin_void_refund */
+  async voidRefund(id, reason){ await this._role('owner'); const D=this.data, i=(D.invoices||[]).find(x=>x.id===id); if(!i||i.doc_type!=='refund') throw new Error('الإشعار غير موجود'); if(i.status!=='issued') throw new Error('الإشعار ملغى مسبقًا');
+    if(String(reason||'').trim().length<3) throw new Error('اكتب سبب الإلغاء'); const o=D.orders.find(x=>x.id===i.order_id);
+    i.status='void'; i.void_reason=String(reason).trim().slice(0,300); i.voided_at=new Date().toISOString(); o.paid_amount=r2(o.paid_amount+i.paid); o.refunded=r2(o.refunded-i.paid);
+    this._orderEvent(o,'refund_voided','admin',`${i.number} · ${reason}`); this.audit('order.refund_void', o.id); this.save(); return {ok:true}; },
   /* تصحيح رسوم الطلب وسبب الخصم (مراجعة البيانات) */
   async saveOrderMeta(id, f){ const o=(this.data.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); const total=Math.round(+f.total*100)/100;
     if(!(total>0)) throw new Error('اكتب إجمالي الرسوم'); if(total<(+o.paid_amount||0)) throw new Error('الإجمالي أقل من المدفوع');
@@ -811,7 +860,7 @@ export const CloudStore = {
     const att=this._e(a).map(x=>({...x, time:new Date(x.checkin_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour12:false})}));
     return {programs:this._e(p), packages:this._e(k), trainees:this._e(t), cohorts:this._e(c), enrollments:this._e(e), attendance:att, settings:this._e(s), certificates:this._e(ce), partners:this._e(pt).map(x=>({...x, order:x.sort_order})),
       plans:this._e(pl), schedule_templates:this._e(tp).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})), schedule_exceptions:this._e(ex).map(x=>({...x, start:hm(x.start_time), end:hm(x.end_time)})),
-      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs), orders:this._e(ord).map(o=>({...o, events:this._e(oev).filter(e=>e.order_id===o.id)})), invoices:this._e(inv).map(i=>({...i, total:+i.total, paid:+i.paid, remaining:+i.remaining})), program_requests:this._e(prq)};
+      subscriptions:this._e(su), sub_attendance:this._e(sa).map(tm), checkin_attempts:this._e(at).map(x=>({...x, trainee_hint:x.trainee_hint})), custom_requests:this._e(cr), audit_logs:[], teachers:this._e(te), guardian_links:this._e(gl), notifications:this._e(nt), assignments:[], submissions:[], daily_reports:this._e(dr), policies:this._e(po), policy_acceptances:this._e(pa), profile_change_requests:this._e(pcr), questions:this._e(qs), orders:this._e(ord).map(o=>({...o, events:this._e(oev).filter(e=>e.order_id===o.id)})), invoices:this._e(inv).map(i=>({...i, total:+i.total, paid:+i.paid, remaining:+i.remaining, lines:(i.lines||[]).map(x=>({...x, amount:+x.amount}))})), program_requests:this._e(prq)};
   },
   _strip(o, keys){ const r={...o}; keys.forEach(k=>delete r[k]); return r; },
   async saveProgram(p){ const row=this._strip(p,['id','created_at','cohort']); if(!row.code) row.code = p.accreditation_no ? 'p'+p.accreditation_no : 'px'+Math.random().toString(36).slice(2,8); this._e(p.id ? await this.sb.from('programs').update(row).eq('id',p.id) : await this.sb.from('programs').insert(row)); },
@@ -909,6 +958,11 @@ export const CloudStore = {
   async reviewOrder(id, decision, reason, expected_version){ return this._e(await this.sb.rpc('admin_review_order',{p_id:id, p_decision:decision, p_reason:reason||'', p_version:expected_version??null})); },
   async confirmOrderPayment(id, amount, confirmed=true, reason='', method='transfer'){ return this._e(await this.sb.rpc('admin_confirm_payment',{p_id:id, p_amount:+amount||0, p_confirmed:confirmed, p_reason:reason||'', p_method:method})); },
   async addOrderPayment(id, f){ return this._e(await this.sb.rpc('admin_add_payment',{p_id:id, p:f})); },
+  async receivePayment(id, f){ return this._e(await this.sb.rpc('admin_receive_payment',{p_id:id, p:f})); },
+  async changePlan(id, f){ return this._e(await this.sb.rpc('admin_change_plan',{p_id:id, p:f})); },
+  async cancelOrder(id, reason){ return this._e(await this.sb.rpc('admin_cancel_order',{p_id:id, p_reason:String(reason||'')})); },
+  async refundOrder(id, f){ return this._e(await this.sb.rpc('admin_refund',{p_id:id, p:f})); },
+  async voidRefund(id, reason){ return this._e(await this.sb.rpc('admin_void_refund',{p_id:id, p_reason:String(reason||'')})); },
   async saveOrderMeta(id, f){ return this._e(await this.sb.rpc('admin_save_order_meta',{p_id:id, p:f})); },
   async saveTrainee(id, f){ return this._e(await this.sb.rpc('admin_save_trainee',{p_id:id, p:f})); },
   async resolveImportNote(id, idx, done=true){ return this._e(await this.sb.rpc('admin_resolve_import_note',{p_id:id, p_idx:idx, p_done:done})); },

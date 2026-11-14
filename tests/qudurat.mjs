@@ -79,6 +79,8 @@ await p.fill('#sm-nid', nid2); await p.fill('#sm-name', 'نورة علي محم�
 await p.selectOption('#sm-plan', { label: 'الذهبية' }); await p.fill('#sm-start', past); await p.click('#smS'); await p.waitForTimeout(800);
 const s2 = await S(n => { const D = window.__SAMA__.LocalStore.data; const t = D.trainees.find(x => x.national_id === n); return D.subscriptions.find(s => s.trainee_id === t?.id); }, nid2);
 ok(s2 && s2.section === 'girls' && s2.start_date === past && s2.start_manual && s2.status === 'active', 'إضافة طالبة حالية بتاريخ بداية يدوي وقسم البنات');
+ok(/استلام المبلغ/.test(await text('.modal')) && await S(id => window.__SAMA__.LocalStore.data.orders.some(o => o.subscription_id === id && o.approval === 'approved'), s2.id), 'المشترك المضاف له طلب موافق عليه، وتفتح نافذة استلام المبلغ');
+await p.click('#rm-later'); await p.waitForTimeout(300);
 
 // الاستيراد من Excel: صف سليم وصف خاطئ
 const nid3 = await S(() => window.__SAMA__.makeSaudiId('1'));

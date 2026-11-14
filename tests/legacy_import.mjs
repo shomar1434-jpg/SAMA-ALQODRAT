@@ -58,11 +58,11 @@ ok(!/تاريخ الميلاد غير مسجّل/.test(await text('#dBody')), '�
 
 // طرق السداد والدفعة الإضافية
 await p.goto(U + 'admin/#admin-orders'); await p.reload(); await p.waitForSelector('#of-st'); await p.selectOption('#of-st', 'all'); await p.fill('#of-q', o1.number); await p.waitForTimeout(600);
-await p.click(`[data-oo="${o1.id}"]`); await p.waitForSelector('#om-add');
+await p.click(`[data-oo="${o1.id}"]`); await p.waitForSelector('#om-recv');
 ok(/مرحَّلة من قبل النظام/.test(await text('.modal')) && /رسوم التسجيل 690 \(شبكة\)|رسوم التسجيل ٦٩٠ \(شبكة\)/.test(await text('.modal')), 'الطلب يعرض الرصيد المرحَّل ودفعاته السابقة بطرقها');
-await p.fill('#om-a2', '900'); await p.click('#om-add'); await p.waitForTimeout(300);
+await p.fill('#opl-a0', '900'); await p.click('#om-recv'); await p.waitForTimeout(300);
 ok(/أكبر من المتبقي/.test(await text('#omE')), 'دفعة أكبر من المتبقي تُرفض');
-await p.fill('#om-a2', '250'); await p.selectOption('#om-m2', 'cash'); await p.click('#om-add'); await p.waitForTimeout(700);
+await p.fill('#opl-a0', '250'); await p.selectOption('#opl-m0', 'cash'); await p.click('#om-recv'); await p.waitForTimeout(700);
 D = await data(); const inv = D.invoices[0];
 ok(D.orders.find(o => o.id === o1.id).paid_amount === 1190 && inv && inv.method === 'نقدًا' && inv.paid === 250 && inv.remaining === 500, 'الدفعة الإضافية تصدر فاتورتها بطريقة السداد المختارة والمتبقي بعدها');
 ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'لا تمرير أفقي');

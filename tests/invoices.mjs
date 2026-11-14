@@ -21,7 +21,7 @@ await p.fill('.ord-f [name=reference]', 'TRX-4411'); await p.click('.ord-f butto
 let D = await data(); const o = D.orders.find(x => x.claim?.reference === 'TRX-4411');
 ok(o && !(D.invoices || []).length, 'لا فاتورة قبل تأكيد السداد');
 
-await admin('admin-orders'); await p.click(`[data-oo="${o.id}"]`); await p.waitForSelector('#om-a'); await p.click('#om-pay'); await p.waitForTimeout(700);
+await admin('admin-orders'); await p.click(`[data-oo="${o.id}"]`); await p.waitForSelector('#opl-a0'); await p.click('#om-recv'); await p.waitForTimeout(700);
 D = await data(); let inv = D.invoices[0];
 ok(D.invoices.length === 1 && /^INV-\d{4}-\d{6}$/.test(inv.number) && inv.order_number === o.number, 'تصدر فاتورة برقم تسلسلي عند تأكيد السداد');
 ok(inv.customer_name === 'راشد سعد علي المالكي' && inv.kind === 'plan' && inv.service === o.title && inv.purchase_date === o.created_at.slice(0, 10), 'اسم صاحب الخدمة ونوع الخدمة وتاريخ شرائها');
@@ -29,7 +29,7 @@ ok(inv.total === o.total && inv.paid === o.due_now && inv.remaining === o.total 
 
 await admin('admin-invoices');
 const main = await text('#main');
-ok(main.includes(inv.number) && /راشد سعد/.test(main) && /TRX-4411/.test(main) && /إجمالي المحصَّل/.test(main), 'صفحة الفواتير تعرض الفاتورة والإجماليات');
+ok(main.includes(inv.number) && /راشد سعد/.test(main) && /TRX-4411/.test(main) && /المحصَّل/.test(main), 'صفحة الفواتير تعرض الفاتورة والإجماليات');
 await p.fill('#if-q', 'لا يوجد'); await p.waitForTimeout(600);
 ok(!(await text('#main')).includes(inv.number), 'البحث يصفّي القائمة');
 await p.fill('#if-q', 'TRX-4411'); await p.waitForTimeout(600);
