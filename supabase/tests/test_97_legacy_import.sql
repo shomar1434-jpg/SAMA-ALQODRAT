@@ -11,7 +11,7 @@ begin
     jsonb_build_object('full_name','صف مرفوض','national_id','1999999982','phone','0557770083','plan_id',pl.id,'start_date',d,'errors',jsonb_build_array('رقم الجوال غير صحيح')));
   begin perform admin_import_legacy(rows); ok := false; exception when others then ok := true; end;
   assert ok, 'الاستيراد للمسؤول فقط';
-  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'import-admin@test'); insert into admins(user_id) values (v_admin);
+  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'import-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   r := admin_import_legacy(rows);
   assert (r->>'added')::int = 1 and jsonb_array_length(r->'skipped') = 1, 'يُستورد الجاهز ويُترك المرفوض';

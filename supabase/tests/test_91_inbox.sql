@@ -37,7 +37,7 @@ begin
   perform set_config('app.phone', '', true); perform set_config('app.uid', '', true);
   begin perform admin_notify(jsonb_build_object('audience','student','text','رسالة تجريبية')); ok := false; exception when others then ok := sqlerrm like '%غير مصرح%'; end;
   assert ok, 'رسالة الإدارة للإدارة فقط';
-  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'inbox-admin@test'); insert into admins(user_id) values (v_admin);
+  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'inbox-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   r := admin_notify(jsonb_build_object('audience','student','scope','section','section','boys','text','تذكير بالاختبار الأسبوع القادم'));
   assert (r->>'count')::int >= 1 and exists (select 1 from notifications where kind = 'admin' and trainee_id = v_t), 'رسالة لقسم البنين';

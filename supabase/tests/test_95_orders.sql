@@ -30,7 +30,7 @@ begin
   begin perform admin_confirm_payment(o.id, 690); ok := false; exception when others then ok := true; end;
   assert ok, 'تأكيد السداد للمسؤول فقط';
 
-  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'orders-admin@test'); insert into admins(user_id) values (v_admin);
+  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'orders-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   begin perform admin_review_order(o.id, 'rejected', ''); ok := false; exception when others then ok := true; end;
   assert ok, 'الرفض يحتاج سببًا';

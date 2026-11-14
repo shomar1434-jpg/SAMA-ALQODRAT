@@ -1,4 +1,6 @@
 import { LOGO } from './assets/logo.js';
+import { pageAdmins, pageAudit } from './admins_views.js';
+import { canSeePage, ADMIN_ROLES } from './admin_logic.js';
 import { CATEGORIES, catPill, computeEnd } from './catalog.js';
 import { PROFILE_FIELDS, STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, enrollsOf, isSessionDay, progCode, sessionDays, takenOf } from './data2.js';
 import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules, setBusy } from './features.js';
@@ -24,15 +26,16 @@ import { pageAccess } from './access_views.js';
    5) لوحة الإدارة
    ===================================================================== */
 export let AD=null; export function setAD(v){ AD=v; }
+export let ME=null; export function setMe(v){ ME=v; }
 export const flt={ from:null, to:null, prog:'all', cat:'all' };
 export const progOf = id => AD.programs.find(p=>p.id===id);
 export const progName = id => progOf(id)?.name || '—';
 export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p.category).filter(Boolean)])].sort(catSort);
 export async function viewAdmin(r){
   const app=$('#app');
-  const pages=[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-orders','wallet','طلبات الشراء'],['admin-invoices','form','الفواتير'],['admin-data','search','مراجعة البيانات'],['admin-access','lock','تفعيل الأجهزة'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-notify','alert','الإشعارات والرسائل'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-settings','settings','الإعدادات']];
+  const me=await Store.adminMe(); setMe(me); const pages=([['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-rules','pie','آلية الاحتساب'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-users','users','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-orders','wallet','طلبات الشراء'],['admin-invoices','form','الفواتير'],['admin-data','search','مراجعة البيانات'],['admin-access','lock','تفعيل الأجهزة'],['admin-daily','form','تقرير اليوم'],['admin-policies','lock','مركز السياسات'],['admin-notify','alert','الإشعارات والرسائل'],['admin-programs','book','البرامج والباقات'],['admin-trainees','id','المتدربون'],['admin-reports','form','التقارير والطباعة'],['admin-partners','award','النبذة والشركاء'],['admin-admins','lock','إدارة المسؤولين'],['admin-audit','form','أرشيف الحركات'],['admin-settings','settings','الإعدادات']]).filter(([h])=>canSeePage(me?.role, h));
   app.innerHTML = `<div class="admin"><aside class="side">
-      <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة</span></b></div>
+      <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة${me?.role?` · ${ADMIN_ROLES[me.role]}`:''}</span></b></div>
       <div class="sec">الصفحات</div>
       ${pages.map(([h,i,t])=>`<a href="#${h}" class="${r===h?'on':''}">${ic(i)}${t}</a>`).join('')}
       <div class="sec">أدوات</div>
@@ -41,11 +44,12 @@ export async function viewAdmin(r){
       <a href="#" id="logout">${ic('logout')}خروج</a>
     </aside><section class="main" id="main">${skeleton()}</section></div>`;
   $('#logout').onclick=async e=>{ e.preventDefault(); await Store.logout(); location.hash='#register'; };
+  if(!canSeePage(me?.role, r)){ $('#main').innerHTML=emptyBox('هذه الصفحة لمدير النظام', 'دورك الحالي: '+(ADMIN_ROLES[me?.role]||'')+'. اطلب من مدير النظام إن احتجت إليها.'); return; }
   try{ AD = await Store.adminData(); }catch(e){ $('#main').innerHTML=emptyBox('تعذّر تحميل البيانات', esc(e.message)); return; }
   if(!flt.to){ flt.to=riyadhNow().date; flt.from=addDays(flt.to,-29); }
   const fu=$('.side a[href="#admin-followup"]'); if(fu){ const n=followupRows().filter(x=>x.level==='bad').length; if(n) fu.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} حالة حرجة">${fmtNum(n)}</span>`); }
   { const oa=$('.side a[href="#admin-orders"]'), n=openOrdersCount(AD); if(oa && n) oa.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} طلبًا يحتاج إجراء">${fmtNum(n)}</span>`); }
-  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin-notify':pageNotify, 'admin-bank':pageBank, 'admin-orders':pageOrders, 'admin-invoices':pageInvoices, 'admin-data':pageData, 'admin-access':pageAccess, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings })[r]();
+  ({ 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin-notify':pageNotify, 'admin-bank':pageBank, 'admin-orders':pageOrders, 'admin-invoices':pageInvoices, 'admin-data':pageData, 'admin-access':pageAccess, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings, 'admin-admins':pageAdmins, 'admin-audit':pageAudit })[r]();
 }
 export async function reloadAD(){ AD = await Store.adminData(); }
 

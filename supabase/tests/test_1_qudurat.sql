@@ -49,7 +49,7 @@ begin
   -- 5) دوال الإدارة تتطلب مسؤولًا
   begin perform admin_save_subscription('{}'::jsonb); ok := false; exception when others then ok := sqlerrm like '%غير مصرح%'; end;
   assert ok, 'الإدارة ممنوعة لغير المسؤول';
-  insert into auth.users(id, email) values (v_admin, 'admin@test'); insert into admins(user_id) values (v_admin);
+  insert into auth.users(id, email) values (v_admin, 'admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   r := admin_save_subscription(jsonb_build_object('birth_date','1995-01-01','national_id', v_nid2, 'full_name', 'نورة علي محمد الحازمي', 'gender', 'أنثى',
        'plan_id', (select id from plans where tier = 'gold' and mode = 'in_person'), 'start_date', d - 20));

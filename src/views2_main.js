@@ -49,7 +49,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 export async function route(){
@@ -80,6 +80,7 @@ export async function route(){
   if(r==='checkin') return viewGeneralCheckin();
   if(r==='portals') return viewPortals();
   if(r==='policies') return viewPolicies();
+  if(r==='admin-join'){ if(await Store.isAdmin()){ location.replace('#admin'); return; } return viewLogin('join'); }
   if(!(await Store.isAdmin())) return viewLogin(r);
   if(r==='display') return viewDisplay();
   return viewAdmin(r);
@@ -474,21 +475,22 @@ export async function viewDisplay(){
 /* =====================================================================
    4) دخول المدير
    ===================================================================== */
-export function viewLogin(){
-  const cloud = Store.mode==='cloud';
+export function viewLogin(mode){
+  const cloud = Store.mode==='cloud', join = cloud && mode==='join';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
-    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>دخول مدير النظام</h2><div class="hint">الدفعات والحضور والتحليلات وإدارة البرامج</div></div></div>
-    <form id="lf" class="grid pad">
-      ${cloud?`<div class="field"><label>البريد الإلكتروني</label><input class="inp" name="u" type="email" dir="ltr" required></div>`:''}
-      <div class="field"><label>${cloud?'كلمة المرور':'رمز الدخول'}</label><input class="inp" name="p" type="password" ${cloud?'':'inputmode="numeric"'} required></div>
-      <div class="errtxt" id="lErr"></div>
-      <button class="btn pri">${ic('lock')} دخول</button>
-      ${cloud?`<button type="button" class="btn" id="lfNew">إنشاء حساب مسؤول مدعوّ</button><p class="hint" style="margin:0">للمسؤول الجديد الذي أضافه مدير النظام ببريده: اكتب بريدك وكلمة مرور تختارها (8 أحرف على الأقل) ثم اضغط «إنشاء حساب».</p>`:''}
+    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${join?'تفعيل حساب مسؤول مدعوّ':'دخول مدير النظام'}</h2><div class="hint">${join?'لمن وصله رابط دعوة من مدير النظام':'الدفعات والحضور والتحليلات وإدارة البرامج'}</div></div></div>
+    <form id="lf" class="grid pad" novalidate>
+      ${join?`<p class="hint" style="margin:0">اكتب البريد الذي دعاك به مدير النظام، واختر كلمة مرور من 8 أحرف على الأقل. تصلك رسالة تأكيد على بريدك؛ افتح الرابط فيها ثم ادخل من صفحة الدخول. البريد غير المدعوّ لا يحصل على أي صلاحية.</p>`:''}
+      ${cloud?`<div class="field"><label for="lf-u">البريد الإلكتروني</label><input class="inp" id="lf-u" name="u" type="email" dir="ltr" autocomplete="username" required></div>`:''}
+      <div class="field"><label for="lf-p">${cloud?(join?'كلمة مرور جديدة':'كلمة المرور'):'رمز الدخول'}</label><input class="inp" id="lf-p" name="p" type="password" ${cloud?`autocomplete="${join?'new-password':'current-password'}"`:'inputmode="numeric"'} required></div>
+      <div class="errtxt" id="lErr" role="alert"></div>
+      <button class="btn pri" id="lfGo">${ic('lock')} ${join?'تفعيل الحساب':'دخول'}</button>
+      ${join?`<a class="btn" href="#admin">العودة إلى الدخول</a>`:''}
       ${cloud?'':`<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>البيانات تجريبية. رمز الدخول الافتراضي <b>1234</b>، وتغيّره من الإعدادات.</span></div>`}
     </form></div></div>`;
-  $('#lf').onsubmit = async e=>{ e.preventDefault(); const F=Object.fromEntries(new FormData(e.target)), b=$('#lf button');
+  $('#lf').onsubmit = async e=>{ e.preventDefault(); const F=Object.fromEntries(new FormData(e.target)), b=$('#lfGo'); $('#lErr').textContent='';
+    if(join){ const u=String(F.u||'').trim().toLowerCase();
+      if(!/^\S+@\S+\.\S+$/.test(u) || String(F.p||'').length<8){ $('#lErr').textContent='اكتب بريدك وكلمة مرور من 8 أحرف على الأقل'; return; }
+      setBusy(b,true,'جارٍ التفعيل'); try{ const r=await Store.adminSignup(u, F.p); setBusy(b,false); if(r.confirm){ $('#lErr').textContent='أُرسلت رسالة تأكيد إلى بريدك. افتح الرابط فيها ثم ادخل من صفحة الدخول ببريدك وكلمة مرورك.'; return; } location.replace('#admin'); route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } return; }
     setBusy(b,true,'جارٍ الدخول'); try{ await Store.login(F.u, F.p); route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } };
-  if($('#lfNew')) $('#lfNew').onclick = async e=>{ const f=$('#lf'), b=e.currentTarget; $('#lErr').textContent='';
-    if(!/^\S+@\S+\.\S+$/.test(f.u.value) || f.p.value.length<8){ $('#lErr').textContent='اكتب بريدك وكلمة مرور من 8 أحرف على الأقل'; return; }
-    setBusy(b,true,'جارٍ الإنشاء'); try{ const r=await Store.adminSignup(f.u.value.trim().toLowerCase(), f.p.value); if(r.confirm){ setBusy(b,false); $('#lErr').textContent='أُرسلت رسالة تأكيد إلى بريدك. افتح الرابط فيها ثم ادخل هنا ببريدك وكلمة مرورك.'; return; } route(); }catch(x){ setBusy(b,false); $('#lErr').textContent=x.message; } };
 }

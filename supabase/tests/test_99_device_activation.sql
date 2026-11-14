@@ -6,7 +6,7 @@ begin
   select phone into ph from trainees t where exists (select 1 from subscriptions s where s.trainee_id = t.id) and phone ~ '^05[0-9]{8}$' and not exists (select 1 from trainees x where x.phone = t.phone and x.id <> t.id) limit 1;
   begin perform admin_issue_activation(ph, 'student'); ok := false; exception when others then ok := true; end;
   assert ok, 'الإصدار للمسؤول فقط';
-  insert into auth.users(id, email) values (v_admin, 'act-admin@test'); insert into admins(user_id) values (v_admin);
+  insert into auth.users(id, email) values (v_admin, 'act-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   begin perform admin_issue_activation('0599999990', 'student'); ok := false; exception when others then ok := true; end;
   assert ok, 'رقم بلا حساب لا يُصدر له رمز';

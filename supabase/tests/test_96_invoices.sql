@@ -9,7 +9,7 @@ begin
   r := register_subscription(p || jsonb_build_object('plan_id', pl.id));
   select * into o from orders where number = r->'order'->>'number';
   perform order_report_transfer(jsonb_build_object('number', o.number, 'national_id', '1999999971', 'amount', pl.reg_fee, 'date', d, 'reference', 'TRX-900'));
-  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'inv-admin@test'); insert into admins(user_id) values (v_admin);
+  v_admin := gen_random_uuid(); insert into auth.users(id, email) values (v_admin, 'inv-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
   assert (select count(*) from invoices where order_id = o.id) = 0, 'لا فاتورة قبل تأكيد السداد';
   r := admin_confirm_payment(o.id, pl.reg_fee);
