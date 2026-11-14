@@ -45,6 +45,7 @@ for (const [name, w, h, touch] of SIZES) {
   await p.goto(U + 'admin/'); await p.waitForSelector('[name=p]'); await check('دخول الإدارة');
   await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForSelector('#main');
   for (const r of ['admin', 'admin-attendance', 'admin-cohorts', 'admin-qudurat', 'admin-users', 'admin-bank', 'admin-orders', 'admin-invoices', 'admin-data', 'admin-access', 'admin-notify', 'admin-trainees', 'admin-settings', 'admin-admins', 'admin-audit']) { await p.goto(U + 'admin/#' + r); await p.waitForSelector('#main'); await check('الإدارة/' + r); }
+  for (const g of ['admin', 'trainer', 'trainee']) { await p.goto(U + 'guide/' + g + '.html'); await p.waitForSelector('main'); await check('دليل الاستخدام/' + g); }
   ok(!bad.length && !errs.length, `${engine} · ${name} (${w}×${h})` + (bad.length ? '\n   - ' + bad.slice(0, 14).join('\n   - ') : '') + (errs.length ? '\n   أخطاء: ' + errs.slice(0, 3).join(' | ') : ''));
   await ctx.close();
 }

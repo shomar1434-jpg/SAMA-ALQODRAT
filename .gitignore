@@ -7,3 +7,5 @@ Thumbs.db
 supabase/.temp/
 dist/
 !.env.example
+.guide/
+guide-shots/
