@@ -2,6 +2,7 @@
 import { chromium } from 'playwright';
 import { serveDist, reporter } from './_server.mjs';
 import { traineeStatement } from '../src/statement_logic.js';
+import { dataIssues } from '../src/import_logic.js';
 const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 
@@ -16,6 +17,18 @@ const SD = { orders: [{ id: 'o1', trainee_id: 't', number: 'SAMA-2026-000001', t
 const St = traineeStatement(SD, 't');
 ok(St.orders === 2 && St.charges === 1890 && St.paid === 1490 && St.refunded === 100 && St.balance === 500, 'الإجماليات: الرسوم والمدفوع والمسترد والرصيد (بلا المرفوض والملغاة)');
 ok(St.rows.map(r => r.balance).join(',') === '1690,1190,500,700,400,500', 'الرصيد المتحرك بالتسلسل الزمني');
+
+// الخطوة AO: ترقية محتملة لم تُسجَّل (المدفوع أكثر من سعر الباقة المسجّلة، أو ملاحظة تحويل في الكشف)
+const PL = [{ id: 'b', tier: 'basic', mode: 'in_person', reg_fee: 690, installments: 0, installment_amount: 0 }, { id: 's', tier: 'silver', mode: 'in_person', reg_fee: 690, installments: 2, installment_amount: 250 }];
+const DI = { plans: PL, trainees: [{ id: 't1', full_name: 'اسيل مصعب علي', phone: '0551234567', national_id: '1', import_notes: [] }, { id: 't2', full_name: 'فراس يحيى عبده', phone: '0551234568', national_id: '2', import_notes: [{ text: 'تحويل بين الباقات: الأساسية حول للباقة الفضية', done: false }] }, { id: 't3', full_name: 'سعد علي محمد', phone: '0551234569', national_id: '3', import_notes: [] }],
+  subscriptions: [{ id: 'x1', plan_id: 'b', status: 'ended' }, { id: 'x2', plan_id: 's', status: 'active' }, { id: 'x3', plan_id: 'b', status: 'ended' }],
+  orders: [{ id: 'o1', number: 'SAMA-1', trainee_id: 't1', subscription_id: 'x1', total: 1190, paid_amount: 1190, approval: 'approved' }, { id: 'o2', number: 'SAMA-2', trainee_id: 't2', subscription_id: 'x2', total: 1190, paid_amount: 940, approval: 'approved' }, { id: 'o3', number: 'SAMA-3', trainee_id: 't3', subscription_id: 'x3', total: 690, paid_amount: 690, approval: 'approved' }] };
+const up = Object.fromEntries(dataIssues(DI).map(x => [x.trainee.id, x.issues.filter(i => i.upgrade).map(i => i.text)]));
+ok(up.t1?.length === 1 && /ترقية محتملة/.test(up.t1[0]) && /الفضية 1190/.test(up.t1[0]), 'المدفوع يطابق سعر باقة أعلى: ترقية محتملة لم تُسجَّل');
+ok(up.t2?.length === 1 && /تحويل بين الباقات/.test(up.t2[0]), 'ملاحظة تحويل في الكشف تُصنَّف ترقية');
+ok(!up.t3?.length, 'لا تنبيه لمن دفع سعر باقته');
+DI.orders[2].paid_amount = 700; DI.orders[2].total = 700;
+ok(!dataIssues(DI).find(x => x.trainee.id === 't3')?.issues.some(i => i.upgrade), 'زيادة سداد صغيرة (10 ريالات) لا تُعد ترقية');
 
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
