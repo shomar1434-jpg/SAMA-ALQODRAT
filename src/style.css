@@ -1376,3 +1376,19 @@ body.sim-on{overflow:hidden}
 .an-tr{font-size:11px;margin-inline-start:4px}.an-tr.up{color:var(--success)}.an-tr.dn{color:var(--danger)}
 .an-foot{margin:12px 0 0;font-size:12px}
 .an-in-modal{margin-top:14px}.an-in-modal .an-card{margin:0;box-shadow:none}
+
+/* ---------- الخطوة AS: تقرير الأسبوع ---------- */
+.wk-card{margin-bottom:16px;border-top:3px solid var(--brand)}
+.wk-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 12px;margin-bottom:10px}
+.wk-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.wk-nav .btn{min-width:44px;justify-content:center}
+.wk-sum{background:var(--brand-tint);border-radius:12px;padding:10px 14px;margin-bottom:12px}.wk-sum p{margin:2px 0;line-height:1.9}
+.wk-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:6px}
+.wk-kpis > div{border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:grid;gap:2px}
+.wk-kpis span{font-size:13px;opacity:.8}.wk-kpis b{font-size:22px}.wk-kpis small{font-size:12px;opacity:.75}
+.wk h4{font-size:15px;margin:14px 0 6px}
+.wk-days{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.wk-days li{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:6px 10px;border-radius:10px;background:var(--surface-sunken)}
+.wk-days li .pill{margin-inline-start:auto}
+.wk-sk{display:grid;gap:8px}.wk-sk > div{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wk-tips{margin:0;padding-inline-start:20px;line-height:1.9}
+.wk-print .wk-sum{background:#eef7f5}.wk-print .wk-days li{background:#f5f7f7;break-inside:avoid}.wk-print .wk-kpis{display:none}

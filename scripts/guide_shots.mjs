@@ -61,6 +61,9 @@ await step('statement', async () => { await admin('admin-trainees'); await p.fil
   const tid = await S(() => window.__SAMA__.LocalStore.data.trainees.find(t => t.full_name === 'ماجد سعيد علي العتيبي')?.id);
   await p.click(`[data-tst="${tid}"]`); await p.waitForSelector('.modal'); await shot('a36_statement'); await closeM();
   await p.click(`[data-ted="${tid}"]`); await p.waitForSelector('#fxF'); await shot('a37_edit_trainee'); await closeM(); });
+await step('weekly', async () => { await admin('admin-trainees'); await p.fill('#tq', 'ماجد سعيد'); await W(800);
+  const tid = await S(() => window.__SAMA__.LocalStore.data.trainees.find(t => t.full_name === 'ماجد سعيد علي العتيبي')?.id);
+  await p.click(`[data-twr="${tid}"]`); await p.waitForSelector('.modal .wk'); await shot('a38_weekly'); await closeM(); });
 const pages = [['admin-attendance', 'a18_attendance'], ['admin-cohorts', 'a19_cohorts'], ['admin-followup', 'a20_followup'], ['admin-rules', 'a21_rules'], ['admin-users', 'a22_users'], ['admin-bank', 'a23_bank'], ['admin-data', 'a24_data'], ['admin-access', 'a25_access'], ['admin-daily', 'a26_daily'], ['admin-policies', 'a27_policies'], ['admin-notify', 'a28_notify'], ['admin-programs', 'a29_programs'], ['admin-trainees', 'a30_trainees'], ['admin-reports', 'a31_reports'], ['admin-partners', 'a32_partners'], ['admin-admins', 'a33_admins'], ['admin-audit', 'a34_audit'], ['admin-settings', 'a35_settings']];
 for (const [r, n] of pages) await step(r, async () => { await admin(r); await shot(n, { wait: 900 }); });
 await step('access issue', async () => { await admin('admin-access'); });
@@ -100,7 +103,21 @@ await mshot('s00_welcome', 900); try { await m.click('#wlGo'); await mshot('s00_
 await mshot('s02_dash'); await m.evaluate(() => scrollTo(0, 800)); await mshot('s03_dash_more');
 await mtab('data-st', 'hw'); await mshot('s04_hw');
 try { const q = await m.$('[data-qs]'); if (q) { await q.click(); await mshot('s05_quiz_start'); await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); } } catch {}
+// محاولات تدريب سابقة ليظهر التحليل
+await m.evaluate(sx => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')), s = D.subscriptions.find(x => x.trainee_id === sx.id);
+  const snap = q => ({ id:q.id, text:q.text, options:q.options, correct:q.correct, explanation:q.explanation || '', subject:q.subject, unit:q.unit, category:q.category || '' });
+  ['كمي', 'لفظي', 'كمي'].forEach((sub, i) => { const qs = D.questions.filter(q => q.section === s.section && q.subject === sub && q.status === 'published'), ans = {};
+    qs.forEach((q, j) => { ans[q.id] = (q.category === 'الجبر' || (sub === 'لفظي' && j % 3 === 0)) ? (q.correct + 1) % 4 : q.correct; });
+    const t = new Date(Date.now() - (4 - i) * 86400000).toISOString();
+    D.attempts.push({ id:'g-at' + i, kind:'practice', trainee_id:sx.id, section:s.section, subject:sub, unit:null, started_at:t, submitted_at:t, minutes:10, snapshot:qs.map(snap), answers:ans, score:qs.filter(q => ans[q.id] === q.correct).length, total:qs.length }); });
+  localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); }, Sx);
+await m.reload(); await m.waitForTimeout(1200); await m.evaluate(() => { const r = document.querySelector('.wl'); if (r) document.querySelector('#wlSkip')?.click(); });
 await mtab('data-st', 'level'); await mshot('s06_level');
+try { await m.click('#simGo'); await m.click('#smGo'); await m.waitForTimeout(900);
+  for (let i = 0; i < 3; i++) { await m.click(`.sim-opt >> nth=${i % 4}`); await m.click('#simNext'); await m.waitForTimeout(200); }
+  await m.click('.sim-opt >> nth=1'); await m.click('#simFlag'); await mshot('s06b_sim');
+  await m.click('#simMapB'); await m.click('#simEnd2'); await m.click('#seGo'); await m.waitForTimeout(1200); await mshot('s06c_sim_result');
+  await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); } catch (e) { console.log('SIMFAIL', e.message.split('\n')[0]); }
 await mtab('data-st', 'msg'); await mshot('s07_msg');
 await mtab('data-st', 'rate'); await mshot('s08_rate');
 await m.goto(U + '#checkin'); await m.waitForTimeout(1200); await mshot('s09_checkin');

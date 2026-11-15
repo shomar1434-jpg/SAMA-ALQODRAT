@@ -14,6 +14,7 @@ import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
+import { weeklyNotes } from './weekly_logic.js';
 import { catOk, simOpen, simExpired, simsToday, SIM_DAILY_MAX, sortSubjects, buildSim, cleanAnswers, CATEGORIES } from './sim_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, backfillCategories, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf, snapOf, liveSubsOf } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
@@ -562,7 +563,7 @@ export const LocalStore = {
   async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; if(out) out.q_meta=qMetaOf(this.data, out); return out; },
   /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
   runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
-    const add=sessionReminders(D, riyadhNow()).filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },
+    const n=riyadhNow(), add=[...sessionReminders(D, n), ...weeklyNotes(D, n).map(x=>({id:uid(), at:new Date().toISOString(), read_at:null, ...x}))].filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },
   async inboxState(role){ const s=await this.portalSession(role); if(!s) return {items:[], unread:0}; this.load(); this.runReminders(); const sc=scopeData(this.data, role, s.phone); return sc ? inboxOf(sc, role) : {items:[], unread:0}; },
   async adminNotify(f){ const D=this.data, text=String(f.text||'').trim(); if(text.length<3) throw new Error('اكتب نص الرسالة'); if(text.length>600) throw new Error('الرسالة أطول من 600 حرف');
     if(!['student','guardian','teacher'].includes(f.audience)) throw new Error('اختر الفئة المستهدفة');
@@ -811,6 +812,11 @@ export const LocalStore = {
     const L=(this.data.questions=this.data.questions||[]), row={teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft', category:catGuard(q.subject, q.category)};
     if(q.id){ const x=L.find(y=>y.id===q.id); if(!x) throw new Error('السؤال غير موجود'); Object.assign(x,row,{version:(x.version||1)+1}); } else L.push({id:uid(), version:1, created_at:new Date().toISOString(), ...row});
     this.audit('question.save', q.id||'new', t.id); this.save(); return {ok:true}; },
+  /* بيانات التعلم لمتدرب واحد (↔ admin_trainee_learning): للتقرير الأسبوعي في الإدارة */
+  async traineeLearning(id){ const D=this.data, subs=(D.subscriptions||[]).filter(s=>s.trainee_id===id);
+    const out={ attempts:(D.attempts||[]).filter(a=>a.trainee_id===id&&a.submitted_at), submissions:(D.submissions||[]).filter(x=>x.trainee_id===id),
+      assignments:(D.assignments||[]).filter(a=>subs.some(s=>s.section===a.section&&(s.subjects||[]).includes(a.subject))) };
+    return JSON.parse(JSON.stringify({ ...out, q_meta:qMetaOf(D, out) })); },
   /* تصنيف مهارة قياس لأسئلة مختارة (↔ admin_set_category) */
   async setQuestionCategory(ids, category){ const L=this.data.questions||[], c=category||''; const qs=L.filter(q=>(ids||[]).includes(q.id)&&q.status!=='deleted');
     if(!qs.length) throw new Error('اختر سؤالًا واحدًا على الأقل'); if(qs.some(q=>!catOk(q.subject, c))) throw new Error('التصنيف لا يناسب مقرر السؤال');
@@ -981,6 +987,7 @@ export const CloudStore = {
   async startSim(p){ return this._e(await this.sb.rpc('student_start_sim',{p})); },
   async saveAttemptAnswers({attempt_id, answers}){ return this._e(await this.sb.rpc('student_save_attempt',{p_id:attempt_id, p_answers:answers||{}})); },
   async setQuestionCategory(ids, category){ return this._e(await this.sb.rpc('admin_set_category',{p_ids:ids, p_category:category||''})); },
+  async traineeLearning(id){ return this._e(await this.sb.rpc('admin_trainee_learning',{p_trainee:id})); },
   async rateTeacher(p){ return this._e(await this.sb.rpc('student_rate',{p})); },
   async sendMessage(p, role){ return this._e(await this.sb.rpc('send_message',{p, p_role:role})); },
   async markThreadRead({trainee_id, teacher_id}, role){ await this.sb.rpc('mark_thread_read',{p_trainee:trainee_id, p_teacher:teacher_id, p_role:role}); },
