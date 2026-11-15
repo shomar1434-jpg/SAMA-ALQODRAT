@@ -5,6 +5,7 @@
    ===================================================================== */
 import { riyadhNow, uid } from './utils.js';
 import { subStatus } from './qudurat.js';
+import { gradeAny } from './sim_logic.js';
 
 export const SUBJECTS = ['كمي', 'لفظي', 'تحصيلي'];
 export const SUB_TXT = { draft:'مسودة', submitted:'مُرسل', needs_revision:'يحتاج تعديلًا', graded:'مصحح' };
@@ -105,15 +106,15 @@ export function validateQuestion(q){
   if(!(q.correct >= 0 && q.correct < 4)) throw new Error('حدد الإجابة الصحيحة');
 }
 /* يبني محاولة من أسئلة منشورة في نطاق المتدرب، ويحفظ نسخة الأسئلة كما هي وقت المحاولة */
-export function buildAttempt(D, trainee_id, section, subject, unit, count, teacher_id = null){
-  const pool = bankFor(D, section, subject, unit, true, teacher_id).slice();
-  if(!pool.length) throw new Error('لا توجد أسئلة منشورة في هذه الوحدة بعد');
+export function buildAttempt(D, trainee_id, section, subject, unit, count, teacher_id = null, category = ''){
+  const pool = bankFor(D, section, subject, unit, true, teacher_id).filter(q => !category || q.category === category);
+  if(!pool.length) throw new Error(category ? 'لا توجد أسئلة منشورة في هذه المهارة بعد' : 'لا توجد أسئلة منشورة في هذه الوحدة بعد');
   for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const qs = pool.slice(0, Math.max(1, Math.min(count || 10, pool.length)));
-  return { id:uid(), trainee_id, teacher_id:teacher_id || null, section, subject, unit:unit || null, started_at:new Date().toISOString(), submitted_at:null, minutes:Math.max(5, qs.length * 2),
+  return { id:uid(), kind:'practice', focus:category || null, trainee_id, teacher_id:teacher_id || null, section, subject, unit:unit || null, started_at:new Date().toISOString(), submitted_at:null, minutes:Math.max(5, qs.length * 2),
     snapshot: qs.map(snapOf), answers:{}, score:null, total:qs.length };
 }
-export const snapOf = q => ({ id:q.id, text:q.text || '', options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1, ...(q.image ? { image:q.image, page_image:q.page_image || '', code:q.code || '' } : {}) });
+export const snapOf = q => ({ id:q.id, text:q.text || '', options:q.options, correct:q.correct, explanation:q.explanation || '', skill:q.skill || '', version:q.version || 1, subject:q.subject, unit:q.unit || '', category:q.category || '', ...(q.image ? { image:q.image, page_image:q.page_image || '', code:q.code || '' } : {}) });
 export const shuffle = a => { for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 /* ---------- واجب اختبار من بنك المدرب ----------
@@ -171,12 +172,7 @@ export function parseBank(text, subjects){
 
 /* ما يُرسل للمتدرب قبل الإنهاء: بلا الإجابات الصحيحة ولا التفسير */
 export const attemptPublic = at => at.submitted_at ? at : { ...at, snapshot: at.snapshot.map(({ correct, explanation, ...q }) => q) };
-export function gradeAttempt(at, answers){
-  const ans = {}; at.snapshot.forEach(q => { const v = answers?.[q.id]; ans[q.id] = Number.isInteger(+v) && +v >= 0 && +v < 4 ? +v : null; });
-  const score = at.snapshot.filter(q => ans[q.id] === q.correct).length;
-  const skills = {}; at.snapshot.forEach(q => { const k = q.skill || 'عام'; skills[k] = skills[k] || { right:0, total:0 }; skills[k].total++; if(ans[q.id] === q.correct) skills[k].right++; });
-  return { ...at, answers:ans, score, submitted_at:new Date().toISOString(), skills };
-}
+export const gradeAttempt = (at, answers) => ({ ...at, ...gradeAny(at, answers) });
 
 /* ---------- تقييم المدرب ---------- */
 export function canRate(D, trainee_id, teacher){
@@ -200,6 +196,10 @@ export function threadFor(D, trainee_id, teacher_id){
 export function validateMessage(text){ const t = String(text || '').trim(); if(!t) throw new Error('اكتب الرسالة'); if(t.length > 1000) throw new Error('الرسالة أطول من 1000 حرف'); return t; }
 
 /* ---------- بيانات تجريبية: أسئلة منشورة وواجب لكل قسم ---------- */
+export const DEMO_CAT = { 'المعادلات':'الجبر', 'المتتابعات':'الجبر', 'النسبة المئوية':'الحساب', 'التناسب':'الحساب', 'الإحصاء':'الإحصاء والاحتمالات', 'المساحات':'الهندسة',
+  'التناظر اللفظي':'التناظر اللفظي', 'المفردة الشاذة':'الارتباط والاختلاف', 'إكمال الجمل':'إكمال الجمل' };
+/* تصنيف تلقائي آمن: أسئلة اللفظي ذات صفحة القطعة = استيعاب المقروء (يطابق الترحيل) */
+export function backfillCategories(D){ (D.questions || []).forEach(q => { if(q.category === undefined) q.category = DEMO_CAT[q.skill] || (q.subject === 'لفظي' && q.page_image ? 'استيعاب المقروء' : ''); }); }
 export function demoLearning(D){
   const n = riyadhNow(), addDays = (d, k) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10); };
   const Q = {
@@ -219,7 +219,7 @@ export function demoLearning(D){
   D.questions = []; D.attempts = []; D.ratings = []; D.messages = [];
   for(const section of ['boys', 'girls']) for(const subject of ['كمي', 'لفظي']) {
     const t = (D.teachers || []).find(x => x.section === section && x.subjects.includes(subject));
-    Q[subject].forEach(([text, options, correct, explanation, skill, unit]) => D.questions.push({ id:uid(), section, subject, unit, skill, text, options, correct, explanation, difficulty:'متوسط', status:'published', teacher_id:t?.id || null, version:1, created_at:new Date().toISOString() }));
+    Q[subject].forEach(([text, options, correct, explanation, skill, unit]) => D.questions.push({ id:uid(), section, subject, unit, skill, category:DEMO_CAT[skill] || '', text, options, correct, explanation, difficulty:'متوسط', status:'published', teacher_id:t?.id || null, version:1, created_at:new Date().toISOString() }));
     if(t) D.assignments.push({ id:uid(), teacher_id:t.id, section, subject, title:`تدريبات ${subject} — الأسبوع الحالي`, body:'حل التمارين من 1 إلى 10 في ملزمة الوحدة، واكتب خطوات الحل.', publish_date:addDays(n.date, -3), due_date:addDays(n.date, 2), max_score:10, created_at:new Date().toISOString() });
   }
 }

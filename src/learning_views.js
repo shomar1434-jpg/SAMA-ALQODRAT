@@ -8,6 +8,8 @@ import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy } from './features.js';
 import { SECTIONS, subStatus, planName } from './qudurat.js';
+import { simCard, bindSimCard, simResult } from './sim_views.js';
+import { CATEGORIES } from './sim_logic.js';
 import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen, attemptsLeft, attemptsOf, MAX_ATTEMPTS } from './learning_logic.js';
 
 const STATE_TXT = { new:'جديد', draft:'قيد الحل', submitted:'مُرسل', needs_revision:'يحتاج تعديلًا', graded:'مصحح', late:'متأخر' };
@@ -57,6 +59,7 @@ export const setHwPreset = p => { HW_PRESET = p; };
 /* نص السؤال أو صورته (البنك المشترك مصوَّر)، ورابط صفحة القطعة عند وجودها. base يضبطه setBankAssets عند تحميل البوابة */
 let ASSETS = '';
 export const setBankAssets = b => { ASSETS = b || ''; };
+export const getBankAssets = () => ASSETS;
 export function qStem(q, thumb){
   const src = q.image ? assetUrl(q.image, ASSETS) : '', pg = q.page_image ? assetUrl(q.page_image, ASSETS) : '';
   return q.image ? `<span class="qimg ${thumb ? 'th' : ''}">${src ? `<img src="${esc(src)}" alt="سؤال مصوَّر ${esc(q.code || '')}" loading="lazy">` : `<span class="hint">صورة السؤال ${esc(q.code || '')} غير متاحة (لم يُضبط مسار تخزين صور البنك)</span>`}${!thumb && pg ? `<a class="linkbtn" href="${esc(pg)}" target="_blank" rel="noopener">عرض صفحة القطعة</a>` : ''}</span>${q.text ? `<p>${esc(q.text)}</p>` : ''}` : `<p>${esc(q.text)}</p>`;
@@ -84,19 +87,26 @@ export function studentLevel(D, tr, it, reload){ setBankAssets(D.bank_assets);
   const subs = (D.subscriptions || []).filter(s => s.trainee_id === tr.id);
   const units = (D.bank_units || []).filter(u => subs.some(s => s.section === u.section && (s.subjects || []).includes(u.subject)));
   const past = (D.attempts || []).filter(a => a.trainee_id === tr.id && a.submitted_at).sort((a, b) => b.submitted_at.localeCompare(a.submitted_at));
-  return { html:`<div class="grid g2" style="align-items:start"><div class="card pad rv"><h3 class="ctitle">${ic('spark')}قياس مستواي</h3>
+  const catOpts = sub => `<option value="">كل المهارات</option>${(CATEGORIES[sub] || []).map(c => `<option>${esc(c)}</option>`).join('')}`;
+  return { html:`${simCard(D, tr)}<div class="grid g2" style="align-items:start;margin-top:16px"><div class="card pad rv"><h3 class="ctitle">${ic('spark')}تدريب سريع</h3>
       ${units.length ? `<form id="lvF" class="grid" novalidate>
         <div class="field"><label for="lv-u">المقرر والوحدة وبنك المدرب</label><select class="inp" id="lv-u">${units.map((u, i) => `<option value="${i}">${esc(u.subject)} · ${esc(u.unit)}${u.teacher_name ? ` · ${esc(u.teacher_name)}` : ''} (${fmtNum(u.count)} سؤالًا)</option>`).join('')}</select></div>
+        <div class="field"><label for="lv-c">المهارة</label><select class="inp" id="lv-c">${catOpts(units[0].subject)}</select><span class="hint">اختيار مهارة يجمع أسئلتها من كل الوحدات.</span></div>
         <div class="field"><label for="lv-n">عدد الأسئلة</label><select class="inp" id="lv-n">${[5, 10, 20].map(n => `<option>${n}</option>`).join('')}</select></div>
-        <button class="btn pri" id="lvGo">${ic('timer')} ابدأ الاختبار</button>
-        <p class="hint" style="margin:0">أسئلة من بنك مدرب مقررك. لا تظهر الإجابات الصحيحة قبل التسليم.</p></form>` : emptyBox('لا توجد أسئلة منشورة لمقرراتك بعد')}</div>
-    <div class="card pad rv"><h3 class="ctitle">${ic('chart')}محاولاتي</h3>${past.length ? `<ul class="ses-list">${past.map(a => `<li><b>${esc(a.subject)}</b><span>${esc(a.unit || '')}</span><span class="pill ${a.score / a.total >= .7 ? 'ok' : 'warn'}">${fmtNum(a.score)} / ${fmtNum(a.total)}</span><span class="hint">${fmtShort(a.submitted_at.slice(0, 10))}</span></li>`).join('')}</ul>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div></div>`,
-  bind(){ if(!$('#lvF')) return; $('#lvF').onsubmit = async e => { e.preventDefault(); const u = units[+$('#lv-u').value], b = $('#lvGo'); setBusy(b, true, 'جارٍ تجهيز الأسئلة');
-      try { const at = await Store.startAttempt({ trainee_id:tr.id, section:u.section, subject:u.subject, unit:u.unit, teacher_id:u.teacher_id || null, count:+$('#lv-n').value }); runAttempt(at, reload); } catch(x){ setBusy(b, false); toast(x.message); } }; } };
+        <button class="btn pri" id="lvGo">${ic('timer')} ابدأ التدريب</button>
+        <p class="hint" style="margin:0">أسئلة من بنك مقررك. لا تظهر الإجابات الصحيحة قبل التسليم.</p></form>` : emptyBox('لا توجد أسئلة منشورة لمقرراتك بعد')}</div>
+    <div class="card pad rv"><h3 class="ctitle">${ic('chart')}محاولاتي</h3>${past.length ? `<ul class="ses-list at-list">${past.slice(0, 30).map(a => { const p = Math.round(a.score / a.total * 100);
+        return `<li><button class="at-row" data-atv="${a.id}"><b>${a.kind === 'sim' ? `${ic('timer')} محاكي` : esc(a.subject)}</b><span>${esc(a.kind === 'sim' ? a.focus || '' : a.focus || a.unit || '')}</span><span class="pill ${p >= 70 ? 'ok' : p >= 45 ? 'warn' : 'bad'}">${a.kind === 'sim' ? fmtNum(p) + '٪' : `${fmtNum(a.score)} / ${fmtNum(a.total)}`}</span><span class="hint">${fmtShort(a.submitted_at.slice(0, 10))}</span></button></li>`; }).join('')}</ul>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div></div>`,
+  bind(){ bindSimCard(D, tr, reload);
+    $$('[data-atv]').forEach(b => b.onclick = () => simResult(past.find(a => a.id === b.dataset.atv)));
+    if(!$('#lvF')) return;
+    $('#lv-u').onchange = () => { $('#lv-c').innerHTML = catOpts(units[+$('#lv-u').value].subject); };
+    $('#lvF').onsubmit = async e => { e.preventDefault(); const u = units[+$('#lv-u').value], b = $('#lvGo'), c = $('#lv-c').value; setBusy(b, true, 'جارٍ تجهيز الأسئلة');
+      try { const at = await Store.startAttempt({ trainee_id:tr.id, section:u.section, subject:u.subject, unit:c ? null : u.unit, teacher_id:c ? null : u.teacher_id || null, category:c || null, count:+$('#lv-n').value }); runAttempt(at, reload); } catch(x){ setBusy(b, false); toast(x.message); } }; } };
 }
 function runAttempt(at, reload){
   const ans = {}, end = Date.now() + at.minutes * 60000;
-  modal(`<h3>قياس المستوى · ${esc(at.subject)}</h3><div class="hint" style="margin:-4px 0 10px">الوقت المتبقي: <b id="atT" class="num"></b></div>
+  modal(`<h3>تدريب · ${esc(at.subject)}${at.focus ? ' · ' + esc(at.focus) : ''}</h3><div class="hint" style="margin:-4px 0 10px">الوقت المتبقي: <b id="atT" class="num"></b></div>
     <form id="atF">${at.snapshot.map((q, i) => `<fieldset class="q ${q.image ? 'qi' : ''}"><legend><b>${fmtNum(i + 1)}.</b> ${q.image ? '' : esc(q.text)}</legend>${q.image ? qStem(q) : ''}
       ${q.options.map((o, j) => `<label class="opt"><input type="radio" name="q${i}" value="${j}" data-q="${q.id}"> ${esc(o)}</label>`).join('')}</fieldset>`).join('')}
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn pri" id="atS">${ic('check')} تسليم</button></div></form>`);
@@ -104,10 +114,7 @@ function runAttempt(at, reload){
   const tick = setInterval(() => { const left = Math.max(0, end - Date.now()), el = $('#atT'); if(!el){ clearInterval(tick); return; }
     el.textContent = `${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`; if(!left){ clearInterval(tick); finish(); } }, 500);
   const finish = async () => { clearInterval(tick); const r = await Store.finishAttempt({ attempt_id:at.id, answers:ans });
-    modal(`<h3>النتيجة: ${fmtNum(r.score)} من ${fmtNum(r.total)}</h3>
-      ${r.skills ? `<div class="skills">${Object.entries(r.skills).map(([k, v]) => `<div><span>${esc(k)}</span><div class="tbar"><i style="width:${Math.round(v.right / v.total * 100)}%"></i></div><b class="num">${fmtNum(v.right)}/${fmtNum(v.total)}</b></div>`).join('')}</div>` : ''}
-      <ol class="qres">${r.snapshot.map(q => `<li class="${r.answers[q.id] === q.correct ? 'ok' : 'bad'}">${qStem(q)}<p><b>الصحيح:</b> ${esc(q.options[q.correct])}${r.answers[q.id] != null && r.answers[q.id] !== q.correct ? ` · <b>إجابتك:</b> ${esc(q.options[r.answers[q.id]])}` : ''}</p>${q.explanation ? `<p class="hint">${esc(q.explanation)}</p>` : ''}</li>`).join('')}</ol>
-      <div style="text-align:end"><button class="btn pri" id="atX">إغلاق</button></div>`); $('#atX').onclick = () => { closeModal(); reload(); }; };
+    simResult(r, reload); };
   $('#atF').onsubmit = e => { e.preventDefault(); finish(); };
 }
 
@@ -238,14 +245,17 @@ export function questionModal({ q, subjects, save, done, title }){
     <div class="field"><label for="qf-u">الوحدة</label><input class="inp" id="qf-u" name="unit" value="${esc(q?.unit || '')}" placeholder="عام"></div>
     <div class="field" style="grid-column:1/-1"><label for="qf-t">نص السؤال</label><textarea class="inp" id="qf-t" name="text" rows="2" style="padding:10px 14px">${esc(q?.text || '')}</textarea></div>
     ${[0, 1, 2, 3].map(i => `<div class="field"><label class="opt"><input type="radio" name="correct" value="${i}" ${q?.correct === i ? 'checked' : ''}> الخيار ${'أبجد'[i]} (الصحيح)</label><input class="inp" name="o${i}" value="${esc(q?.options?.[i] || '')}" aria-label="الخيار ${'أبجد'[i]}"></div>`).join('')}
-    <div class="field"><label for="qf-k">المهارة</label><input class="inp" id="qf-k" name="skill" value="${esc(q?.skill || '')}"></div>
+    <div class="field"><label for="qf-c">مهارة قياس</label><select class="inp" id="qf-c" name="category"></select></div>
+    <div class="field"><label for="qf-k">الموضوع (اختياري)</label><input class="inp" id="qf-k" name="skill" value="${esc(q?.skill || '')}"></div>
     <div class="field"><label for="qf-d">الصعوبة</label><select class="inp" id="qf-d" name="difficulty">${['سهل', 'متوسط', 'صعب'].map(x => `<option ${(q?.difficulty || 'متوسط') === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
     <div class="field"><label for="qf-st">الحالة</label><select class="inp" id="qf-st" name="status"><option value="published">منشور</option><option value="draft" ${q?.status === 'draft' ? 'selected' : ''}>مسودة</option></select></div>
     <div class="field"><label for="qf-e">التفسير (يظهر بعد التسليم)</label><input class="inp" id="qf-e" name="explanation" value="${esc(q?.explanation || '')}"></div>
     <p class="hint" style="grid-column:1/-1;margin:0">تعديل سؤال لا يغيّر نتائج محاولات أو واجبات سابقة؛ كل منها يحفظ نسخة أسئلته.</p>
     <div class="errtxt" id="qfE" style="grid-column:1/-1" aria-live="polite"></div><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="qfC">إلغاء</button><button class="btn pri" id="qfS">${ic('check')} حفظ</button></div></form>`);
+  const cats = () => { const sub = $('#qf-s').value, cur = $('#qf-c').value || q?.category || ''; $('#qf-c').innerHTML = `<option value="">غير مصنّف</option>${(CATEGORIES[sub] || []).map(c => `<option ${c === cur ? 'selected' : ''}>${esc(c)}</option>`).join('')}`; };
+  cats(); $('#qf-s').addEventListener('change', cats);
   $('#qfC').onclick = closeModal; $('#qf').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target), b = $('#qfS');
-    const o = { id:q?.id, subject:fd.get('subject'), unit:fd.get('unit'), text:fd.get('text'), options:[0, 1, 2, 3].map(i => fd.get('o' + i)), correct:fd.get('correct') == null ? -1 : +fd.get('correct'), skill:fd.get('skill'), difficulty:fd.get('difficulty'), status:fd.get('status'), explanation:fd.get('explanation') };
+    const o = { id:q?.id, subject:fd.get('subject'), unit:fd.get('unit'), text:fd.get('text'), options:[0, 1, 2, 3].map(i => fd.get('o' + i)), correct:fd.get('correct') == null ? -1 : +fd.get('correct'), skill:fd.get('skill'), category:fd.get('category') || '', difficulty:fd.get('difficulty'), status:fd.get('status'), explanation:fd.get('explanation') };
     setBusy(b, true, 'جارٍ الحفظ'); try { await save(o); closeModal(); toast('حُفظ السؤال'); done(); } catch(x){ setBusy(b, false); $('#qfE').textContent = x.message; } };
 }
 

@@ -14,7 +14,8 @@ import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
-import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf } from './learning_logic.js';
+import { catOk, simOpen, simExpired, simsToday, SIM_DAILY_MAX, sortSubjects, buildSim, cleanAnswers, CATEGORIES } from './sim_logic.js';
+import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, backfillCategories, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf, snapOf, liveSubsOf } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
 
 /* =====================================================================
@@ -57,6 +58,7 @@ export function enrollmentStats(D, e, c){
     reachable: needed <= Math.max(0,remaining) };
 }
 /* ===== آلية الاحتساب ورسائل التنبيه: يضبطها مسؤول النظام ===== */
+const catGuard=(subject, c)=>{ if(c&&!catOk(subject, c)) throw new Error('التصنيف لا يناسب المقرر'); return c||''; };
 export const CALC_DEFAULTS = { cert_threshold:75, late_weight:1, warn_consec:2,
   msg_ok:'نسبة حضورك {النسبة}٪ وأنت على المسار الصحيح للحصول على الشهادة. واصل الحضور.',
   msg_low:'تنبيه: نسبة حضورك {النسبة}٪ دون حد الشهادة {الحد}٪. احرص على حضور المحاضرات القادمة.',
@@ -202,7 +204,7 @@ export function sectionDaysTxt(D, section){
 export function scopeData(D, role, phone){
   const ph=normPhone(phone), pick=(o,k)=>Object.fromEntries(k.map(x=>[x,o[x]]));
   const base={ plans:D.plans||[], schedule_templates:D.schedule_templates||[], schedule_exceptions:D.schedule_exceptions||[],
-    settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes',...Object.keys(CALC_DEFAULTS).filter(k=>k.startsWith('msg_'))]) };
+    settings:pick(D.settings||{},['late_minutes','early_minutes','late_weight','cert_threshold','warn_consec','remind_minutes','sim_per_subject','sim_sec_per_q',...Object.keys(CALC_DEFAULTS).filter(k=>k.startsWith('msg_'))]) };
   const tSafe=t=>({id:t.id, full_name:t.full_name, gender:t.gender});
   const ordersFor=ids=>(D.orders||[]).filter(o=>ids.includes(o.trainee_id)).map(o=>orderPublic(o, D.settings.bank));
   const teachersPub=(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects, active:true, bio:t.bio||'', avatar:t.avatar||'', cv:t.cv||''}));
@@ -302,7 +304,7 @@ export const LocalStore = {
     D.orders=D.orders||[]; D.invoices=D.invoices||[]; (D.trainees||[]).forEach(t=>{ if(t.imported && !t.import_notes) t.import_notes=[]; }); if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
     if(!D.plans.some(p=>p.tier==='custom')) D.plans.push(...customPlans());       // باقة «خصصناها لك» للبيانات المحفوظة قبل إضافتها
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || []; D.program_requests = D.program_requests || [];
-    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
+    if(!D.teachers){ D.teachers=[]; D.guardian_links=[]; D.notifications=[]; demoPeople(D); } D.assignments=D.assignments||[]; D.submissions=D.submissions||[]; D.daily_reports=D.daily_reports||[]; if(!D.questions) demoLearning(D); backfillCategories(D); if(!D.policies || (D.policies.length && D.policies.every(x=>x.status==='draft'))){ D.policies=demoPolicies(); D.policy_acceptances=D.policy_acceptances||[]; } (D.policies||[]).forEach(x=>{ if(String(x.id).startsWith('pol-')) x.requires_acceptance=false; }); if(!D.trainees.some(t=>t.phone==='0550000003')) demoProgramTrainee(D);
     this.autoArchive(); this.save();
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
@@ -763,16 +765,31 @@ export const LocalStore = {
     this.save(); return {ok:true}; },
   async deleteGroup(id){ const me=await this._me(), D=this.data, i=(D.trainer_groups||[]).findIndex(y=>y.id===id&&y.teacher_id===me.id); if(i<0) throw new Error('غير مصرح'); D.trainer_groups.splice(i,1); this.save(); return {ok:true}; },
   async saveQuestion(q){ const me=await this._me(); validateQuestion(q); if(!teacherCovers(me, me.section, q.subject)) throw new Error('المقرر خارج نطاقك');
-    const L=this.data.questions, row={subject:q.subject, section:me.section, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
+    const L=this.data.questions, row={subject:q.subject, section:me.section, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft', category:catGuard(q.subject, q.category)};
     if(q.id){ const x=L.find(y=>y.id===q.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row,{version:(x.version||1)+1}); }
     else L.push({id:uid(), teacher_id:me.id, version:1, created_at:new Date().toISOString(), ...row}); this.save(); return {ok:true}; },
   async setQuestionStatus(id, status){ const me=await this._me(), x=this.data.questions.find(y=>y.id===id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح');
     if(!['draft','published','deleted'].includes(status)) throw new Error('حالة غير صالحة'); x.status=status; this.save(); return {ok:true}; },
-  async startAttempt({trainee_id, section, subject, unit, count, teacher_id}){ await this._student(trainee_id); const D=this.data; if(!studentHasScope(D,trainee_id,section,subject)) throw new Error('هذا المقرر ليس ضمن اشتراكك');
+  async startAttempt({trainee_id, section, subject, unit, count, teacher_id, category}){ await this._student(trainee_id); const D=this.data; if(!studentHasScope(D,trainee_id,section,subject)) throw new Error('هذا المقرر ليس ضمن اشتراكك');
     if(teacher_id&&!teacherCovers((D.teachers||[]).find(t=>t.id===teacher_id), section, subject)) throw new Error('هذا البنك ليس لمدرب مقررك');
-    const at=buildAttempt(D, trainee_id, section, subject, unit, count, teacher_id||null); (D.attempts=D.attempts||[]).push(at); this.save(); return attemptPublic(at); },
+    if(category&&!catOk(subject, category)) throw new Error('المهارة غير معروفة');
+    const at=buildAttempt(D, trainee_id, section, subject, unit, count, teacher_id||null, category||''); (D.attempts=D.attempts||[]).push(at); this.save(); return attemptPublic(at); },
+  /* المحاكي (↔ student_start_sim): محاكٍ مفتوح واحد يُستأنف، والمنتهي يُصحَّح بما حُفظ، وحد يومي */
+  async startSim({trainee_id, subjects}){ await this._student(trainee_id); const D=this.data; D.attempts=D.attempts||[];
+    const open=D.attempts.find(a=>a.trainee_id===trainee_id&&a.kind==='sim'&&!a.submitted_at);
+    if(open){ if(simOpen(open)) return attemptPublic(open); Object.assign(open, gradeAttempt(open, open.answers)); }
+    if(simsToday(D, trainee_id)>=SIM_DAILY_MAX) throw new Error(`وصلت الحد اليومي للمحاكي (${SIM_DAILY_MAX} محاولات)`);
+    const subs=liveSubsOf(D, trainee_id), list=sortSubjects((subjects||[]).filter(Boolean)); if(!list.length) throw new Error('اختر مقررًا واحدًا على الأقل');
+    const pools={}; let section=null;
+    for(const s of list){ const sub=subs.find(x=>(x.subjects||[]).includes(s)); if(!sub) throw new Error('هذا المقرر ليس ضمن اشتراكك'); section=section||sub.section;
+      pools[s]=(D.questions||[]).filter(q=>q.status==='published'&&q.subject===s&&(q.shared||(q.section===sub.section&&(D.teachers||[]).some(t=>t.id===q.teacher_id&&t.active!==false)))); }
+    const at=buildSim(D, trainee_id, section, list, pools, D.settings, snapOf); D.attempts.push(at); this.save(); return attemptPublic(at); },
+  async saveAttemptAnswers({attempt_id, answers}){ const D=this.data, at=(D.attempts||[]).find(x=>x.id===attempt_id); if(!at) throw new Error('المحاولة غير موجودة'); await this._student(at.trainee_id);
+    if(at.submitted_at) throw new Error('سُلّمت المحاولة'); if(at.deadline&&!simOpen(at)) throw new Error('انتهى الوقت');
+    at.answers={...(at.answers||{}), ...cleanAnswers(at, answers)}; this.save(); return {ok:true}; },
   async finishAttempt({attempt_id, answers}){ const D=this.data, at=(D.attempts||[]).find(x=>x.id===attempt_id); if(!at) throw new Error('المحاولة غير موجودة'); await this._student(at.trainee_id);
-    if(at.submitted_at) return at; const g=gradeAttempt(at, answers); Object.assign(at, g); this.save(); return at; },
+    if(at.submitted_at) return at; const late=at.deadline&&simExpired(at);   // بعد انتهاء الوقت يُصحَّح ما حُفظ فقط
+    const g=gradeAttempt(at, {...(at.answers||{}), ...(late?{}:cleanAnswers(at, answers))}); Object.assign(at, g); this.save(); return at; },
   async rateTeacher({trainee_id, teacher_id, stars, items, comment}){ await this._student(trainee_id); const D=this.data, t=D.teachers.find(x=>x.id===teacher_id); const c=canRate(D, trainee_id, t); if(!c.ok) throw new Error(c.why);
     const st=Math.round(+stars); if(!(st>=1&&st<=5)) throw new Error('اختر من نجمة إلى خمس نجوم'); const per=period();
     const it=Object.fromEntries(Object.entries(items||{}).map(([k,v])=>[k, Math.min(5,Math.max(1,Math.round(+v)||st))]));
@@ -788,9 +805,13 @@ export const LocalStore = {
   /* بنوك أسئلة المدربين من الإدارة: إضافة وتعديل واستيراد لمدرب محدد، ضمن قسمه ومقرراته */
   _bankTeacher(id){ const t=(this.data.teachers||[]).find(x=>x.id===id); if(!t) throw new Error('اختر المدرب'); return t; },
   async adminSaveQuestion(q){ const t=this._bankTeacher(q.teacher_id); validateQuestion(q); if(!(t.subjects||[]).includes(q.subject)) throw new Error('المقرر ليس من مقررات المدرب');
-    const L=(this.data.questions=this.data.questions||[]), row={teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft'};
+    const L=(this.data.questions=this.data.questions||[]), row={teacher_id:t.id, section:t.section, subject:q.subject, unit:String(q.unit||'').trim()||'عام', skill:String(q.skill||'').trim(), text:q.text.trim(), options:q.options.map(x=>String(x).trim()), correct:+q.correct, explanation:String(q.explanation||'').trim(), difficulty:q.difficulty||'متوسط', status:q.status==='published'?'published':'draft', category:catGuard(q.subject, q.category)};
     if(q.id){ const x=L.find(y=>y.id===q.id); if(!x) throw new Error('السؤال غير موجود'); Object.assign(x,row,{version:(x.version||1)+1}); } else L.push({id:uid(), version:1, created_at:new Date().toISOString(), ...row});
     this.audit('question.save', q.id||'new', t.id); this.save(); return {ok:true}; },
+  /* تصنيف مهارة قياس لأسئلة مختارة (↔ admin_set_category) */
+  async setQuestionCategory(ids, category){ const L=this.data.questions||[], c=category||''; const qs=L.filter(q=>(ids||[]).includes(q.id)&&q.status!=='deleted');
+    if(!qs.length) throw new Error('اختر سؤالًا واحدًا على الأقل'); if(qs.some(q=>!catOk(q.subject, c))) throw new Error('التصنيف لا يناسب مقرر السؤال');
+    qs.forEach(q=>{ q.category=c; }); this.audit('question.category', c||'-', String(qs.length)); this.save(); return {count:qs.length}; },
   /* استيراد بنك مشترك للمقرر (محتوى واحد يراه مدربا المقرر): يُضاف الجديد ويُحدَّث الموجود برمزه؛ تغيّر المفتاح يرفع الإصدار */
   /* اعتماد مفاتيح البنك المشترك (شرط الاختبار الرسمي): لمقرر كامل أو لوحدة منه */
   async approveKeys(subject, unit, approved=true){ const L=(this.data.questions||[]).filter(q=>q.shared&&q.subject===subject&&(!unit||q.unit===unit)&&q.status!=='deleted'); if(!L.length) throw new Error('لا أسئلة في هذا النطاق');
@@ -954,6 +975,9 @@ export const CloudStore = {
   async setQuestionStatus(id, status){ this._e(await this.sb.rpc('teacher_question_status',{p_id:id, p_status:status})); return {ok:true}; },
   async startAttempt(p){ return this._e(await this.sb.rpc('student_start_attempt',{p})); },
   async finishAttempt({attempt_id, answers}){ return this._e(await this.sb.rpc('student_finish_attempt',{p_id:attempt_id, p_answers:answers||{}})); },
+  async startSim(p){ return this._e(await this.sb.rpc('student_start_sim',{p})); },
+  async saveAttemptAnswers({attempt_id, answers}){ return this._e(await this.sb.rpc('student_save_attempt',{p_id:attempt_id, p_answers:answers||{}})); },
+  async setQuestionCategory(ids, category){ return this._e(await this.sb.rpc('admin_set_category',{p_ids:ids, p_category:category||''})); },
   async rateTeacher(p){ return this._e(await this.sb.rpc('student_rate',{p})); },
   async sendMessage(p, role){ return this._e(await this.sb.rpc('send_message',{p, p_role:role})); },
   async markThreadRead({trainee_id, teacher_id}, role){ await this.sb.rpc('mark_thread_read',{p_trainee:trainee_id, p_teacher:teacher_id, p_role:role}); },

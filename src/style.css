@@ -1295,3 +1295,65 @@ body.wl-open{overflow:hidden}
 .portal-card .pl-cta{--tc:var(--pc)}
 @media(prefers-reduced-motion:reduce){.portal-card,.pc-art{transition:none}.portal-card:hover .pc-art{transform:none}}
 @media(max-width:640px){.portals-page{padding:22px 0 30px}.pc-art{width:104px;height:104px}.pc-art svg{width:88px;height:88px}}
+
+/* ---------- الخطوة AQ: محاكي الاختبار وتصنيف المهارات ---------- */
+.sim-card{border-top:3px solid var(--brand)}
+.sim-card-h{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.sim-badge{flex:0 0 46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--brand-tint);color:var(--brand-strong)}
+.sim-badge svg{width:24px;height:24px}
+.sim-pick{border:0;padding:0;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:10px}
+.sim-pick legend{margin-bottom:6px}
+.sim-sub{border:1px solid var(--border);border-radius:14px;padding:10px 14px;min-height:44px;background:var(--surface-card)}
+.sim-sub:has(input:checked){border-color:var(--brand);background:var(--brand-tint)}
+.sim-sub span{display:grid}.sim-sub small{color:var(--text-2,inherit);opacity:.75;font-size:12px}
+.sim-meta{margin:4px 0 10px;font-size:14px}
+.sim-rules{padding-inline-start:20px;line-height:1.9}
+.at-list li{padding:0}
+.at-row{all:unset;box-sizing:border-box;width:100%;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:10px 12px;border-radius:12px;cursor:pointer;min-height:44px}
+.at-row:hover,.at-row:focus-visible{background:var(--surface-sunken)}.at-row:focus-visible{outline:2px solid var(--brand)}
+.at-row svg{width:15px;height:15px;vertical-align:-2px}
+body.sim-on{overflow:hidden}
+.sim{position:fixed;inset:0;z-index:70;background:var(--surface,var(--surface-card));display:grid;grid-template-rows:auto auto 1fr auto;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+.sim-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface-card)}
+.sim-h-a,.sim-h-b{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sim-t{display:inline-flex;gap:6px;align-items:center;font-size:17px;padding:4px 12px;border-radius:999px;background:var(--brand-tint);color:var(--brand-strong)}
+.sim-t.low{background:var(--danger-tint);color:var(--danger-ink)}.sim-t svg{width:18px;height:18px}
+.sim-prog{height:4px;background:var(--surface-sunken)}.sim-prog i{display:block;height:100%;background:var(--brand);transition:width .3s}
+.sim-b{overflow:auto;padding:18px 16px 24px}
+.sim-q{max-width:820px;margin:0 auto}
+.sim-qh{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px}.sim-qh .btn{margin-inline-start:auto}
+.sim-qh .btn.warn{background:var(--warning-tint);color:var(--warning-ink);border-color:transparent}
+.sim-stem img{max-width:100%;height:auto}
+.sim-text{font-size:19px;line-height:1.9}
+.sim-pg{border:1px solid var(--border);border-radius:14px;padding:8px 12px;margin-bottom:12px;background:var(--surface-sunken)}
+.sim-pg summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center;gap:6px}.sim-pg summary svg{width:16px;height:16px}
+.sim-pg img{display:block;max-width:100%;height:auto;margin-top:8px;border-radius:8px;background:#fff}
+.sim-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:14px}
+.sim-opt{display:flex;gap:10px;align-items:center;min-height:52px;padding:10px 14px;border:1.5px solid var(--border);border-radius:14px;cursor:pointer;background:var(--surface-card)}
+.sim-opt input{position:absolute;opacity:0;pointer-events:none}
+.sim-opt b{flex:0 0 34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface-sunken);font-size:17px}
+.sim-opt.on{border-color:var(--brand);background:var(--brand-tint)}.sim-opt.on b{background:var(--brand);color:#fff}
+.sim-opt:has(input:focus-visible){outline:2px solid var(--brand);outline-offset:2px}
+.sim-f{display:flex;justify-content:space-between;gap:10px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface-card)}
+.sim-f .btn{min-width:120px}
+.sim-map{position:absolute;inset-block:0;inset-inline-end:0;width:min(360px,100%);background:var(--surface-card);border-inline-start:1px solid var(--border);box-shadow:-12px 0 30px -18px rgba(0,0,0,.35);padding:14px 16px;overflow:auto;z-index:2}
+.sim-map-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sim-map-s h4{font-size:14px;margin:10px 0 6px}
+.sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.sim-n{min-height:44px;border-radius:10px;border:1px solid var(--border);background:var(--surface-card);font:inherit;cursor:pointer;position:relative}
+.sim-legend .sim-n{display:inline-grid;place-items:center;min-height:24px;width:24px;font-size:12px;margin-inline:6px 2px;vertical-align:middle}
+.sim-n.a{background:var(--brand-tint);border-color:var(--brand)}
+.sim-n.f::after{content:"";position:absolute;top:4px;inset-inline-end:4px;width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.sim-n.c{outline:2px solid var(--brand-strong);outline-offset:1px}
+.sim-res-h{display:flex;gap:16px;align-items:center;margin-bottom:10px}
+.sim-note{background:var(--info-tint);color:var(--info-ink);padding:8px 12px;border-radius:10px}
+.sim-h4{font-size:15px;margin:14px 0 4px}
+.sim-rev{margin-top:12px}.sim-rev summary{cursor:pointer;font-weight:600;min-height:40px;display:flex;align-items:center}
+.kc-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}.kc-bar .inp{width:auto;min-width:160px}
+.kc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:52vh;overflow:auto;padding:2px}
+.kc-q{display:grid;gap:6px;padding:8px;border:1px solid var(--border);border-radius:12px;cursor:pointer;position:relative}
+.kc-q:has(input:checked){border-color:var(--brand);background:var(--brand-tint)}
+.kc-q input{position:absolute;top:8px;inset-inline-start:8px;width:18px;height:18px;accent-color:var(--brand)}
+.kc-code{font-size:12px;text-align:end;opacity:.7}.kc-q .qimg{margin:0}.kc-q .qimg.th img{max-height:110px;max-width:100%}
+@media(max-width:560px){.sim-h{padding:8px 10px}.sim-h-a b{display:none}.sim-b{padding:14px 12px 20px}.sim-f .btn{min-width:0;flex:1}.sim-res-h{flex-direction:column;text-align:center}.skills > div{grid-template-columns:96px 1fr 44px}}
+@media(prefers-reduced-motion:reduce){.sim-prog i{transition:none}}
