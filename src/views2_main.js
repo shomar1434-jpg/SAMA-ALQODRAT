@@ -1,3 +1,4 @@
+import { PORTAL_ART } from './portal_art.js';
 import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
 import { PAGE, adminBase, publicBase, portalBase } from './config.js';
@@ -52,6 +53,14 @@ export function cohortPublicState(c, today=riyadhNow().date){
 export const ROUTES = ['admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
+/* حالة قاعدة البيانات: أيقونة خضراء متصلة، حمراء غير متصلة (لا شبكة)، ذهبية للبيانات التجريبية */
+export function syncDb(){
+  const el = $('#modeTag'); if(!el) return;
+  const k = Store.mode !== 'cloud' ? 'demo' : navigator.onLine === false ? 'off' : 'on';
+  const t = { on:'متصل بقاعدة البيانات', off:'غير متصل بقاعدة البيانات — تحقق من الإنترنت', demo:'بيانات تجريبية (غير متصل بقاعدة البيانات)' }[k];
+  el.className = 'dbst ' + k; el.setAttribute('aria-label', t); el.title = t;
+  if(!syncDb.bound){ syncDb.bound = true; window.addEventListener('online', syncDb); window.addEventListener('offline', syncDb); }
+}
 export async function route(){
   cleanup(); closeModal(); closePrint();
   // عائد من رابط بريد Supabase (دعوة مسؤول، تأكيد، استعادة كلمة المرور): تُعتمد الجلسة ثم يختار كلمة مروره
@@ -66,8 +75,7 @@ export async function route(){
   if(PAGE==='admin' && !h) h='admin';
   const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : ['contact','verify'].includes(h)||h.startsWith('verify') ? '' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
-  $('#modeTag').textContent = Store.mode==='cloud' ? 'متصل بقاعدة البيانات' : 'بيانات تجريبية';
-  $('#modeTag').classList.toggle('cloud', Store.mode==='cloud');
+  syncDb();
   window.scrollTo(0,0);
   if(/^v-[A-Za-z0-9-]+$/.test(h)) return viewVerify(h.slice(2));
   if(h==='verify') return viewVerify('');
@@ -414,9 +422,13 @@ export async function viewGeneralCheckin(){
    ===================================================================== */
 /* اختيار البوابة: المتدرب، وولي الأمر، والمدرب (لكل منها صفحة ودور) */
 export function viewPortals(){
-  const C=[['student','user','بوابة المتدرب','حضورك ونسبة إنجازك في باقتك أو برنامجك التدريبي، وواجباتك وشهادتك ومواعيدك القادمة.'],['guardian','users','بوابة ولي الأمر','متابعة حضور ابنك أو ابنتك وتقدّمه والتنبيهات. تدخل بجوالك المسجَّل ولي أمرٍ في بياناته، ثم تكتب سجله المدني مرة واحدة.'],['teacher','book','بوابة المدرب','كشف حضور متدربيك اليومي، والتنبيهات، والتواصل مع أولياء الأمور.']];
-  $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint" style="margin:8px 0 0">الدخول برقم جوالك المسجّل في المعهد ورمز تحقق.</p></div>
-    <div class="grid g3">${C.map(([k,i,t,d],n)=>`<a class="card pad portal-card rv" style="--i:${n}" href="${portalBase(k)}"><span class="kic-lg t-info">${ic(i)}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div>${siteFooter()}`;
+  const C=[['student','بوابة المتدرب','للمتدربين والمتدربات','حضورك ونسبة إنجازك في باقتك أو برنامجك، وواجباتك واختباراتك ومواعيدك القادمة، وتسجيل الحضور من جوالك.','s'],
+    ['guardian','بوابة ولي الأمر','لأولياء الأمور','متابعة حضور ابنك أو ابنتك وتقدّمه، والتنبيهات والرسائل. الدخول برقم هوية الابن أو الابنة.','g'],
+    ['teacher','بوابة المدرب','للمدربين والمدربات','كشف حضور متدربيك اليومي، والواجبات والاختبارات، والمجموعات الذكية، والتواصل.','t']];
+  $('#app').innerHTML = `<section class="portals-page"><div class="wrap">
+    <div class="sec-head rv portals-head"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint">الدخول برقم الهوية، وفي المرة الأولى برمز التفعيل من إدارة المركز.</p></div>
+    <div class="portals-grid">${C.map(([k,t,who,d,c],n)=>`<a class="portal-card pc-${c} rv" style="--i:${n}" href="${portalBase(k)}">
+      <span class="pc-art">${PORTAL_ART[k]}</span><span class="pc-who">${who}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div></section>${siteFooter()}`;
 }
 /* الباركود الموحد لكل البرامج والباقات (D-03): يُطبع ويُعلَّق في المعهد ولا يتغير */
 export async function viewQRCheckin(){
