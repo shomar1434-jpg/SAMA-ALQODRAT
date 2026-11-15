@@ -1357,3 +1357,22 @@ body.sim-on{overflow:hidden}
 .kc-code{font-size:12px;text-align:end;opacity:.7}.kc-q .qimg{margin:0}.kc-q .qimg.th img{max-height:110px;max-width:100%}
 @media(max-width:560px){.sim-h{padding:8px 10px}.sim-h-a b{display:none}.sim-b{padding:14px 12px 20px}.sim-f .btn{min-width:0;flex:1}.sim-res-h{flex-direction:column;text-align:center}.skills > div{grid-template-columns:96px 1fr 44px}}
 @media(prefers-reduced-motion:reduce){.sim-prog i{transition:none}}
+
+/* ---------- الخطوة AR: تحليل نقاط الضعف ---------- */
+.an-card{margin-bottom:16px;border-top:3px solid var(--gold)}
+.an-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 12px;margin-bottom:10px}
+.an-weak{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--surface-sunken);margin-bottom:12px}
+.an-good{display:flex;gap:6px;align-items:center;color:var(--success-ink);margin:0 0 12px}.an-good svg{width:18px;height:18px}
+.an-subs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.an-sub{border:1px solid var(--border);border-radius:14px;padding:12px}
+.an-sub-h{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+.an-skills{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.an-skills li{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(60px,1fr) 44px;gap:4px 10px;align-items:center}
+.an-skills li.mute{opacity:.7}
+.an-skills .an-n{grid-column:1/-1;margin:-4px 0 0;font-size:12px}
+.an-skills .btn{grid-column:1/-1;justify-self:start}
+.an-k{font-size:14px}
+.tbar.an-bad i{background:var(--danger)}.tbar.an-warn i{background:var(--warning)}.tbar.an-ok i{background:var(--success)}
+.an-tr{font-size:11px;margin-inline-start:4px}.an-tr.up{color:var(--success)}.an-tr.dn{color:var(--danger)}
+.an-foot{margin:12px 0 0;font-size:12px}
+.an-in-modal{margin-top:14px}.an-in-modal .an-card{margin:0;box-shadow:none}

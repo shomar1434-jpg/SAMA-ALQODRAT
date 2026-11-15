@@ -9,6 +9,7 @@ import { modal, closeModal } from './views2_programs.js';
 import { setBusy } from './features.js';
 import { SECTIONS, subStatus, planName } from './qudurat.js';
 import { simCard, bindSimCard, simResult } from './sim_views.js';
+import { analysisHtml, bindAnalysis } from './analysis_views.js';
 import { CATEGORIES } from './sim_logic.js';
 import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen, attemptsLeft, attemptsOf, MAX_ATTEMPTS } from './learning_logic.js';
 
@@ -88,7 +89,7 @@ export function studentLevel(D, tr, it, reload){ setBankAssets(D.bank_assets);
   const units = (D.bank_units || []).filter(u => subs.some(s => s.section === u.section && (s.subjects || []).includes(u.subject)));
   const past = (D.attempts || []).filter(a => a.trainee_id === tr.id && a.submitted_at).sort((a, b) => b.submitted_at.localeCompare(a.submitted_at));
   const catOpts = sub => `<option value="">كل المهارات</option>${(CATEGORIES[sub] || []).map(c => `<option>${esc(c)}</option>`).join('')}`;
-  return { html:`${simCard(D, tr)}<div class="grid g2" style="align-items:start;margin-top:16px"><div class="card pad rv"><h3 class="ctitle">${ic('spark')}تدريب سريع</h3>
+  return { html:`${analysisHtml(D, tr.id, { role:'student', practice:true })}${simCard(D, tr)}<div class="grid g2" style="align-items:start;margin-top:16px"><div class="card pad rv"><h3 class="ctitle">${ic('spark')}تدريب سريع</h3>
       ${units.length ? `<form id="lvF" class="grid" novalidate>
         <div class="field"><label for="lv-u">المقرر والوحدة وبنك المدرب</label><select class="inp" id="lv-u">${units.map((u, i) => `<option value="${i}">${esc(u.subject)} · ${esc(u.unit)}${u.teacher_name ? ` · ${esc(u.teacher_name)}` : ''} (${fmtNum(u.count)} سؤالًا)</option>`).join('')}</select></div>
         <div class="field"><label for="lv-c">المهارة</label><select class="inp" id="lv-c">${catOpts(units[0].subject)}</select><span class="hint">اختيار مهارة يجمع أسئلتها من كل الوحدات.</span></div>
@@ -97,7 +98,7 @@ export function studentLevel(D, tr, it, reload){ setBankAssets(D.bank_assets);
         <p class="hint" style="margin:0">أسئلة من بنك مقررك. لا تظهر الإجابات الصحيحة قبل التسليم.</p></form>` : emptyBox('لا توجد أسئلة منشورة لمقرراتك بعد')}</div>
     <div class="card pad rv"><h3 class="ctitle">${ic('chart')}محاولاتي</h3>${past.length ? `<ul class="ses-list at-list">${past.slice(0, 30).map(a => { const p = Math.round(a.score / a.total * 100);
         return `<li><button class="at-row" data-atv="${a.id}"><b>${a.kind === 'sim' ? `${ic('timer')} محاكي` : esc(a.subject)}</b><span>${esc(a.kind === 'sim' ? a.focus || '' : a.focus || a.unit || '')}</span><span class="pill ${p >= 70 ? 'ok' : p >= 45 ? 'warn' : 'bad'}">${a.kind === 'sim' ? fmtNum(p) + '٪' : `${fmtNum(a.score)} / ${fmtNum(a.total)}`}</span><span class="hint">${fmtShort(a.submitted_at.slice(0, 10))}</span></button></li>`; }).join('')}</ul>` : '<p class="hint">لا توجد محاولات بعد.</p>'}</div></div>`,
-  bind(){ bindSimCard(D, tr, reload);
+  bind(){ bindSimCard(D, tr, reload); bindAnalysis(D, tr, at => runAttempt(at, reload));
     $$('[data-atv]').forEach(b => b.onclick = () => simResult(past.find(a => a.id === b.dataset.atv)));
     if(!$('#lvF')) return;
     $('#lv-u').onchange = () => { $('#lv-c').innerHTML = catOpts(units[+$('#lv-u').value].subject); };
