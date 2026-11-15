@@ -38,5 +38,20 @@ export function hash32(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^
    كل كلمة في نص البحث يجب أن تظهر في أحد الحقول؛ المسافات بين الكلمات مقبولة وتُطوى المكررة. */
 export const normAr = s => String(s ?? '').toLowerCase().replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '')
   .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\s+/g, ' ').trim();
+/* خيارات البحث عن شخص: كل الحقول، أو جزء محدد من الاسم، أو الهوية، أو الجوال */
+export const SEARCH_SCOPES = { all:'كل الحقول', first:'الاسم الأول', father:'اسم الأب', family:'اسم العائلة', nid:'رقم الهوية', phone:'الجوال' };
+export const scopeSelect = (id, val = 'all') => `<select class="inp" id="${id}" aria-label="البحث في" style="width:auto">${Object.entries(SEARCH_SCOPES).map(([k, v]) => `<option value="${k}" ${val === k ? 'selected' : ''}>${k === 'all' ? 'البحث في: كل الحقول' : v}</option>`).join('')}</select>`;
+export function matchPerson(scope, q, t, ...extra){
+  if(!scope || scope === 'all') return matchQ(q, t?.full_name, t?.national_id, t?.phone, ...extra);
+  const nq = normAr(q); if(!nq) return true;
+  const parts = normAr(t?.full_name).split(' ').filter(Boolean), digits = v => String(v ?? '').replace(/\D/g, '');
+  if(scope === 'first') return (parts[0] || '').startsWith(nq);
+  if(scope === 'father') return (parts[1] || '').startsWith(nq);
+  if(scope === 'family') return parts.length > 1 && (parts[parts.length - 1].startsWith(nq) || parts.slice(-2).join(' ').startsWith(nq) || parts.slice(2).join(' ').includes(nq));
+  const dq = digits(normAr(q)); if(!dq) return false;
+  if(scope === 'nid') return digits(t?.national_id).includes(dq);
+  if(scope === 'phone') { const ph = digits(t?.phone), g = digits(t?.guardian_phone), d = dq.replace(/^(966|0)/, ''); return [ph, g].some(x => x && x.replace(/^(966|0)/, '').includes(d)); }
+  return matchQ(q, t?.full_name);
+}
 export const matchQ = (q, ...fields) => { const toks = normAr(q).split(' ').filter(Boolean); if(!toks.length) return true;
   const hay = normAr(fields.filter(x => x != null && x !== '').join(' ')); return toks.every(t => hay.includes(t)); };

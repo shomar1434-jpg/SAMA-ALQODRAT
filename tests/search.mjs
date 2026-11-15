@@ -1,11 +1,18 @@
 // الخطوة AF: البحث يقبل المسافات والكلمات المتعددة، وشريط بحث في «حضور اليوم» للقدرات والتحصيلي
 import { chromium } from 'playwright';
 import { serveDist, reporter } from './_server.mjs';
-import { matchQ } from '../src/utils.js';
+import { matchQ, matchPerson } from '../src/utils.js';
 const { ok, failed } = reporter();
 ok(matchQ('محمد علي', 'أحمد محمد علي الحكمي') && matchQ('علي محمد', 'أحمد محمد علي الحكمي') && !matchQ('محمد سعد', 'أحمد محمد علي'), 'كلمات متعددة بأي ترتيب');
 ok(matchQ('احمد  ', 'أحمد علي') && matchQ('  ', 'أي شيء') && matchQ('', 'x'), 'المسافات الزائدة لا تُفسد البحث');
 ok(matchQ('فاطمه', 'فاطمة') && matchQ('مصطفي', 'مصطفى') && matchQ('١٠٥٢', '1052234567'), 'تطبيع الهمزات والتاء والألف المقصورة والأرقام العربية');
+const P = { full_name: 'اسيل مصعب علي دقدقي', national_id: '1123456789', phone: '0551234567', guardian_phone: '0559876543' };
+ok(matchPerson('first', 'أسيل', P) && !matchPerson('first', 'مصعب', P), 'البحث بالاسم الأول وحده (مع تطبيع الهمزة)');
+ok(matchPerson('father', 'مصعب', P) && !matchPerson('father', 'دقدقي', P), 'البحث باسم الأب');
+ok(matchPerson('family', 'دقدق', P) && !matchPerson('family', 'اسيل', P), 'البحث باسم العائلة بأي بدايته');
+ok(matchPerson('nid', '٣٤٥٦', P) && !matchPerson('nid', 'اسيل', P), 'البحث برقم الهوية (والأرقام العربية)');
+ok(matchPerson('phone', '966551234567', P) && matchPerson('phone', '0559876', P), 'البحث بالجوال بأي صيغة، وجوال ولي الأمر');
+ok(matchPerson('all', 'دقدقي أسيل', P), 'كل الحقول: أي جزء وبأي ترتيب');
 const { server, origin: U } = serveDist();
 const b = await chromium.launch(); const p = await (await b.newContext({ viewport:{ width:1280, height:900 } })).newPage();
 const errs = []; p.on('pageerror', e => errs.push(e.message));
@@ -30,5 +37,14 @@ ok((await p.inputValue('#tq')) === two, 'بحث المتدربين يقبل ال
 await p.goto(U + 'admin/#admin-access'); await p.waitForTimeout(900);
 await typeSlow('#ac-q', two);
 ok((await p.inputValue('#ac-q')) === two, 'بحث تفعيل الأجهزة يقبل المسافة');
+// نتائج تخفيها تصفية الحالة: تنبيه وزر «عرض كل الحالات»
+await p.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const s = D.subscriptions.find(x => x.start_date); s.status = 'ended'; s.start_date = '2025-11-01'; s.end_date = '2026-01-01'; s.track_from = null;
+  const t = D.trainees.find(x => x.id === s.trainee_id); t.full_name = 'اسيل مصعب علي دقدقي'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
+await p.reload(); await p.waitForTimeout(700); await p.goto(U + 'admin/#admin-qudurat'); await p.waitForTimeout(900);
+await p.selectOption('#qsc', 'family'); await p.waitForTimeout(300);
+await p.fill('#qq', 'دقدقي'); await p.waitForTimeout(700);
+ok(/مخفية/.test(await p.textContent('#qBody')) && !!(await p.$('#qAllSt')), 'تنبيه بنتيجة مطابقة مخفية بتصفية الحالة');
+await p.click('#qAllSt'); await p.waitForTimeout(500);
+ok(/دقدقي/.test(await p.textContent('#qBody tbody')) && /منتهٍ/.test(await p.textContent('#qBody tbody')), 'عرض كل الحالات يُظهر الاشتراك المنتهي');
 ok(!errs.length, 'لا أخطاء' + (errs.length ? ': ' + errs[0] : ''));
 await b.close(); server.close(); process.exit(failed() ? 1 : 0);

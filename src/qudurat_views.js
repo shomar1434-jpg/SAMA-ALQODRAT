@@ -4,7 +4,7 @@
 import { editTraineeModal } from './import_views.js';
 import { statementModal } from './statement_views.js';
 import { planPoster, COMPARE_ART } from './plan_art.js';
-import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, addDays, validSaudiId, DAYS, matchQ } from './utils.js';
+import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, addDays, validSaudiId, DAYS, matchPerson, scopeSelect } from './utils.js';
 import { ic, emptyBox, ringSvg, toast, countUp } from './views2_head.js';
 import { Store } from './data2.js';
 import { sectionDaysTxt } from './data2.js';
@@ -157,7 +157,7 @@ export async function viewPlanPage(id){
 /* =====================================================================
    3) لوحة الإدارة: الاشتراكات، والباقات، والجدول، والطلبات
    ===================================================================== */
-let qTab = 'subs', qf = { plan:'all', section:'all', status:'live', q:'' };
+let qTab = 'subs', qf = { plan:'all', section:'all', status:'live', q:'', scope:'all' };
 export function pageQudurat(){
   const m = $('#main'), D = AD, n = riyadhNow();
   const subs = D.subscriptions || [], live = subs.filter(s => ['pending', 'active'].includes(subStatus(s, n.date)));
@@ -193,15 +193,15 @@ function deviceAlerts(D, n){
     <p class="hint" style="margin:4px 0 0">قد يكون متدرب حضّر عن زملائه. راجع الحضور الفعلي في القاعة.</p></div></div>`;
 }
 
-function filteredSubs(D, n){
+function filteredSubs(D, n, anyStatus = false){
   const q = qf.q.trim();
   return (D.subscriptions || []).filter(s => {
     const st = subStatus(s, n.date), t = D.trainees.find(x => x.id === s.trainee_id);
     if(qf.plan !== 'all' && s.plan_id !== qf.plan) return false;
     if(qf.section !== 'all' && s.section !== qf.section) return false;
-    if(qf.status === 'live' && !['pending', 'active'].includes(st)) return false;
-    if(!['all', 'live'].includes(qf.status) && st !== qf.status) return false;
-    if(!matchQ(q, t?.full_name, t?.national_id, t?.phone, s.ref)) return false;
+    if(!anyStatus && qf.status === 'live' && !['pending', 'active'].includes(st)) return false;
+    if(!anyStatus && !['all', 'live'].includes(qf.status) && st !== qf.status) return false;
+    if(!matchPerson(qf.scope, q, t, s.ref)) return false;
     return true;
   });
 }
@@ -209,12 +209,16 @@ function tabSubs(){
   const D = AD, n = riyadhNow(), body = $('#qBody');
   const rows = filteredSubs(D, n).map(s => ({ s, t:D.trainees.find(x => x.id === s.trainee_id), st:subStats(D, s, n) }))
     .sort((a, b) => (a.t?.full_name || '').localeCompare(b.t?.full_name || '', 'ar'));
+  const shown = new Set(rows.map(x => x.s.id)), extra = qf.q.trim() && qf.status !== 'all' ? filteredSubs(D, n, true).filter(s => !shown.has(s.id)) : [];
+  const hidden = extra.length, hiddenSt = [...new Set(extra.map(s => SUB_STATUS[subStatus(s, n.date)]))];
   body.innerHTML = `<div class="card pad rv"><div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <input class="inp" id="qq" placeholder="بحث بالاسم أو السجل أو الجوال" value="${esc(qf.q)}" style="flex:1;min-width:200px" aria-label="بحث">
+      <input class="inp" id="qq" placeholder="بحث بأي جزء من الاسم أو السجل أو الجوال" value="${esc(qf.q)}" style="flex:1;min-width:200px" aria-label="بحث">
+      ${scopeSelect('qsc', qf.scope)}
       <select class="inp" id="qp" aria-label="الباقة" style="width:auto"><option value="all">كل الباقات</option>${(D.plans || []).map(p => `<option value="${p.id}" ${qf.plan === p.id ? 'selected' : ''}>${esc(planName(p))}</option>`).join('')}</select>
       <select class="inp" id="qs" aria-label="القسم" style="width:auto"><option value="all">البنون والبنات</option>${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${qf.section === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <select class="inp" id="qst" aria-label="الحالة" style="width:auto">${[['live', 'القائمة'], ['all', 'الكل'], ...Object.entries(SUB_STATUS)].map(([k, v]) => `<option value="${k}" ${qf.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <button class="btn sm" id="qx">${ic('copy')} Excel</button></div>
+    ${hidden ? `<p class="alert t-info" style="margin:0 0 12px"><span class="aic">${ic('search')}</span><span>${fmtNum(hidden)} ${hidden === 1 ? 'نتيجة مطابقة مخفية' : 'نتائج مطابقة مخفية'} لأن حالتها ${hiddenSt.join(' أو ')} (التصفية الآن: «${qf.status === 'live' ? 'القائمة' : SUB_STATUS[qf.status] || 'الكل'}»). <button class="btn sm" id="qAllSt">عرض كل الحالات</button></span></p>` : ''}
     ${rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>القسم</th><th>الحالة</th><th>البداية – النهاية</th><th>الحضور</th><th>المدة</th><th></th></tr></thead><tbody>
       ${rows.map(({ s, t, st }) => `<tr><td><b style="font-weight:500">${esc(t?.full_name || '—')}</b><div class="hint" dir="ltr" style="text-align:right">${esc(t?.national_id || '')}</div></td>
         <td>${esc(planName(st.plan))}</td><td>${SECTIONS[s.section]}</td><td><span class="pill dot ${SUB_TONE[st.status]}">${SUB_STATUS[st.status]}</span>${s.start_manual ? '<div class="hint">بداية يدوية</div>' : ''}</td>
@@ -223,6 +227,8 @@ function tabSubs(){
         <td style="min-width:110px">${s.start_date ? `<div class="tbar" role="img" aria-label="مضى ${fmtNum(st.timePct)}٪ من المدة"><i style="width:${st.timePct}%"></i></div><div class="hint">${fmtNum(st.daysLeft)} يومًا متبقية</div>` : '<span class="hint">لم تبدأ</span>'}</td>
         <td style="white-space:nowrap"><button class="btn sm" data-sv="${s.id}" title="سجل الحضور" aria-label="سجل حضور ${esc(t?.full_name || '')}">${ic('calendar')} السجل</button> <button class="btn sm" data-se="${s.id}" title="تعديل الاشتراك" aria-label="تعديل اشتراك ${esc(t?.full_name || '')}">${ic('edit')} تعديل</button></td></tr>`).join('')}
       </tbody></table></div>` : emptyBox('لا توجد اشتراكات مطابقة', 'غيّر عوامل التصفية أو أضف مشتركًا.')}</div>`;
+  $('#qsc').onchange = e => { qf.scope = e.target.value; tabSubs(); };
+  if($('#qAllSt')) $('#qAllSt').onclick = () => { qf.status = 'all'; tabSubs(); };
   let tmr; $('#qq').oninput = e => { qf.q = e.target.value; clearTimeout(tmr); tmr = setTimeout(() => { tabSubs(); const el = $('#qq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
   $('#qp').onchange = e => { qf.plan = e.target.value; tabSubs(); };
   $('#qs').onchange = e => { qf.section = e.target.value; tabSubs(); };
@@ -234,11 +240,11 @@ function tabSubs(){
 }
 
 /* كشف اليوم لكل قسم: من حضر، ومن تأخر، ومن لم يسجل بعد */
-let tdQ = '', tdSt = 'all';   // بحث وتصفية «حضور اليوم»
+let tdQ = '', tdSt = 'all', tdSc = 'all';   // بحث وتصفية «حضور اليوم»
 function tabToday(){
   const D = AD, n = riyadhNow(), body = $('#qBody');
-  const pass = (t, a) => matchQ(tdQ, t?.full_name, t?.national_id, t?.phone) && (tdSt === 'all' || (tdSt === 'present' ? !!a : !a));
-  body.innerHTML = `<div class="filters" style="margin-bottom:12px"><label class="sr-only" for="tdq">بحث</label><input class="inp" id="tdq" type="search" placeholder="بحث بالاسم أو السجل المدني أو الجوال" value="${esc(tdQ)}" style="flex:1;min-width:200px" autocomplete="off">
+  const pass = (t, a) => matchPerson(tdSc, tdQ, t) && (tdSt === 'all' || (tdSt === 'present' ? !!a : !a));
+  body.innerHTML = `<div class="filters" style="margin-bottom:12px"><label class="sr-only" for="tdq">بحث</label><input class="inp" id="tdq" type="search" placeholder="بحث بأي جزء من الاسم أو السجل أو الجوال" value="${esc(tdQ)}" style="flex:1;min-width:200px" autocomplete="off">${scopeSelect('tdsc', tdSc)}
     <label class="sr-only" for="tds">الحالة</label><select class="inp" id="tds">${[['all', 'الكل'], ['present', 'الحاضرون'], ['absent', 'لم يحضروا']].map(([k, v]) => `<option value="${k}" ${tdSt === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>` + Object.keys(SECTIONS).map((sec, i) => {
     const ses = sessionOn(D, sec, n.date);
     const list = (D.subscriptions || []).filter(s => s.section === sec && ['pending', 'active'].includes(subStatus(s, n.date)))
@@ -252,6 +258,7 @@ function tabToday(){
           <td class="num">${a ? t12(a.time.slice(0, 5)) : '—'}</td>
           <td style="white-space:nowrap"><button class="btn sm" data-mk="${s.id}" data-st="حاضر">حاضر</button> <button class="btn sm" data-mk="${s.id}" data-st="متأخر">متأخر</button>${a ? ` <button class="btn sm danger soft" data-mk="${s.id}" data-st="">إلغاء</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : emptyBox('لا يوجد مشتركون في هذا القسم')}</div>`; }).join('');
+  $('#tdsc').onchange = e => { tdSc = e.target.value; tabToday(); };
   let tdT; $('#tdq').oninput = e => { tdQ = e.target.value; clearTimeout(tdT); tdT = setTimeout(() => { tabToday(); const el = $('#tdq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
   $('#tds').onchange = e => { tdSt = e.target.value; tabToday(); };
   $$('[data-abs]').forEach(b => b.onclick = () => { const [sec, e] = b.dataset.abs.split(':'); absenceModal(AD, 'pkg', sec, riyadhNow().date, e === '1'); });

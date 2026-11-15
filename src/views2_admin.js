@@ -8,7 +8,7 @@ import { PROFILE_FIELDS, STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArc
 import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules, setBusy } from './features.js';
 import { pagePartners } from './partners.js';
 import { exportCSV, pageReports, printDayModal, printSheets, traineesRows } from './print.js';
-import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin, matchQ } from './utils.js';
+import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin, matchQ, matchPerson, scopeSelect } from './utils.js';
 import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, statusPill, toast } from './views2_head.js';
 import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hoursTxt, kpiCard, makeQR, programUrl, route, short, titleBar } from './views2_main.js';
 import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
@@ -389,7 +389,7 @@ export function cohortOpened(p){
 }
 
 /* ---------- المتدربون ---------- */
-export let trQ='', trP='all';
+export let trQ='', trP='all', trSc='all';
 /* طلبات تحديث البيانات (الخطوة A): فروق أدخلها شخص أعاد التسجيل بسجل مدني موجود، ولا تُطبَّق إلا بقرار الإدارة */
 function changeReqHtml(){
   const R=(AD.profile_change_requests||[]).filter(r=>r.status==='pending'); if(!R.length) return '';
@@ -410,10 +410,10 @@ function bindChangeReq(){
 export function pageTrainees(){
   const m=$('#main'); queueMicrotask(bindChangeReq); const {programs,trainees,enrollments,attendance}=AD;
   const ensOf = t => enrollments.filter(e=>e.trainee_id===t.id);
-  const list = trainees.filter(t=>matchQ(trQ,t.full_name,t.national_id,t.phone,...ensOf(t).map(e=>e.ref)) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
+  const list = trainees.filter(t=>matchPerson(trSc,trQ,t,...ensOf(t).map(e=>e.ref)) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
     .sort((a,b)=>(ensOf(b).map(e=>e.created_at).sort().pop()||'').localeCompare(ensOf(a).map(e=>e.created_at).sort().pop()||''));
   m.innerHTML = titleBar(`${ic('id')}المتدربون`, `سجل المتدربين، <em>${fmtNum(list.length)} متدرب</em>`, 'كل متدرب بسجله المدني مرة واحدة، مع كل الدفعات التي سجّل فيها ونسبة حضوره في كل منها.', `<button class="btn sm" id="csvx">${ic('database')} تصدير Excel</button><button class="btn sm" id="csv">${ic('copy')} نسخ كجدول</button>`)+
-   `${changeReqHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">
+   `${changeReqHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="أي جزء من الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">${scopeSelect('tsc',trSc)}
      <select class="inp" id="tp" style="max-width:280px"><option value="all">كل البرامج</option>${allCats().map(c=>{ const ps=programs.filter(p=>p.category===c&&enrollments.some(e=>e.program_id===p.id)); return ps.length?`<optgroup label="${esc(c)}">${ps.map(p=>`<option value="${p.id}" ${trP===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select></div>
    ${list.length?`<div class="tbw rv" style="--i:2"><table class="tb"><thead><tr><th>المتدرب</th><th>السجل المدني</th><th>الجوال</th><th>المدينة</th><th>الدفعات</th><th></th></tr></thead><tbody>
    ${list.slice(0,400).map(t=>`<tr><td><div class="who"><span class="avatar ${t.gender==='أنثى'?'f':''}">${esc(t.full_name[0])}</span><div><b style="font-weight:500">${esc(t.full_name)}</b><div class="hint">${esc(t.education||'')}${t.employer?` · ${esc(t.employer)}`:''}</div></div></div></td>
@@ -422,6 +422,7 @@ export function pageTrainees(){
        return `<button class="enr" data-cv="${c.id}"><span class="pill dot ${e.status==='ملغى'?'bad':STATE_PILL[cohortState(c)]}">${e.status==='ملغى'?'ملغى':STATE_TXT[cohortState(c)]}</span><span style="flex:1;text-align:right">${esc(short(progName(e.program_id)))} · د${fmtNum(c.number)}</span><span class="hint num">${r===null?'—':fmtNum(r)+'٪'}</span></button>`; }).join('')}</div></td>
      <td style="white-space:nowrap"><button class="btn sm" data-ted="${t.id}" title="تعديل بيانات المتدرب" aria-label="تعديل بيانات ${esc(t.full_name)}">${ic('edit')}</button> <button class="btn sm" data-tst="${t.id}" title="كشف الحساب" aria-label="كشف حساب ${esc(t.full_name)}">${ic('receipt')}</button> <button class="btn sm danger soft" data-del="${t.id}" title="حذف المتدرب" aria-label="حذف ${esc(t.full_name)}">${ic('trash')}</button></td></tr>`).join('')}
    </tbody></table></div>${list.length>400?`<p class="hint">تظهر أول ٤٠٠ نتيجة. استخدم البحث لتضييق القائمة.</p>`:''}` : emptyBox('لا يوجد متدربون مطابقون','غيّر البحث أو المرشح.')}`;
+  $('#tsc').onchange=e=>{ trSc=e.target.value; pageTrainees(); };
   $('#tq').oninput=e=>{ trQ=e.target.value; clearTimeout(window._tq); window._tq=setTimeout(()=>{ pageTrainees(); const el=$('#tq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); };
   $('#tp').onchange=e=>{ trP=e.target.value; pageTrainees(); };
   $('#csvx').onclick=()=>exportCSV('المتدربون-وتسجيلاتهم', traineesRows());
