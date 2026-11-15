@@ -17,6 +17,7 @@ import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
 import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
+import { analysisHtml } from './analysis_views.js';
 import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
 import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml, printDaySheet } from './trainer_views.js';
@@ -229,7 +230,7 @@ function viewGuardian(D, s){
       <p>${esc(ch.relation || '')}${it ? ' · ' + esc(it.plan) + ' · قسم ' + esc(it.section) : px ? ' · ' + esc(px.program) : ''}</p></div>
       <div><button class="btn sm ghost-t" id="gLink">${ic('plus')} ربط ابن أو ابنة</button></div></section>
     ${g.children.length > 1 ? `<div class="tabs" style="margin:14px 0">${g.children.map((c, i) => `<button class="tab" data-gi="${i}" aria-selected="${i === gIdx}">${ic('user')}${esc(c.trainee.first_name)}</button>`).join('')}</div>` : ''}
-    ${!u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75))}${ordersCardHtml((D.orders || []).filter(o => o.trainee_id === ch.trainee.id), ch.trainee.first_name)}</div>`;
+    ${!u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, ch.notifications) : programPanelHtml(px, D.settings?.cert_threshold ?? 75))}<div style="margin-top:16px">${analysisHtml(D, ch.trainee.id, { role:'guardian', name:ch.trainee.first_name })}</div>${ordersCardHtml((D.orders || []).filter(o => o.trainee_id === ch.trainee.id), ch.trainee.first_name)}</div>`;
   bindOrdersCard($('#app'), (D.orders || []).filter(o => o.trainee_id === ch.trainee.id), async () => viewGuardian(await Store.portalData('guardian'), s));
   $('#gLink').onclick = () => { modal(linkFormHtml(false)); bindLinkForm(); };
   $$('[data-gi]').forEach(b => b.onclick = () => { gIdx = +b.dataset.gi; sIdx = 0; viewGuardian(D, s); });

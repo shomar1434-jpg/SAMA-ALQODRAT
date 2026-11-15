@@ -58,6 +58,9 @@ export function enrollmentStats(D, e, c){
     reachable: needed <= Math.max(0,remaining) };
 }
 /* ===== آلية الاحتساب ورسائل التنبيه: يضبطها مسؤول النظام ===== */
+/* التصنيف الحالي لأسئلة محاولات البوابة واختباراتها (↔ q_meta في portal_data) */
+const qMetaOf=(D, sc)=>{ const ids=new Set([...(sc.attempts||[]).flatMap(a=>(a.snapshot||[]).map(q=>q.id)), ...(sc.assignments||[]).flatMap(a=>(a.quiz||[]).map(q=>q.id))]), o={};
+  (D.questions||[]).forEach(q=>{ if(ids.has(q.id)) o[q.id]=[q.category||'', q.unit||'']; }); return o; };
 const catGuard=(subject, c)=>{ if(c&&!catOk(subject, c)) throw new Error('التصنيف لا يناسب المقرر'); return c||''; };
 export const CALC_DEFAULTS = { cert_threshold:75, late_weight:1, warn_consec:2,
   msg_ok:'نسبة حضورك {النسبة}٪ وأنت على المسار الصحيح للحصول على الشهادة. واصل الحضور.',
@@ -230,7 +233,7 @@ export function scopeData(D, role, phone){
       assignments:(D.assignments||[]).filter(a=>a.teacher_id===me.id), submissions:(D.submissions||[]).filter(x=>ids.includes(x.trainee_id)&&(D.assignments||[]).some(a=>a.id===x.assignment_id&&a.teacher_id===me.id)),
       notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id), notifications_in:(D.notifications||[]).filter(x=>x.to==='teacher'&&x.teacher_id===me.id),
       questions:teacherBank(D, me), groups:(D.trainer_groups||[]).filter(g=>g.teacher_id===me.id).map(g=>({id:g.id, name:g.name, trainee_ids:g.trainee_ids.filter(id=>ids.includes(id)), created_at:g.created_at})),
-      attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject))),
+      attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.kind==='sim'||(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject)))),
       rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
       // دفعات البرامج المسندة إليه: كشفها وحضورها (أسماء المتدربين فقط)
       ...(()=>{ const cs=(D.cohorts||[]).filter(c=>c.teacher_id===me.id&&!cohortArchived(c)), cids=cs.map(c=>c.id), en=(D.enrollments||[]).filter(e=>cids.includes(e.cohort_id)&&e.status!=='ملغى'), eids=en.map(e=>e.id), tids=en.map(e=>e.trainee_id);
@@ -556,7 +559,7 @@ export const LocalStore = {
   async portalCheckin(traineeId, code, opts={}){ const se=await this.portalSession('student'); if(!se) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا');
     const t=this.data.trainees.find(x=>x.id===traineeId && normPhone(x.phone)===normPhone(se.phone)); if(!t) throw new Error('غير مصرح');
     return this.checkin(t.national_id, code, null, {device:opts.device||'portal', choice:opts.choice}); },
-  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; return out; },
+  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; if(out) out.q_meta=qMetaOf(this.data, out); return out; },
   /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
   runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
     const add=sessionReminders(D, riyadhNow()).filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },

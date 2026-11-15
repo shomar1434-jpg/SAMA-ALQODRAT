@@ -12,6 +12,7 @@ import { teacherTeaches } from './learning_logic.js';
 import { setHwPreset } from './learning_views.js';
 import { setBusy } from './features.js';
 import { SECTIONS } from './qudurat.js';
+import { analysisHtml } from './analysis_views.js';
 import { smartGroups, daySummary, BIO_MAX, CV_MAX, AVATAR_MAX, GROUP_NAME_MAX, PEOPLE_FLAGS, peopleRows, peopleFilter, traineeCard } from './trainer_logic.js';
 
 const avatarHtml = (t, big) => t.avatar ? `<img class="avt ${big ? 'lg' : ''}" src="${esc(t.avatar)}" alt="صورة ${esc(t.full_name)}">` : `<span class="avt ph ${big ? 'lg' : ''}" aria-hidden="true">${esc((t.full_name || '؟').trim()[0])}</span>`;
@@ -107,7 +108,7 @@ export function teacherPeople(D, reload, go){
     bind(){ const sel = () => { $('#ppSel').textContent = picked.size ? `المحدَّد: ${fmtNum(picked.size)}` : ''; };
       const wire = () => { $$('[data-pk]').forEach(c => c.onchange = () => { c.checked ? picked.add(c.dataset.pk) : picked.delete(c.dataset.pk); sel(); });
         $$('[data-pc]').forEach(b => b.onclick = () => { const r = all.find(x => x.trainee_id === b.dataset.pc);
-          modal(`${cardHtml(traineeCard(D, D.me, r, n.date))}<div style="text-align:end;margin-top:12px"><button class="btn pri" id="pcX">إغلاق</button></div>`); $('#pcX').onclick = closeModal; }); };
+          modal(`${cardHtml(traineeCard(D, D.me, r, n.date))}<div class="an-in-modal">${analysisHtml(D, r.trainee_id, { role:'teacher', subjects:D.me.subjects, name:String(r.name || '').split(' ')[0] })}</div><div style="text-align:end;margin-top:12px"><button class="btn pri" id="pcX">إغلاق</button></div>`); $('#pcX').onclick = closeModal; }); };
       const draw = () => { $('#ppList').innerHTML = rowsHtml(); wire(); };
       $('#pp-q').oninput = e => { PF.q = e.target.value; draw(); }; $('#pp-p').onchange = e => { PF.plan = e.target.value; draw(); }; $('#pp-f').onchange = e => { PF.flag = e.target.value; draw(); };
       $('#ppAll').onclick = () => { peopleFilter(all, PF).forEach(r => picked.add(r.trainee_id)); draw(); sel(); };
