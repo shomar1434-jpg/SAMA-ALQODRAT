@@ -8,7 +8,7 @@ import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, addDays, validSa
 import { ic, emptyBox, ringSvg, toast, countUp } from './views2_head.js';
 import { Store } from './data2.js';
 import { sectionDaysTxt } from './data2.js';
-import { TIERS, MODES, DURATION_TXT, planTotal, planName, planOpen, SECTIONS, SUB_STATUS, SUB_TONE, EXC_TXT, subStats, subStatus, sessionOn, sessionsBetween, sectionOfGender, priorSessions } from './qudurat.js';
+import { TIERS, MODES, DURATION_TXT, planTotal, planName, planOpen, SECTIONS, SUB_STATUS, SUB_TONE, EXC_TXT, subStats, subStatus, sessionOn, sessionsBetween, sectionOfGender, priorSessions, subEnd } from './qudurat.js';
 import { initMarquee } from './marquee.js';
 import { regFormHtml, bindRegForm, titleBar, kpiCard } from './views2_main.js';
 import { siteFooter } from './landing.js';
@@ -217,7 +217,7 @@ function tabSubs(){
       <select class="inp" id="qp" aria-label="الباقة" style="width:auto"><option value="all">كل الباقات</option>${(D.plans || []).map(p => `<option value="${p.id}" ${qf.plan === p.id ? 'selected' : ''}>${esc(planName(p))}</option>`).join('')}</select>
       <select class="inp" id="qs" aria-label="القسم" style="width:auto"><option value="all">البنون والبنات</option>${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${qf.section === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <select class="inp" id="qst" aria-label="الحالة" style="width:auto">${[['live', 'القائمة'], ['all', 'الكل'], ...Object.entries(SUB_STATUS)].map(([k, v]) => `<option value="${k}" ${qf.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <button class="btn sm" id="qx">${ic('copy')} Excel</button></div>
+      <button class="btn sm" id="qx">${ic('copy')} Excel</button>${rows.length ? `<button class="btn sm" id="qBS">${ic('calendar')} تاريخ البداية للمعروضين</button>` : ''}</div>
     ${hidden ? `<p class="alert t-info" style="margin:0 0 12px"><span class="aic">${ic('search')}</span><span>${fmtNum(hidden)} ${hidden === 1 ? 'نتيجة مطابقة مخفية' : 'نتائج مطابقة مخفية'} لأن حالتها ${hiddenSt.join(' أو ')} (التصفية الآن: «${qf.status === 'live' ? 'القائمة' : SUB_STATUS[qf.status] || 'الكل'}»). <button class="btn sm" id="qAllSt">عرض كل الحالات</button></span></p>` : ''}
     ${rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>القسم</th><th>الحالة</th><th>البداية – النهاية</th><th>الحضور</th><th>المدة</th><th></th></tr></thead><tbody>
       ${rows.map(({ s, t, st }) => `<tr><td><b style="font-weight:500">${esc(t?.full_name || '—')}</b><div class="hint" dir="ltr" style="text-align:right">${esc(t?.national_id || '')}</div></td>
@@ -228,6 +228,7 @@ function tabSubs(){
         <td style="white-space:nowrap"><button class="btn sm" data-sv="${s.id}" title="سجل الحضور" aria-label="سجل حضور ${esc(t?.full_name || '')}">${ic('calendar')} السجل</button> <button class="btn sm" data-se="${s.id}" title="تعديل الاشتراك" aria-label="تعديل اشتراك ${esc(t?.full_name || '')}">${ic('edit')} تعديل</button></td></tr>`).join('')}
       </tbody></table></div>` : emptyBox('لا توجد اشتراكات مطابقة', 'غيّر عوامل التصفية أو أضف مشتركًا.')}</div>`;
   $('#qsc').onchange = e => { qf.scope = e.target.value; tabSubs(); };
+  if($('#qBS')) $('#qBS').onclick = () => bulkStartModal(rows);
   if($('#qAllSt')) $('#qAllSt').onclick = () => { qf.status = 'all'; tabSubs(); };
   let tmr; $('#qq').oninput = e => { qf.q = e.target.value; clearTimeout(tmr); tmr = setTimeout(() => { tabSubs(); const el = $('#qq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
   $('#qp').onchange = e => { qf.plan = e.target.value; tabSubs(); };
@@ -266,6 +267,35 @@ function tabToday(){
 }
 
 /* سجل اشتراك: الأيام المنعقدة مع الحضور، وتعديل يدوي موثّق */
+/* تاريخ بداية الباقة مرن (الخطوة AN): يُعدَّل لأي اشتراك ولو قبل تاريخ سابق، وتُحسب النهاية للباقة تلقائيًا */
+const saveStart = (s, date) => Store.saveSubscription({ id:s.id, trainee_id:s.trainee_id, plan_id:s.plan_id, section:s.section, start_date:date || null, prior_absences:s.prior_absences || 0 });
+const startEditor = (s, D) => { const pl = (D.plans || []).find(p => p.id === s.plan_id), today = riyadhNow().date;
+  return `<div class="sd-start"><div class="field" style="margin:0"><label for="sdStart">تاريخ بداية الباقة</label><input class="inp" type="date" id="sdStart" value="${s.start_date || ''}" max="${today}"></div>
+    <div class="sd-end hint" id="sdEnd">${s.start_date && pl ? `النهاية: ${fmtDate(subEnd(pl, s.start_date))}` : 'اختر يوم البداية'}</div>
+    <button class="btn sm pri" id="sdSv" type="button">${ic('check')} حفظ التاريخ</button></div>`; };
+function bindStart(s, D, after){
+  const pl = (D.plans || []).find(p => p.id === s.plan_id);
+  $('#sdStart').onchange = e => { $('#sdEnd').textContent = e.target.value && pl ? `النهاية: ${fmtDate(subEnd(pl, e.target.value))}` : 'اختر يوم البداية'; };
+  $('#sdSv').onclick = async e => { const b = e.currentTarget, v = $('#sdStart').value; setBusy(b, true, 'جارٍ الحفظ');
+    try { await saveStart(s, v); await reloadAD(); toast('حُفظ تاريخ البداية'); after(); } catch(x){ setBusy(b, false); toast(x.message); } };
+}
+/* تعديل تاريخ البداية لكل الاشتراكات المعروضة بالتصفية الحالية */
+function bulkStartModal(rows){
+  const today = riyadhNow().date;
+  modal(`<h3>${ic('calendar')} تاريخ البداية للمعروضين</h3>
+    <p class="hint" style="margin:-4px 0 12px">يُطبَّق على ${fmtNum(rows.length)} اشتراكًا الظاهرة الآن بالتصفية الحالية (الباقة، القسم، الحالة، البحث)، وتُحسب نهاية كل اشتراك لباقته. الملغاة لا تتغير.</p>
+    <div class="field"><label for="bsD">تاريخ البداية</label><input class="inp" type="date" id="bsD" max="${today}"></div>
+    <div class="errtxt" id="bsE" role="alert"></div><p class="hint" id="bsP" aria-live="polite"></p>
+    <div style="display:flex;gap:8px;justify-content:end"><button class="btn" id="bsX">إلغاء</button><button class="btn pri" id="bsS">${ic('check')} تطبيق</button></div>`);
+  $('#bsX').onclick = closeModal;
+  $('#bsS').onclick = async e => { const v = $('#bsD').value, b = e.currentTarget; $('#bsE').textContent = '';
+    if(!v){ $('#bsE').textContent = 'اختر تاريخ البداية'; return; }
+    const list = rows.filter(r => r.s.status !== 'cancelled'); setBusy(b, true, 'جارٍ التطبيق'); let done = 0; const fails = [];
+    for(const r of list){ try { await saveStart(r.s, v); done++; } catch(x){ fails.push(`${r.t?.full_name || ''}: ${x.message}`); } $('#bsP').textContent = `تم ${fmtNum(done)} من ${fmtNum(list.length)}`; }
+    await reloadAD(); setBusy(b, false);
+    if(fails.length){ $('#bsE').innerHTML = fails.slice(0, 8).map(esc).join('<br>'); toast(`طُبّق على ${fmtNum(done)}، وتعذّر ${fmtNum(fails.length)}`); }
+    else { closeModal(); toast(`طُبّق تاريخ البداية على ${fmtNum(done)} اشتراكًا`); } tabSubs(); };
+}
 function subDetail(id){
   const D = AD, n = riyadhNow(), s = (D.subscriptions || []).find(x => x.id === id); if(!s) return;
   const t = D.trainees.find(x => x.id === s.trainee_id), st = subStats(D, s, n);
@@ -277,16 +307,18 @@ function subDetail(id){
       <div><b class="num">${fmtNum(st.remaining)}</b><span>جلسة متبقية</span></div><div><b class="num">${fmtNum(st.daysLeft)}</b><span>يومًا للنهاية</span></div></div>
       <div class="tbar big" role="img" aria-label="مضى ${fmtNum(st.timePct)}٪ من مدة الباقة"><i style="width:${st.timePct}%"></i></div>
       <p class="hint" style="margin:6px 0 12px">من ${fmtDate(s.start_date)} إلى ${fmtDate(st.end)}${s.start_manual ? ' (تاريخ بداية أدخلته الإدارة)' : ''}</p>
+      ${startEditor(s, D)}
       <div class="daygrid">${days.map(d => { const a = st.att.find(x => x.att_date === d.date), fut = d.date > n.date;
         const pre = !a && s.track_from && d.date < s.track_from, cls = a ? (a.status === 'متأخر' ? 'late' : 'ok') : pre ? 'pre' : fut ? 'fut' : 'abs', lbl = a ? a.status : pre ? 'قبل المنصة (من الكشف اليدوي)' : fut ? 'قادمة' : 'غائب';
         return `<button class="dg ${cls}" ${fut ? 'disabled' : ''} data-dd="${d.date}" title="${fmtDate(d.date)} · ${lbl}" aria-label="${fmtDate(d.date)}: ${lbl}"><span>${fmtShort(d.date)}</span></button>`; }).join('')}</div>
       <p class="hint" style="margin:8px 0 0">اضغط يومًا منعقدًا للتبديل بين: حاضر ← متأخر ← غائب. كل تعديل يُسجَّل في سجل التدقيق.${st.prior ? ` الأيام المنقطة قبل التسجيل في المنصة (${fmtNum(st.prior)} جلسة) تُحتسب حضورًا عدا ${fmtNum(st.priorAbsences)} يوم غياب من الكشوف اليدوية، وتعدّلها من «تعديل».` : ''}</p>`
-    : emptyBox('لم يبدأ الاشتراك بعد', 'يبدأ تلقائيًا من أول حضور بالباركود، أو حدّد تاريخ البداية من «تعديل».')}
+    : emptyBox('لم يبدأ الاشتراك بعد', 'يبدأ تلقائيًا من أول حضور بالباركود، أو حدّد تاريخ البداية الآن.') + startEditor(s, D)}
     <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap">
       <button class="btn sm danger soft" id="sdC">${s.status === 'cancelled' ? 'استعادة الاشتراك' : 'إلغاء الاشتراك'}</button>
       <div style="display:flex;gap:8px"><button class="btn sm" id="sdE">${ic('edit')} تعديل</button><button class="btn pri sm" id="sdX">إغلاق</button></div></div>`);
   $('#sdX').onclick = closeModal;
   $('#sdE').onclick = () => subModal(s);
+  bindStart(s, D, () => subDetail(s.id));
   $('#sdC').onclick = () => { const on = s.status !== 'cancelled'; (on ? (fn => confirmBox('إلغاء الاشتراك', 'يبقى سجل الحضور محفوظًا، ويمكن استعادة الاشتراك لاحقًا.', fn, 'إلغاء الاشتراك')) : (fn => fn()))(async () => { await Store.cancelSubscription(s.id, on); await reloadAD(); toast(on ? 'أُلغي الاشتراك' : 'استُعيد الاشتراك'); closeModal(); pageQudurat(); }); };
   $$('[data-dd]').forEach(b => b.onclick = async () => { const a = st.att.find(x => x.att_date === b.dataset.dd);
     const next = !a ? 'حاضر' : a.status === 'حاضر' ? 'متأخر' : null;

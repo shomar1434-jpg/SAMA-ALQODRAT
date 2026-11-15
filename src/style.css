@@ -1234,3 +1234,6 @@ body.wl-open{overflow:hidden}
 .hero-checkin{margin-top:12px}
 .hero-done{margin-top:12px;background:rgba(143,220,192,.18)!important}
 @media(prefers-reduced-motion:reduce){.wl-card{animation:none}}
+/* تاريخ بداية الباقة المرن في سجل الاشتراك (الخطوة AN) */
+.sd-start{display:flex;gap:10px;align-items:end;flex-wrap:wrap;padding:12px;margin:0 0 12px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface-sunken)}
+.sd-start .field{flex:1 1 180px}.sd-end{flex:1 1 140px;padding-bottom:12px}
