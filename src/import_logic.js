@@ -75,6 +75,9 @@ export const legacySummary = rows => ({ count:rows.length, ok:rows.filter(r => !
   total:rows.reduce((a, r) => a + (r.errors.length ? 0 : r.total), 0), paid:rows.reduce((a, r) => a + (r.errors.length ? 0 : r.paid), 0) });
 
 /* مراجعة البيانات: ما ينقص أو يحتاج نظرًا في قاعدة المتدربين. لكل متدرب قائمة ملاحظات؛ field يدل على الحقل الذي يكمله المسؤول */
+const UPGRADE_GAP = 200;   // فرق أقل من ذلك زيادة سداد لا ترقية
+const UPGRADE_RX = /تحويل بين الباقات|ترقي|رُقّي|رقي إلى|حول للباقة|حوّل/;
+const planLabel = p => `الباقة ${({ basic:'الأساسية', silver:'الفضية', gold:'الذهبية', diamond:'الماسية', custom:'«خصصناها لك»' })[p.tier] || p.name}`;
 export function dataIssues(D){
   const byPhone = {}; (D.trainees || []).forEach(t => { if(t.phone) (byPhone[t.phone] = byPhone[t.phone] || []).push(t.id); });
   const out = [];
@@ -93,8 +96,14 @@ export function dataIssues(D){
       if(plan && +o.total !== planTotal(plan) && !o.discount_note) add(`الطلب ${o.number}: الرسوم ${o.total} تخالف سعر الباقة ${planTotal(plan)} دون سبب مكتوب`, 'order:' + o.id);
       if(o.opening && !(+o.paid_amount > 0)) add(`الطلب ${o.number}: لا دفعات مسجّلة`, 'order:' + o.id);
       if(+o.paid_amount > +o.total) add(`الطلب ${o.number}: المدفوع ${o.paid_amount} أكثر من الرسوم ${o.total}`, 'order:' + o.id);
+      /* ترقية محتملة لم تُسجَّل: المدفوع أو الرسوم أكثر من سعر الباقة المسجّلة (الخطوة AO) */
+      const paidNow = Math.max(+o.paid_amount || 0, +o.total || 0);
+      if(plan && sub.status !== 'cancelled' && paidNow - planTotal(plan) >= UPGRADE_GAP){
+        const up = (D.plans || []).filter(p => p.mode === plan.mode && p.tier !== plan.tier && planTotal(p) > planTotal(plan) && planTotal(p) <= paidNow).sort((a, b) => planTotal(b) - planTotal(a))[0];
+        I.push({ text:`ترقية محتملة لم تُسجَّل: ${o.paid_amount > planTotal(plan) ? 'المدفوع' : 'الرسوم'} ${paidNow} أكثر من سعر ${planLabel(plan)} ${planTotal(plan)}${up ? ` ويطابق ${planTotal(up) === paidNow ? '' : 'أو يتجاوز '}سعر ${planLabel(up)} ${planTotal(up)}` : ''}. غيّر الباقة من «طلبات الشراء» ← الطلب ${o.number} ← «تغيير الباقة».`, field:'order:' + o.id, upgrade:true });
+      }
     }
-    (t.import_notes || []).forEach((n, i) => { if(!n.done) I.push({ text:n.text, field:null, note:i }); });
+    (t.import_notes || []).forEach((n, i) => { if(!n.done) I.push({ text:n.text, field:null, note:i, upgrade:UPGRADE_RX.test(n.text) || undefined }); });
     if(I.length) out.push({ trainee:t, issues:I });
   }
   return out.sort((a, b) => b.issues.length - a.issues.length || a.trainee.full_name.localeCompare(b.trainee.full_name, 'ar'));

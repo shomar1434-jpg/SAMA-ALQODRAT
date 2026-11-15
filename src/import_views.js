@@ -25,8 +25,8 @@ export function pageData(){
   dTab === 'issues' ? issuesTab(all, n) : importTab();
 }
 function issuesTab(all, n){
-  const kinds = [['all', 'كل الملاحظات'], ['birth_date', 'تاريخ الميلاد'], ['guardian_phone', 'جوال ولي الأمر'], ['email', 'البريد'], ['full_name', 'الاسم'], ['national_id', 'رقم الهوية'], ['order', 'الرسوم والدفعات'], ['note', 'ملاحظات الكشف السابق']];
-  const hit = i => dOnly === 'all' || (dOnly === 'note' ? i.note != null : dOnly === 'order' ? String(i.field || '').startsWith('order:') : i.field === dOnly);
+  const kinds = [['all', 'كل الملاحظات'], ['birth_date', 'تاريخ الميلاد'], ['guardian_phone', 'جوال ولي الأمر'], ['email', 'البريد'], ['full_name', 'الاسم'], ['national_id', 'رقم الهوية'], ['upgrade', 'ترقية محتملة'], ['order', 'الرسوم والدفعات'], ['note', 'ملاحظات الكشف السابق']];
+  const hit = i => dOnly === 'all' || (dOnly === 'upgrade' ? !!i.upgrade : dOnly === 'note' ? i.note != null : dOnly === 'order' ? String(i.field || '').startsWith('order:') : i.field === dOnly);
   const list = all.filter(x => matchPerson(dSc, dQ, x.trainee, x.trainee.guardian_phone) && x.issues.some(hit));
   $('#dBody').innerHTML = `<div class="filters"><label class="sr-only" for="dq">بحث</label><input class="inp" id="dq" type="search" placeholder="أي جزء من الاسم أو الهوية أو الجوال" value="${esc(dQ)}" style="flex:1;min-width:200px">${scopeSelect('dsc', dSc)}
       <label class="sr-only" for="dk">نوع الملاحظة</label><select class="inp" id="dk">${kinds.map(([k, v]) => `<option value="${k}" ${dOnly === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
