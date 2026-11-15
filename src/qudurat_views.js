@@ -3,6 +3,7 @@
    ===================================================================== */
 import { editTraineeModal } from './import_views.js';
 import { statementModal } from './statement_views.js';
+import { adminWeeklyModal } from './weekly_views.js';
 import { planPoster, COMPARE_ART } from './plan_art.js';
 import { $, $$, esc, fmtNum, fmtDate, fmtShort, riyadhNow, t12, addDays, validSaudiId, DAYS, matchPerson, scopeSelect } from './utils.js';
 import { ic, emptyBox, ringSvg, toast, countUp } from './views2_head.js';
@@ -330,7 +331,7 @@ function subModal(s){
   const D = AD, t = s ? D.trainees.find(x => x.id === s.trainee_id) : null, plans = (D.plans || []).filter(p => p.active !== false);
   modal(`<h3>${s ? 'تعديل الاشتراك' : 'إضافة مشترك'}</h3>
     <form id="smF" class="grid g2" novalidate>
-      ${s ? `<div class="field" style="grid-column:1/-1"><label>المتدرب</label><div class="inp" style="display:flex;align-items:center;background:var(--surface-sunken)">${esc(t?.full_name || '')} · <span dir="ltr">${esc(t?.national_id || '')}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn sm" id="smTE">${ic('edit')} تعديل بيانات المتدرب</button><button type="button" class="btn sm" id="smST">${ic('receipt')} كشف الحساب</button></div></div>`
+      ${s ? `<div class="field" style="grid-column:1/-1"><label>المتدرب</label><div class="inp" style="display:flex;align-items:center;background:var(--surface-sunken)">${esc(t?.full_name || '')} · <span dir="ltr">${esc(t?.national_id || '')}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn sm" id="smTE">${ic('edit')} تعديل بيانات المتدرب</button><button type="button" class="btn sm" id="smST">${ic('receipt')} كشف الحساب</button> <button type="button" class="btn sm" id="smWR">${ic('calendar')} تقرير الأسبوع</button></div></div>`
         : `<div class="field"><label for="sm-nid">السجل المدني <i>*</i></label><input class="inp num" id="sm-nid" name="national_id" inputmode="numeric" maxlength="10" dir="ltr"><span class="hint" id="smFound"></span></div>
            <div class="field"><label for="sm-name">الاسم الرباعي <i>*</i></label><input class="inp" id="sm-name" name="full_name" maxlength="80"></div>
            <div class="field"><label for="sm-phone">الجوال</label><input class="inp num" id="sm-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr"></div>
@@ -352,6 +353,7 @@ function subModal(s){
     $('#sm-phone').addEventListener('input', e => e.target.value = toLatin(e.target.value).replace(/\D/g, '')); }
   if($('#smTE')) $('#smTE').onclick = () => editTraineeModal(t.id, () => pageQudurat());
   if($('#smST')) $('#smST').onclick = () => statementModal(t.id);
+  if($('#smWR')) $('#smWR').onclick = () => adminWeeklyModal(AD, t.id, id => Store.traineeLearning(id));
   $('#smF').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#smE').textContent = '';
     if(!s){ if(!validSaudiId(f.national_id)) return $('#smE').textContent = 'رقم السجل المدني غير صحيح.'; if(f.full_name.trim().split(/\s+/).length < 3) return $('#smE').textContent = 'اكتب الاسم الثلاثي على الأقل.'; }
     const b = $('#smS'); setBusy(b, true, 'جارٍ الحفظ');

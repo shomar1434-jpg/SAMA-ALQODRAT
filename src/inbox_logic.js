@@ -4,8 +4,8 @@ import { uid, toMin, t12 } from './utils.js';
 import { sessionOn, SECTIONS, planName } from './qudurat.js';
 
 export const SOON_DEFAULT = 10;      // دقائق قبل بدء الجلسة (0 = معطّل)
-export const KIND_TITLE = { session_soon:'تبدأ الجلسة قريبًا', absence:'غياب', late:'تأخر', reminder:'تذكير بالحضور', homework:'واجب', general:'إشعار', admin:'رسالة من إدارة المعهد', message:'رسالة جديدة' };
-export const KIND_TONE = { session_soon:'info', absence:'bad', late:'warn', reminder:'warn', homework:'warn', general:'info', admin:'info', message:'ok' };
+export const KIND_TITLE = { weekly_report:'تقرير الأسبوع', session_soon:'تبدأ الجلسة قريبًا', absence:'غياب', late:'تأخر', reminder:'تذكير بالحضور', homework:'واجب', general:'إشعار', admin:'رسالة من إدارة المعهد', message:'رسالة جديدة' };
+export const KIND_TONE = { weekly_report:'ok', session_soon:'info', absence:'bad', late:'warn', reminder:'warn', homework:'warn', general:'info', admin:'info', message:'ok' };
 export const AUDIENCE_TXT = { student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' };
 
 const isRunning = (c, d) => !c.archived_at && c.start_date <= d && c.end_date >= d;
