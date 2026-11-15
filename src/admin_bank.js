@@ -12,7 +12,8 @@ import { AD, reloadAD } from './views2_admin.js';
 import { setBusy } from './features.js';
 import { SECTIONS } from './qudurat.js';
 import { parseBank, BANK_COLUMNS, BANK_SAMPLE } from './learning_logic.js';
-import { questionModal } from './learning_views.js';
+import { questionModal, qStem, setBankAssets } from './learning_views.js';
+import { CATEGORIES, UNCAT } from './sim_logic.js';
 
 const ST_TXT = { published:'منشور', draft:'مسودة' };
 let cur = null, fSub = '', fUnit = '', fSt = '', fQ = '';
@@ -29,15 +30,16 @@ export function pageBank(){
           <span class="pill ${pub ? 'ok' : 'g'}">${fmtNum(pub)} منشور${mine.length - pub ? ` · ${fmtNum(mine.length - pub)} مسودة` : ''}</span></button>`; }).join('')}</div><div id="bankBody"></div>`
       : `<div class="card pad">${emptyBox('لا يوجد مدربون بعد', 'أضف المدرب أولًا من «المدربون وأولياء الأمور»، ثم ارجع لبناء بنكه.')}<div style="text-align:center;margin-top:10px"><a class="btn pri" href="#admin-users">${ic('plus')} إضافة مدرب</a></div></div>`);
   /* البنوك المشتركة: محتوى واحد لكل مقرر يراه مدربا المقرر (بنين وبنات) */
-  const sh = (AD.questions || []).filter(q => q.shared && q.status !== 'deleted'), bySub = {}; sh.forEach(q => { const o = bySub[q.subject] = bySub[q.subject] || { n:0, pub:0, ok:0, units:new Set() }; o.n++; o.units.add(q.unit); if(q.status === 'published') o.pub++; if(q.key_status === 'approved') o.ok++; });
+  const sh = (AD.questions || []).filter(q => q.shared && q.status !== 'deleted'), bySub = {}; sh.forEach(q => { const o = bySub[q.subject] = bySub[q.subject] || { n:0, pub:0, ok:0, cat:0, units:new Set() }; o.n++; o.units.add(q.unit); if(q.status === 'published') o.pub++; if(q.key_status === 'approved') o.ok++; if(q.category) o.cat++; });
   m.insertAdjacentHTML('beforeend', `<div class="card pad rv" id="sharedBank" style="margin-top:18px"><h3 class="ctitle">${ic('database')}البنوك المشتركة للمقررات</h3>
     <p class="hint" style="margin:-4px 0 10px">بنك واحد لكل مقرر يستخدمه مدربا المقرر (بنين وبنات)، والواجبات والنتائج تبقى لكل مدرب مع طلابه. الأسئلة مصوَّرة، ومفاتيحها لا تصل للمتدرب قبل التسليم.</p>
-    ${Object.keys(bySub).length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المقرر</th><th>الأسئلة</th><th>المنشور</th><th>النماذج/الوحدات</th><th>مفاتيح معتمدة</th><th></th></tr></thead><tbody>${Object.entries(bySub).map(([s, o]) => `<tr><td><b>${esc(s)}</b></td><td class="num">${fmtNum(o.n)}</td><td class="num">${fmtNum(o.pub)}</td><td class="num">${fmtNum(o.units.size)}</td><td class="num">${fmtNum(o.ok)} من ${fmtNum(o.n)}</td><td style="white-space:nowrap"><button class="btn sm ${o.ok === o.n ? '' : 'pri'}" data-ka="${esc(s)}" data-on="${o.ok === o.n ? '0' : '1'}">${o.ok === o.n ? 'إلغاء اعتماد المفاتيح' : 'اعتماد مفاتيح المقرر'}</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لم يُستورد بنك مشترك بعد.</p>'}
+    ${Object.keys(bySub).length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المقرر</th><th>الأسئلة</th><th>المنشور</th><th>النماذج/الوحدات</th><th>مفاتيح معتمدة</th><th>مصنّفة المهارة</th><th></th></tr></thead><tbody>${Object.entries(bySub).map(([s, o]) => `<tr><td><b>${esc(s)}</b></td><td class="num">${fmtNum(o.n)}</td><td class="num">${fmtNum(o.pub)}</td><td class="num">${fmtNum(o.units.size)}</td><td class="num">${fmtNum(o.ok)} من ${fmtNum(o.n)}</td><td><span class="pill ${o.cat === o.n ? 'ok' : 'warn'}">${fmtNum(o.cat)} من ${fmtNum(o.n)}</span></td><td style="white-space:nowrap"><button class="btn sm" data-kc="${esc(s)}">${ic('target')} تصنيف المهارات</button> <button class="btn sm ${o.ok === o.n ? '' : 'pri'}" data-ka="${esc(s)}" data-on="${o.ok === o.n ? '0' : '1'}">${o.ok === o.n ? 'إلغاء اعتماد المفاتيح' : 'اعتماد مفاتيح المقرر'}</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لم يُستورد بنك مشترك بعد.</p>'}
     <div class="grid g2" style="margin-top:12px;align-items:end"><div class="field"><label for="sb-base">مسار تخزين صور البنك (رابط المجلد)</label><input class="inp" id="sb-base" dir="ltr" placeholder="https://…/bank" value="${esc(AD.settings?.bank_assets || '')}"></div>
       <div class="field"><label for="sb-file">استيراد حزمة بنك (JSON)</label><input class="inp" type="file" id="sb-file" accept=".json,application/json"></div></div>
     <div class="errtxt" id="sbE" role="alert"></div><div style="text-align:end"><button class="btn sm" id="sb-save">${ic('check')} حفظ المسار</button></div></div>`);
   $$('[data-ka]').forEach(b => b.onclick = () => { const on = b.dataset.on === '1';
     confirmBox(on ? 'اعتماد مفاتيح الإجابات' : 'إلغاء اعتماد المفاتيح', on ? `تقرّ بأن مفاتيح بنك ${b.dataset.ka} روجعت وصارت صالحة للاختبارات الرسمية.` : `تعود مفاتيح بنك ${b.dataset.ka} «غير معتمدة» ولا تُستخدم في اختبار رسمي جديد.`, async () => { await Store.approveKeys(b.dataset.ka, null, on); await reloadAD(); toast(on ? 'اعتُمدت المفاتيح' : 'أُلغي الاعتماد'); pageBank(); }, on ? 'اعتماد' : 'إلغاء الاعتماد'); });
+  $$('[data-kc]').forEach(b => b.onclick = () => categorizeModal(b.dataset.kc));
   $('#sb-save').onclick = async () => { await Store.saveSettings({ bank_assets:$('#sb-base').value.trim() }); await reloadAD(); toast('حُفظ مسار صور البنك'); };
   $('#sb-file').onchange = async e => { const f = e.target.files[0]; if(!f) return; $('#sbE').textContent = '';
     try { const r = await Store.importSharedBank(JSON.parse(await f.text())); await reloadAD(); toast(`بنك مشترك: أضيف ${fmtNum(r.added)} وحُدّث ${fmtNum(r.updated)}`); pageBank(); } catch(x){ $('#sbE').textContent = x instanceof SyntaxError ? 'الملف ليس JSON صالحًا' : x.message; } };
@@ -60,7 +62,7 @@ function body(t, mine){
       <label class="sr-only" for="bf-st">الحالة</label><select class="inp" id="bf-st"><option value="">كل الحالات</option>${Object.entries(ST_TXT).map(([k, v]) => `<option value="${k}" ${fSt === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <label class="sr-only" for="bf-q">بحث</label><input class="inp" id="bf-q" type="search" placeholder="بحث في نص السؤال" value="${esc(fQ)}"></div>
     ${list.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المقرر</th><th>الوحدة</th><th>السؤال</th><th>الصحيح</th><th>الحالة</th><th></th></tr></thead><tbody>${list.map(q => `<tr>
-        <td>${esc(q.subject)}</td><td>${esc(q.unit || 'عام')}</td><td style="max-width:420px">${esc(q.text)}${q.skill ? ` <span class="hint">· ${esc(q.skill)}</span>` : ''}</td><td>${esc(q.options?.[q.correct] ?? '')}</td>
+        <td>${esc(q.subject)}</td><td>${esc(q.unit || 'عام')}<div class="hint">${esc(q.category || UNCAT)}</div></td><td style="max-width:420px">${esc(q.text)}${q.skill ? ` <span class="hint">· ${esc(q.skill)}</span>` : ''}</td><td>${esc(q.options?.[q.correct] ?? '')}</td>
         <td><span class="pill dot ${q.status === 'published' ? 'ok' : 'g'}">${ST_TXT[q.status] || q.status}</span></td>
         <td style="white-space:nowrap"><button class="btn sm" data-qe="${q.id}" aria-label="تعديل">${ic('edit')}</button> <button class="btn sm" data-qp="${q.id}">${q.status === 'published' ? 'إيقاف' : 'نشر'}</button> <button class="btn sm danger soft" data-qd="${q.id}" aria-label="حذف">${ic('trash')}</button></td></tr>`).join('')}</tbody></table></div>`
       : emptyBox(mine.length ? 'لا أسئلة بهذه التصفية' : 'البنك فارغ', mine.length ? '' : 'أضف الأسئلة واحدًا واحدًا، أو الصقها كلها من ملف Excel.')}</div>`;
@@ -100,4 +102,35 @@ function importModal(t, done){
   $('#impGo').onclick = async () => { const b = $('#impGo'); setBusy(b, true, 'جارٍ الاستيراد');
     try { const r = await Store.adminImportQuestions(t.id, parsed.rows, $('#imp-pub').checked ? 'published' : 'draft'); closeModal(); toast(`أُضيف ${fmtNum(r.count)} سؤال إلى بنك ${t.full_name}${r.skipped ? `، وتُخطّي ${fmtNum(r.skipped)} مكررًا` : ''}`); done(); }
     catch(x){ setBusy(b, false); $('#impE').textContent = x.message; } };
+}
+
+/* تصنيف مهارات قياس للبنك المشترك: اختيار أسئلة (بالصورة) وتطبيق تصنيف عليها دفعة واحدة */
+let kcUnit = '', kcOnly = true;
+function categorizeModal(subject){
+  setBankAssets(AD.settings?.bank_assets);
+  const all = (AD.questions || []).filter(q => q.shared && q.subject === subject && q.status !== 'deleted').sort((a, b) => (a.order || 0) - (b.order || 0));
+  const units = [...new Set(all.map(q => q.unit))];
+  if(!units.includes(kcUnit)) kcUnit = units.find(u => all.some(q => q.unit === u && !q.category)) || units[0] || '';
+  const list = all.filter(q => q.unit === kcUnit && (!kcOnly || !q.category)), cats = CATEGORIES[subject] || [];
+  const dist = cats.map(c => [c, all.filter(q => q.category === c).length]).filter(x => x[1]);
+  modal(`<h3>تصنيف مهارات ${esc(subject)}</h3>
+    <p class="hint" style="margin:-8px 0 10px">التصنيف يبني تحليل نقاط الضعف للمتدربين. حدّد الأسئلة ثم اختر مهارتها. ${fmtNum(all.filter(q => q.category).length)} من ${fmtNum(all.length)} مصنّفة${dist.length ? ': ' + dist.map(([c, n]) => `${esc(c)} ${fmtNum(n)}`).join('، ') : ''}.</p>
+    <div class="bank-f"><label class="sr-only" for="kc-u">الوحدة</label><select class="inp" id="kc-u">${units.map(u => `<option ${u === kcUnit ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>
+      <label class="chk"><input type="checkbox" id="kc-o" ${kcOnly ? 'checked' : ''}> غير المصنّفة فقط</label></div>
+    ${list.length ? `<div class="kc-bar"><label class="chk"><input type="checkbox" id="kc-all"> تحديد الكل (${fmtNum(list.length)})</label>
+        <label class="sr-only" for="kc-c">المهارة</label><select class="inp" id="kc-c">${cats.map(c => `<option>${esc(c)}</option>`).join('')}<option value="">إزالة التصنيف</option></select>
+        <button class="btn pri sm" id="kc-go" disabled>${ic('check')} تطبيق على المحدد</button></div>
+      <div class="kc-grid">${list.map(q => `<label class="kc-q"><input type="checkbox" value="${q.id}"><span class="kc-code">${esc(q.code || '')}</span>${qStem(q, true)}<span class="pill ${q.category ? 'ok' : 'g'}">${esc(q.category || UNCAT)}</span></label>`).join('')}</div>`
+      : `<p class="hint">${kcOnly ? 'كل أسئلة هذه الوحدة مصنّفة.' : 'لا أسئلة.'}</p>`}
+    <div class="errtxt" id="kcE" aria-live="polite"></div><div style="text-align:end;margin-top:10px"><button class="btn" id="kc-x">إغلاق</button></div>`);
+  const sel = () => $$('.kc-grid input:checked').map(x => x.value), upd = () => { const n = sel().length, g = $('#kc-go'); if(g){ g.disabled = !n; g.lastChild.textContent = n ? ` تطبيق على ${fmtNum(n)}` : ' تطبيق على المحدد'; } };
+  $('#kc-u').onchange = e => { kcUnit = e.target.value; categorizeModal(subject); };
+  $('#kc-o').onchange = e => { kcOnly = e.target.checked; categorizeModal(subject); };
+  $('#kc-x').onclick = () => { closeModal(); pageBank(); };
+  if(!list.length) return;
+  $$('.kc-grid input').forEach(x => x.onchange = upd);
+  $('#kc-all').onchange = e => { $$('.kc-grid input').forEach(x => { x.checked = e.target.checked; }); upd(); };
+  $('#kc-go').onclick = async () => { const b = $('#kc-go'), ids = sel(); setBusy(b, true, 'جارٍ الحفظ');
+    try { const r = await Store.setQuestionCategory(ids, $('#kc-c').value); await reloadAD(); toast(`صُنّف ${fmtNum(r.count)} سؤالًا`); categorizeModal(subject); }
+    catch(x){ setBusy(b, false); $('#kcE').textContent = x.message; } };
 }
