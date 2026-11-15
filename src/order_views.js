@@ -2,7 +2,7 @@
    الإدارة: «طلبات الشراء» (#admin-orders): مراجعة، تأكيد سداد، قبول مؤقت، وإعدادات الحساب البنكي.
    ===================================================================== */
 import { statementModal } from './statement_views.js';
-import { $, $$, esc, fmtNum, fmtShort, matchQ } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, matchPerson, scopeSelect } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
@@ -16,17 +16,17 @@ import { CENTER } from './catalog.js';
 import { payHtml, bindPay, opsHtml, bindOps, isFull } from './billing_views.js';
 
 /* ---------- الإدارة: طلبات الشراء ---------- */
-let oF = { st:'open', q:'' };
+let oF = { st:'open', q:'', sc:'all' };
 export const openOrdersCount = D => (D.orders || []).filter(o => o.approval === 'pending_review' || (o.payment === 'claimed' && o.approval !== 'rejected')).length;
 export function pageOrders(){
   const m = $('#main'), D = AD, all = (D.orders || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)), tr = id => (D.trainees || []).find(t => t.id === id);
   const match = o => oF.st === 'all' ? true : oF.st === 'open' ? (o.approval === 'pending_review' || o.approval === 'needs_information' || (o.approval !== 'rejected' && o.payment !== 'confirmed')) : oF.st === 'claimed' ? o.payment === 'claimed' : oF.st === 'ready' ? orderReady(o) : o.approval === oF.st;
-  const list = all.filter(o => match(o) && matchQ(oF.q, o.number, tr(o.trainee_id)?.full_name, tr(o.trainee_id)?.phone, tr(o.trainee_id)?.national_id, o.title));
+  const list = all.filter(o => match(o) && matchPerson(oF.sc, oF.q, tr(o.trainee_id), o.number, o.title));
   const bank = D.settings?.bank || {}, n = k => all.filter(o => k(o)).length;
   m.innerHTML = titleBar(`${ic('wallet')}طلبات الشراء`, 'طلبات الشراء <em>للمراجعة</em>', 'لكل تسجيل طلب برقم فريد. المراجعة وتأكيد السداد قراران مستقلان: الموافقة لا تثبت وصول التحويل، وتأكيد السداد يكون بعد مطابقة كشف البنك.') +
     `<div class="grid g4" style="margin-bottom:14px">${[['بانتظار المراجعة', n(o => o.approval === 'pending_review'), 'warn'], ['تحويلات قيد المطابقة', n(o => o.payment === 'claimed'), 'info'], ['مستوفية (موافقة + سداد)', n(o => orderReady(o) && !o.provisional), 'ok'], ['قبول مؤقت', n(o => o.provisional), 'g']].map(([t, v, c]) => `<div class="card pad ostat"><span class="hint"><span class="pill dot ${c}" aria-hidden="true" style="padding:0 0 0 6px"></span>${t}</span><b class="num">${fmtNum(v)}</b></div>`).join('')}</div>
     <div class="filters"><label class="sr-only" for="of-st">الحالة</label><select class="inp" id="of-st">${[['open', 'تحتاج إجراء'], ['pending_review', 'بانتظار المراجعة'], ['claimed', 'تحويل قيد المطابقة'], ['needs_information', 'مطلوب استكمال'], ['approved', 'موافق عليها'], ['ready', 'مستوفية'], ['rejected', 'مرفوضة'], ['all', 'الكل']].map(([k, v]) => `<option value="${k}" ${oF.st === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <label class="sr-only" for="of-q">بحث</label><input class="inp" id="of-q" type="search" placeholder="رقم الطلب أو الاسم أو الجوال" value="${esc(oF.q)}" style="flex:1;min-width:200px"></div>
+      <label class="sr-only" for="of-q">بحث</label><input class="inp" id="of-q" type="search" placeholder="رقم الطلب أو أي جزء من الاسم أو الجوال" value="${esc(oF.q)}" style="flex:1;min-width:200px">${scopeSelect('of-sc', oF.sc)}</div>
     ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>المتدرب</th><th>البند</th><th>المطلوب الآن</th><th>المتبقي</th><th>المراجعة</th><th>السداد</th><th></th></tr></thead><tbody>${list.map(o => { const t = tr(o.trainee_id);
         return `<tr><td class="num" dir="ltr"><b>${esc(o.number)}</b></td><td>${fmtShort(o.created_at.slice(0, 10))}</td><td>${esc(t?.full_name || '—')}<div class="hint num" dir="ltr">${esc(t?.phone || '')}</div></td><td style="max-width:240px">${esc(o.title)}</td>
           <td class="num">${o.due_now > 0 ? fmtNum(o.due_now) : '—'}${o.total > o.due_now ? `<div class="hint">من ${fmtNum(o.total)}</div>` : ''}</td>
@@ -45,6 +45,7 @@ export function pageOrders(){
         <label class="chk"><input type="checkbox" id="reqAp" ${D.settings?.require_order_approval ? 'checked' : ''}> منع تسجيل الحضور قبل «موافقة المسؤول + تأكيد السداد»</label>
         <p class="hint" style="margin:8px 0 0">معطَّل افتراضيًا: يحضر المتدرب من أول يوم كما هو الآن، وتتابع الإدارة السداد من هذه الصفحة. عند تفعيله يُرفض مسح الباركود لمن لم يُعتمد طلبه، إلا من مُنح «قبولًا مؤقتًا». التسجيلات السابقة لهذه الميزة لا تتأثر.</p></div></div>`;
   $('#of-st').onchange = e => { oF.st = e.target.value; pageOrders(); };
+  $('#of-sc').onchange = e => { oF.sc = e.target.value; pageOrders(); };
   $('#of-q').oninput = e => { oF.q = e.target.value; clearTimeout(pageOrders.t); pageOrders.t = setTimeout(() => { pageOrders(); const i = $('#of-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
   $$('[data-oo]').forEach(b => b.onclick = () => orderModal(all.find(o => o.id === b.dataset.oo)));
   $('#bankF').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target), b = $('button', e.target); $('#bkE').textContent = ''; setBusy(b, true, 'جارٍ الحفظ');
