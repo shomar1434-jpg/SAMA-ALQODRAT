@@ -31,7 +31,7 @@ export function invoiceHtml(i, receipt){
         <tbody><tr><td>${KIND_TXT[i.kind] || ''}</td><td>${esc(i.service)}</td><td>${fmtGreg(i.purchase_date)}</td><td class="n">${D2(i.total)}</td></tr></tbody></table>
       <div class="inv-2"><table class="inv-k"><caption>${rf ? 'بيانات الرد' : 'بيانات السداد'}</caption><tbody>${row(rf ? 'طرق الرد' : 'طريقة السداد', docLines(i).length > 1 ? linesTxt(i) : esc(i.method))}${row(rf ? 'تاريخ الرد' : 'تاريخ السداد', fmtGreg(i.transfer_date))}${row('رقم المرجع', i.transfer_ref ? `<span dir="ltr">${esc(i.transfer_ref)}</span>` : '—')}${rf ? row('سبب الاسترداد', esc(i.reason || '')) : row('صورة الإيصال', i.has_receipt ? 'مرفقة' : 'غير مرفقة')}</tbody></table>
         <table class="inv-k inv-sum"><caption>الملخص المالي</caption><tbody>${row('مبلغ الخدمة', D2(i.total))}${row(rf ? 'المبلغ المسترد' : 'المدفوع بهذه الفاتورة', `<b>${D2(i.paid)}</b>`)}${row('المتبقي', D2(i.remaining))}</tbody></table></div>`,
-    note:rf ? 'مستند داخلي مرجعي صادر من منصة المركز عند رد المبلغ بأمر المالك، وليس إشعارًا ضريبيًا.' : 'مستند داخلي مرجعي صادر من منصة المركز عند تأكيد وصول المبلغ، وليس فاتورة ضريبية.' }) +
+    note:rf ? 'مستند داخلي مرجعي صادر من مركز المركز عند رد المبلغ بأمر المالك، وليس إشعارًا ضريبيًا.' : 'مستند داخلي مرجعي صادر من مركز المركز عند تأكيد وصول المبلغ، وليس فاتورة ضريبية.' }) +
     (receipt ? `<div class="pdoc inv-rc"><h2>صورة إيصال التحويل — الفاتورة <span dir="ltr">${i.number}</span></h2><img src="${receipt}" alt="صورة إيصال التحويل"></div>` : '');
 }
 /* كشف الفواتير للفترة */

@@ -1,4 +1,4 @@
-// قنوات المركز: صفحة تواصل معنا، واتساب، منصات التواصل، منار، برامج الأطفال وتسجيل طفل بجوال ولي أمره، وقناة تيليجرام للمشتركين
+// قنوات المركز: صفحة تواصل معنا، واتساب، قنوات التواصل، برامج الأطفال وتسجيل طفل بجوال ولي أمره، وقناة تيليجرام للمشتركين
 import { chromium } from 'playwright';
 import { serveDist, reporter } from './_server.mjs';
 const { server, origin: U } = serveDist();
@@ -13,9 +13,9 @@ const years = n => { const d = new Date(Date.now() + 3 * 3600e3); d.setUTCFullYe
 
 await p.goto(U + '#contact'); await p.waitForSelector('.ct-card');
 let L = await hrefs('.ct-card');
-ok(['wa.me/966561606878', 'share.google/PhsXYhqsEzgXpO8Rf', 'snapchat.com/add/samagodrat.sa', 'tiktok.com/@samagodrat.sa', 'instagram.com/samagodrat.sa', 't.me/+PSnecqWQioc3M2Vk', 'mnar.sa', 'tel:0561606878'].every(x => L.some(h => h.includes(x))), 'صفحة «تواصل معنا» تجمع كل قنوات المركز');
+ok(['wa.me/966561606878', 'share.google/PhsXYhqsEzgXpO8Rf', 'snapchat.com/add/samagodrat.sa', 'tiktok.com/@samagodrat.sa', 'instagram.com/samagodrat.sa', 't.me/+PSnecqWQioc3M2Vk', 'tel:0561606878'].every(x => L.some(h => h.includes(x))), 'صفحة «تواصل معنا» تجمع كل قنوات المركز');
 L = await hrefs('.sfoot a');
-ok(L.some(h => h.includes('wa.me')) && L.some(h => h.includes('mnar.sa')) && L.some(h => h.includes('snapchat')) && L.some(h => h.endsWith('#contact')), 'التذييل: واتساب ومنصات التواصل ومنار ورابط تواصل معنا');
+ok(L.some(h => h.includes('wa.me')) && !L.some(h => h.includes('mnar.sa')) && L.some(h => h.includes('snapchat')) && L.some(h => h.endsWith('#contact')), 'التذييل: واتساب ومنصات التواصل ومنار ورابط تواصل معنا');
 ok(!(await p.content()).includes('x.com/') && !/إكس/.test(await text('#app')) && L.some(h => h.includes('t.me/')), 'لا رابط لمنصة إكس، وقناة تيليجرام بين منصات التواصل في التذييل');
 ok((await p.$$eval('.ct-card[target=_blank]', a => a.every(x => x.rel.includes('noopener')))), 'الروابط الخارجية تفتح بأمان');
 
@@ -23,8 +23,8 @@ ok((await p.$$eval('.ct-card[target=_blank]', a => a.every(x => x.rel.includes('
 await p.goto(U + '#home'); await p.reload(); await p.waitForSelector('#kids .kid');
 ok((await p.$$('#kids .kid')).length === 3 && /من 3 إلى 12 سنة/.test(await text('#kids')) && /900 ريال/.test(await text('#kids')) && /25194/.test(await text('#kids')), 'قسم برامج الأطفال بثلاثة برامج كما في مطويات المركز');
 const kidHref = await p.getAttribute('#kids .kid a.btn.pri', 'href');
-await p.click('#kids .kid a.btn.pri'); await p.waitForSelector('.hero-note');
-ok(/منصة منار/.test(await text('.hero-note')) && /القراءة والكتابة/.test(await text('h1')), `صفحة البرنامج تشرح أن الشهادة تصدر عبر منار (${kidHref})`);
+await p.click('#kids .kid a.btn.pri'); await p.waitForSelector('h1');
+ok(!/منار/.test(await text('#app')) && /القراءة والكتابة/.test(await text('h1')), `صفحة البرنامج خالية من نصوص منار (${kidHref})`);
 
 // تسجيل طفل عمره 5 سنوات بجوال ولي أمره
 await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 1 });
@@ -35,7 +35,7 @@ await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=e
 let D = await data(); const kid = D.trainees.find(t => t.national_id === '1000000511');
 ok(kid && kid.guardian_phone === '0556660011' && kid.phone === '0556660011', 'جوال التواصل للطفل هو جوال ولي الأمر');
 const card = await text('#regCard'), wa = await p.getAttribute('#regCard a[href*="wa.me"]', 'href');
-ok(/منصة منار/.test(card) && wa && /طلب الشراء رقم SAMA-\d{4}-\d{6}/.test(decodeURIComponent(wa)), 'رسالة النجاح: خطوة منار وزر واتساب برسالة مجهزة فيها رقم طلب الشراء');
+ok(!/منار/.test(card) && wa && /طلب الشراء رقم SAMA-\d{4}-\d{6}/.test(decodeURIComponent(wa)), 'رسالة النجاح دون منار مع زر واتساب برسالة مجهزة فيها رقم طلب الشراء');
 await p.fill('[name=birth_date]', years(2)).catch(() => {});
 
 // دون 3 سنوات يُرفض

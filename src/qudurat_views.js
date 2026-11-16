@@ -310,9 +310,9 @@ function subDetail(id){
       <p class="hint" style="margin:6px 0 12px">من ${fmtDate(s.start_date)} إلى ${fmtDate(st.end)}${s.start_manual ? ' (تاريخ بداية أدخلته الإدارة)' : ''}</p>
       ${startEditor(s, D)}
       <div class="daygrid">${days.map(d => { const a = st.att.find(x => x.att_date === d.date), fut = d.date > n.date;
-        const pre = !a && s.track_from && d.date < s.track_from, cls = a ? (a.status === 'متأخر' ? 'late' : 'ok') : pre ? 'pre' : fut ? 'fut' : 'abs', lbl = a ? a.status : pre ? 'قبل المنصة (من الكشف اليدوي)' : fut ? 'قادمة' : 'غائب';
+        const pre = !a && s.track_from && d.date < s.track_from, cls = a ? (a.status === 'متأخر' ? 'late' : 'ok') : pre ? 'pre' : fut ? 'fut' : 'abs', lbl = a ? a.status : pre ? 'قبل المركز (من الكشف اليدوي)' : fut ? 'قادمة' : 'غائب';
         return `<button class="dg ${cls}" ${fut ? 'disabled' : ''} data-dd="${d.date}" title="${fmtDate(d.date)} · ${lbl}" aria-label="${fmtDate(d.date)}: ${lbl}"><span>${fmtShort(d.date)}</span></button>`; }).join('')}</div>
-      <p class="hint" style="margin:8px 0 0">اضغط يومًا منعقدًا للتبديل بين: حاضر ← متأخر ← غائب. كل تعديل يُسجَّل في سجل التدقيق.${st.prior ? ` الأيام المنقطة قبل التسجيل في المنصة (${fmtNum(st.prior)} جلسة) تُحتسب حضورًا عدا ${fmtNum(st.priorAbsences)} يوم غياب من الكشوف اليدوية، وتعدّلها من «تعديل».` : ''}</p>`
+      <p class="hint" style="margin:8px 0 0">اضغط يومًا منعقدًا للتبديل بين: حاضر ← متأخر ← غائب. كل تعديل يُسجَّل في سجل التدقيق.${st.prior ? ` الأيام المنقطة قبل التسجيل في المركز (${fmtNum(st.prior)} جلسة) تُحتسب حضورًا عدا ${fmtNum(st.priorAbsences)} يوم غياب من الكشوف اليدوية، وتعدّلها من «تعديل».` : ''}</p>`
     : emptyBox('لم يبدأ الاشتراك بعد', 'يبدأ تلقائيًا من أول حضور بالباركود، أو حدّد تاريخ البداية الآن.') + startEditor(s, D)}
     <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap">
       <button class="btn sm danger soft" id="sdC">${s.status === 'cancelled' ? 'استعادة الاشتراك' : 'إلغاء الاشتراك'}</button>
@@ -339,10 +339,10 @@ function subModal(s){
       <div class="field"><label for="sm-plan">الباقة <i>*</i></label><select class="inp" id="sm-plan" name="plan_id">${plans.map(p => `<option value="${p.id}" ${s?.plan_id === p.id ? 'selected' : ''}>${esc(planName(p))}${p.mode === 'remote' ? ' (قريبًا)' : ''}</option>`).join('')}</select></div>
       <div class="field"><label for="sm-sec">القسم</label><select class="inp" id="sm-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${(s?.section || 'boys') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="field" style="grid-column:1/-1"><label for="sm-start">تاريخ البداية الفعلي</label><input class="inp" type="date" id="sm-start" name="start_date" value="${s?.start_date || ''}" max="${riyadhNow().date}">
-        <span class="hint">اتركه فارغًا ليبدأ الاشتراك تلقائيًا من أول حضور بالباركود. للمتدربين الذين بدؤوا قبل المنصة اكتب تاريخ أول يوم حضروه.</span></div>
-      ${s && priorSessions(D, s).length ? `<div class="field" style="grid-column:1/-1"><label for="sm-pa">أيام الغياب قبل التسجيل في المنصة (من الكشوف اليدوية)</label>
+        <span class="hint">اتركه فارغًا ليبدأ الاشتراك تلقائيًا من أول حضور بالباركود. للمتدربين الذين بدؤوا قبل المركز اكتب تاريخ أول يوم حضروه.</span></div>
+      ${s && priorSessions(D, s).length ? `<div class="field" style="grid-column:1/-1"><label for="sm-pa">أيام الغياب قبل التسجيل في المركز (من الكشوف اليدوية)</label>
         <input class="inp num" id="sm-pa" name="prior_absences" type="number" inputmode="numeric" min="0" max="${priorSessions(D, s).length}" value="${Number(s.prior_absences) || 0}" style="max-width:140px">
-        <span class="hint">من ${fmtDate(s.start_date)} حتى ${fmtDate(addDays(s.track_from, -1))}: ${fmtNum(priorSessions(D, s).length)} جلسة بلا سجل في المنصة، وتُحتسب حضورًا عدا العدد الذي تكتبه هنا.</span></div>` : ''}
+        <span class="hint">من ${fmtDate(s.start_date)} حتى ${fmtDate(addDays(s.track_from, -1))}: ${fmtNum(priorSessions(D, s).length)} جلسة بلا سجل في المركز، وتُحتسب حضورًا عدا العدد الذي تكتبه هنا.</span></div>` : ''}
       <div class="errtxt" id="smE" style="grid-column:1/-1"></div>
       <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="smC">إلغاء</button><button class="btn pri" id="smS">${ic('check')} حفظ</button></div></form>`);
   $('#smC').onclick = closeModal;

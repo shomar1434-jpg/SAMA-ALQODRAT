@@ -56,10 +56,10 @@ export function siteFooter(){
         <a class="sf-item" href="${MAP_URL}" target="_blank" rel="noopener">${ic('pin')}<span>${CENTER.address}</span></a>
         <span class="sf-item">${ic('inbox')}<span>صندوق البريد ${CENTER.pobox}</span></span>
         <h4 style="margin-top:14px">روابط سريعة</h4>
-        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من إفادة حضور</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
+        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
       <div class="sf-col"><h4>معتمد من</h4>
         <div class="sf-acc"><span><img src="${LOGOS.tvtc}" alt="المؤسسة العامة للتدريب التقني والمهني"></span><span><img src="${LOGOS.nelc}" alt="المركز الوطني للتعليم الإلكتروني"></span></div>
-        <a class="sf-item" href="${CENTER.manar}" target="_blank" rel="noopener" style="margin-top:10px">${ic('award')}<span>منصة منار: إصدار الشهادات المعتمدة</span></a></div>
+</div>
     </div>
     <div class="sfoot-bar"><span>© ${new Date().getFullYear()} ${CENTER.name}. جميع الحقوق محفوظة.</span><span dir="ltr">${ph.join(' · ')} · ${CENTER.email}</span></div>
   </footer>`;
@@ -90,7 +90,7 @@ export function viewContact(){
       ${card(CENTER.social.snapchat, SOC[0][2], 'سناب شات', 'samagodrat.sa')}${card(CENTER.social.tiktok, SOC[1][2], 'تيك توك', '@samagodrat.sa')}${card(CENTER.social.instagram, SOC[2][2], 'إنستقرام', 'samagodrat.sa')}${card(CENTER.telegram, TG_LOGO, 'قناة تيليجرام', 'مواد علمية خاصة بالقدرات')}</div>
     <h3 class="ct-h">البرامج والخدمات</h3><div class="ct-grid">
       ${card('#register', ic('book'), 'البرامج التدريبية', 'دليل البرامج المعتمدة والتسجيل', false)}${card('#home', ic('award'), 'باقات القدرات والتحصيلي', 'الباقات والأسعار والتسجيل', false)}${card('#enroll', ic('form'), 'سجّل الآن', 'نموذج التسجيل الموحّد', false)}
-      ${card(CENTER.manar, ic('grad'), 'منصة منار', 'إصدار الشهادات المعتمدة من المؤسسة العامة للتدريب التقني والمهني')}</div></div>${siteFooter()}`;
+</div></div>${siteFooter()}`;
 }
 
 export async function viewHome(){
@@ -106,7 +106,7 @@ export async function viewHome(){
           <div class="cover-art" data-reveal style="--i:2">${BULB_SVG}<i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i></div>
           <div class="cover-text">
             ${STAR_SVG('s1')}
-            <h1 data-reveal style="--i:1"><span class="t1">منصة مركز سما القدرات للتدريب</span><span class="rule"></span><span class="t2">أهلًا بكم في المنصة الرقمية</span></h1>
+            <h1 data-reveal style="--i:1"><span class="t1">مركز سما القدرات للتدريب</span><span class="rule"></span><span class="t2">أهلًا بكم في مركزنا الرقمي</span></h1>
             <p data-reveal style="--i:3">${fmtNum(P.length)} برنامجًا تدريبيًا معتمدًا في ${fmtNum(cats.length)} مجالات، بإشراف ${CENTER.accreditor}. سجّل في برنامجك أو باقتك، وسجّل حضورك بباركود المركز الموحد.</p>
             <div class="cover-cta" data-reveal style="--i:4"><a class="btn pri lg" href="#enroll" id="ctaEnroll">${ic('form')} سجّل الآن</a><a class="btn lg ghost-t" href="#register">${ic('book')} استعرض البرامج</a><a class="btn lg ghost-t" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
           </div>

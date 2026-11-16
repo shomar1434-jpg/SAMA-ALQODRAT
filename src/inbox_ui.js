@@ -58,9 +58,9 @@ function panelHtml(){
   const L = st.items || [];
   return `<div class="ibp-head"><b>${ic('bell')} الإشعارات</b>
       <button class="btn sm ghost" id="ibSound" aria-pressed="${soundOn()}">${soundOn() ? '🔔 الصوت مفعّل' : '🔕 الصوت متوقف'}</button></div>
-    ${(() => { const s = notifyState(); return s === 'unsupported' ? '' : `<div class="ibp-dev">${s === 'granted' ? `<span class="hint">${ic('check')} إشعارات الجهاز مفعّلة: تصلك حين تكون المنصة في الخلفية.</span>`
+    ${(() => { const s = notifyState(); return s === 'unsupported' ? '' : `<div class="ibp-dev">${s === 'granted' ? `<span class="hint">${ic('check')} إشعارات الجهاز مفعّلة: تصلك حين تكون المركز في الخلفية.</span>`
       : s === 'denied' ? '<span class="hint">إشعارات الجهاز محظورة. اسمح بها لهذا الموقع من إعدادات المتصفح.</span>'
-      : `<button class="btn sm" id="ibDev">${ic('bell')} تفعيل إشعارات الجهاز</button><span class="hint">على الآيفون: ثبّت المنصة أولًا على الشاشة الرئيسية.</span>`}</div>`; })()}
+      : `<button class="btn sm" id="ibDev">${ic('bell')} تفعيل إشعارات الجهاز</button><span class="hint">على الآيفون: ثبّت المركز أولًا على الشاشة الرئيسية.</span>`}</div>`; })()}
     ${L.length ? `<ul class="ibp-list">${L.map((x, i) => `<li><button type="button" class="ibp-it ${x.read ? '' : 'new'}" data-ii="${i}">
         <span class="ibt-ic t-${KIND_TONE[x.kind] || 'info'}">${ic(x.action === 'msg' ? 'activity' : 'alert')}</span>
         <span class="ibt-body"><b>${esc(x.title)}</b><span>${esc(String(x.text).slice(0, 160))}</span><small>${when(x.at)}</small></span></button></li>`).join('')}</ul>`
@@ -75,7 +75,7 @@ function openPanel(){
   if((st.items || []).some(x => x.action === 'notice' && !x.read)) Store.markRead(st.role).then(tick).catch(() => {});
 }
 function bindPanel(p){
-  if(p.querySelector('#ibDev')) p.querySelector('#ibDev').onclick = async () => { const r = await askNotify(); if(r === 'granted') deviceNotify('منصة سما القدرات', 'فُعّلت إشعارات الجهاز.', 'sama-enabled'); p.innerHTML = panelHtml(); bindPanel(p); };
+  if(p.querySelector('#ibDev')) p.querySelector('#ibDev').onclick = async () => { const r = await askNotify(); if(r === 'granted') deviceNotify('مركز سما القدرات', 'فُعّلت إشعارات الجهاز.', 'sama-enabled'); p.innerHTML = panelHtml(); bindPanel(p); };
   p.querySelector('#ibSound').onclick = () => { setSound(!soundOn()); unlockAudio(); if(soundOn()) setTimeout(chime, 50); p.innerHTML = panelHtml(); bindPanel(p); };
   p.querySelectorAll('[data-ii]').forEach(b => b.onclick = () => openItem(st.items[+b.dataset.ii]));
 }

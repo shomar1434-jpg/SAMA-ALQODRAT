@@ -78,7 +78,7 @@ function fixModal(x, after){
 }
 function importTab(){
   const s = preview && legacySummary(preview);
-  $('#dBody').innerHTML = `<div class="card pad rv"><h3 class="ctitle">${ic('plus')}استيراد المسجّلين قبل تشغيل المنصة</h3>
+  $('#dBody').innerHTML = `<div class="card pad rv"><h3 class="ctitle">${ic('plus')}استيراد المسجّلين قبل تشغيل المركز</h3>
       <p class="hint" style="margin:-4px 0 10px">الصق الجدول من Excel مع صف العناوين، أو اختر ملف CSV. الأعمدة: اسم المتدرب، البريد، رقم الهوية، رقم الجوال، جوال ولي الأمر، الباقة، تاريخ التسجيل، رسوم الباقة، رسوم التسجيل وطريقة سدادها، ثم الدفعات وطرق سدادها. التاريخ بصيغة 2026-08-10 أو 10/08/2026.</p>
       <div class="grid g2"><div class="field"><label for="im-g">الجنس (إن لم يكن في الجدول عمود «الجنس»)</label><select class="inp" id="im-g"><option>ذكر</option><option>أنثى</option></select></div><div class="field"><label for="im-file">ملف CSV</label><input class="inp" type="file" id="im-file" accept=".csv,.tsv,.txt,text/csv"></div></div>
       <div class="field"><label for="im-t">أو الصق الجدول هنا</label><textarea class="inp" id="im-t" rows="5" dir="rtl" placeholder="م	اسم المتدرب	البريد	رقم الهوية	…"></textarea></div>

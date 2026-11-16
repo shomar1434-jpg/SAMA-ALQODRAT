@@ -65,7 +65,7 @@ export async function pageAdmins(){
         <p class="hint" id="adH" style="grid-column:1/-1;margin:0">${ROLE_HINT.staff}</p>
         <div class="errtxt" id="adE" role="alert" style="grid-column:1/-1"></div>
         <div style="grid-column:1/-1"><button class="btn pri" id="adS">${ic('plus')} إضافة الدعوة</button></div></form>
-      <p class="hint" style="margin:12px 0 0">يصل المدعوّ بريد من المنصة فيه رابط يختار منه كلمة مروره. إن تعذّر إرسال البريد تُنشأ له كلمة مرور مؤقتة تظهر لك مرة واحدة، فتسلّمها له، ويغيّرها عند أول دخول.</p></div>`;
+      <p class="hint" style="margin:12px 0 0">يصل المدعوّ بريد من المركز فيه رابط يختار منه كلمة مروره. إن تعذّر إرسال البريد تُنشأ له كلمة مرور مؤقتة تظهر لك مرة واحدة، فتسلّمها له، ويغيّرها عند أول دخول.</p></div>`;
   $('#ad-r').onchange = e => { $('#adH').textContent = ROLE_HINT[e.target.value]; };
   const add = async () => { const b = $('#adS'); setBusy(b, true, 'جارٍ الإضافة');
     try { const r = await Store.addAdmin($('#ad-e').value, $('#ad-n').value, $('#ad-r').value); inviteResult(r, $('#ad-e').value.trim().toLowerCase()); }
