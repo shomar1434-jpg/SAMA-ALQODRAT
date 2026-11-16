@@ -219,7 +219,7 @@ export function regFormHtml(title, sub, chooser=''){
 }
 export function bindRegForm(target, cohortsFn){
   const f=$('#rf'); wireFormA11y(f,'rf'); bindPolicyConsent($('#rfPol',f));
-  const bd=$('[name=birth_date]',f), isPackage=()=>!!(typeof target==='function' ? target() : target)?.plan_id, minor=()=>isMinor(bd.value, riyadhNow().date);
+  const bd=$('[name=birth_date]',f), isPackage=()=>Boolean((typeof target==='function' ? target() : target)?.plan_id), minor=()=>isMinor(bd.value, riyadhNow().date);
   const syncFields=()=>{ const pkg=isPackage(); ['birth_date','city','education','employer'].forEach(n=>{ const field=$(`[name=${n}]`,f)?.closest('.field'); if(field){ field.hidden=pkg; field.style.display=pkg?'none':''; } }); };
   const birthMsg=v=>{ const a=ageOn(v, riyadhNow().date); return !v ? 'اختر تاريخ الميلاد.' : a==null||v>riyadhNow().date||a<MIN_AGE||a>100 ? 'تاريخ الميلاد غير صحيح.' : ''; };
   const child=()=>isChild(bd.value, riyadhNow().date);
