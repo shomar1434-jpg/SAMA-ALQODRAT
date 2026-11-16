@@ -41,7 +41,7 @@ export async function bindPolicyConsent(box){
   if(!box) return [];
   let req = [];
   try { req = requiredPolicies(await Store.publicPolicies(), riyadhNow().date); } catch(_) { req = []; }
-  if(!req.length){ box.hidden = false; box.innerHTML = `<p class="hint pol-note">${ic('form')} للاطلاع: <a href="#policies" target="_blank" rel="noopener">سياسات المنصة</a> (الخصوصية، والحضور والانضباط، والنزاهة الأكاديمية وغيرها).</p>`; return []; }
+  if(!req.length){ box.hidden = false; box.innerHTML = `<p class="hint pol-note">${ic('form')} للاطلاع: <a href="#policies" target="_blank" rel="noopener">سياسات المركز</a> (الخصوصية، والحضور والانضباط، والنزاهة الأكاديمية وغيرها).</p>`; return []; }
   box.hidden = false;
   box.innerHTML = `<label class="check"><input type="checkbox" name="policies" id="rf-pol" value="${req.map(p => p.id).join(',')}" aria-describedby="rfE"><span>قرأت وأوافق على: ${req.map(p => `<a href="#policy-${p.slug}" target="_blank" rel="noopener">${esc(p.title)}</a> (الإصدار ${fmtNum(p.version)})`).join('، ')}</span></label>`;
   return req;
