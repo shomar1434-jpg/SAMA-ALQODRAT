@@ -11,7 +11,8 @@ const text = async s => ((await p.textContent(s).catch(() => '')) || '').trim();
 const years = n => { const d = new Date(Date.now() + 3 * 3600e3); d.setUTCFullYear(d.getUTCFullYear() - n); return d.toISOString().slice(0, 10); };
 const person = async (name, nid, phone) => { await p.fill('[name=full_name]', name); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', phone);
   await p.selectOption('[name=gender]', 'ذكر'); if (await p.locator('[name=birth_date]').isVisible()) { await p.fill('[name=birth_date]', years(25)); await p.dispatchEvent('[name=birth_date]', 'change'); } else { await p.fill('[name=guardian_phone]', '0509000099'); }
-  await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); };
+  if (await p.locator('[name=city]').isVisible()) await p.selectOption('[name=city]', { index: 1 });
+  if (await p.locator('[name=education]').isVisible()) await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); };
 const admin = async r => { await p.goto(U + 'admin/#' + r); await p.reload(); await p.waitForTimeout(500);
   if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200); } await p.waitForSelector('#main'); };
 
