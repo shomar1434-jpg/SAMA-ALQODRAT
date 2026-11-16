@@ -39,7 +39,7 @@ export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p
 export async function viewAdmin(r){
   const app=$('#app');
   const me=await Store.adminMe(); setMe(me); /* القائمة الجانبية مجمّعة في أقسام، ولكل صفحة أيقونة تخصها */
-  const GROUPS=[['التشغيل اليومي',[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-daily','clipboard','تقرير اليوم']]],
+  const GROUPS=[['التشغيل اليومي',[['display','qr','باركود محاضرات اليوم'],['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','حضور البرامج التدريبية'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-daily','clipboard','تقرير اليوم']]],
     ['المتدربون والتعليم',[['admin-trainees','id','المتدربون'],['admin-data','search','مراجعة البيانات'],['admin-users','user','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-access','key','تفعيل الأجهزة'],['admin-notify','bell','الإشعارات والرسائل']]],
     ['المالية',[['admin-orders','wallet','طلبات الشراء'],['admin-invoices','receipt','الفواتير']]],
     ['المحتوى والتقارير',[['admin-programs','book','البرامج والباقات'],['admin-reports','printer','التقارير والطباعة'],['admin-policies','shield','مركز السياسات'],['admin-partners','handshake','النبذة والشركاء']]],
@@ -49,7 +49,6 @@ export async function viewAdmin(r){
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة${me?.role?` · ${ADMIN_ROLES[me.role]}`:''}</span></b></div>
       ${GROUPS.map(([g,ps])=>`<div class="sec">${g}</div>${ps.map(([h,i,t])=>`<a href="#${h}" class="${r===h?'on':''}">${ic(i)}${t}</a>`).join('')}`).join('')}
       <div class="sec">أدوات</div>
-      <a href="#display">${ic('qr')}باركود محاضرات اليوم</a>
       <a href="#register">${ic('book')}دليل البرامج</a>
       ${Store.mode==='cloud'?`<a href="#" id="chPass">${ic('key')}تغيير كلمة المرور</a>`:''}
       <a href="#" id="logout">${ic('logout')}خروج</a>
