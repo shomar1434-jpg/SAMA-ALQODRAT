@@ -196,12 +196,11 @@ export async function viewEnroll(pre=''){
 /* =====================================================================
    2) صفحة البرنامج: نموذج تسجيل الدفعة + تحقق الحضور (هدف الباركود)
    ===================================================================== */
-/* حقول البرامج التدريبية تُنشأ فقط عند اختيار برنامج؛ باقات القدرات لا تحتوي هذه العناصر في DOM. */
-const programRegistrationFieldsHtml = () => `
-      ${fld('birth_date','تاريخ الميلاد',true,`<input class="inp" name="birth_date" type="date" min="1930-01-01" max="${riyadhNow().date}" autocomplete="bday">`,'لمن هم دون 19 سنة يُطلب جوال ولي الأمر.')}
+/* حقول البرنامج فقط؛ لا تُولَّد داخل نموذج باقات القدرات والتحصيلي. */
+const programBirthFieldHtml = () => `${fld('birth_date','تاريخ الميلاد',true,`<input class="inp" name="birth_date" type="date" min="1930-01-01" max="${riyadhNow().date}" autocomplete="bday">`,'لمن هم دون 19 سنة يُطلب جوال ولي الأمر.')}`;
+const programLocationFieldsHtml = () => `
       ${fld('city','المدينة أو المحافظة',true,`<select class="inp" name="city"><option value="">اختر</option>${CITIES.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
-      ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
 `;
 export function regFormHtml(title, sub, chooser='', mode='program'){
   return `<div class="card pad rv" id="regCard"><h2 class="sec-title">${title}</h2><p class="hint" style="margin:0 0 18px">${sub?esc(sub)+'. ':''}الحقول المعلّمة بـ <span style="color:var(--danger-ink)">*</span> مطلوبة. رقم السجل المدني هو ما يُحضَّر به المتدرب يوميًا في هذه الدفعة.</p>
@@ -212,9 +211,12 @@ export function regFormHtml(title, sub, chooser='', mode='program'){
       ${fld('phone','رقم الجوال',true,`<input class="inp num" name="phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" dir="ltr" style="text-align:right" placeholder="05XXXXXXXX" autocomplete="tel-national">`,'أرقام فقط: 10 أرقام تبدأ بـ 05.')}
       ${fld('email','البريد الإلكتروني',false,`<input class="inp" name="email" type="email" inputmode="email" maxlength="100" dir="ltr" style="text-align:right" placeholder="name@example.com" autocomplete="email" autocapitalize="off" spellcheck="false">`,'يجب أن يحوي علامة @ ونطاقًا، مثل name@gmail.com')}
       ${fld('gender','الجنس',true,`<select class="inp" name="gender"><option value="">اختر</option><option>ذكر</option><option>أنثى</option></select>`)}
-      <div id="rfProgramFields" style="display:contents">${mode==='plan' ? '' : programRegistrationFieldsHtml()}</div>
+      <div id="rfBirthField" style="display:contents">${mode==='plan' ? '' : programBirthFieldHtml()}</div>
       <p id="rfChild" class="alert t-info" style="grid-column:1/-1;margin:0" hidden><span class="aic">${ic('users')}</span><span>تسجيل طفل دون 13 سنة: اكتب <b>جوال ولي الأمر</b> في خانة «رقم الجوال». به يدخل ولي الأمر بوابته ويتابع حضور الطفل وتقدّمه.</span></p>
       <div id="rfGuard" style="grid-column:1/-1" hidden>${fld('guardian_phone','جوال ولي الأمر',true,`<input class="inp num" name="guardian_phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" dir="ltr" style="text-align:right" placeholder="05XXXXXXXX" autocomplete="off">`,'يدخل به ولي الأمر بوابته لمتابعة حضورك وتقدّمك، بعد تأكيده برمز تحقق وبرقم سجلك المدني.')}</div>
+      <div id="rfProgramFields" style="display:contents">${mode==='plan' ? '' : programLocationFieldsHtml()}</div>
+      ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
+
       <div id="rfPol" style="grid-column:1/-1" hidden></div>
       <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود المركز الموحد والتحقق برقم سجلي المدني.</span></label>
     </form>
@@ -224,7 +226,14 @@ export function regFormHtml(title, sub, chooser='', mode='program'){
 export function bindRegForm(target, cohortsFn){
   const f=$('#rf'); wireFormA11y(f,'rf'); bindPolicyConsent($('#rfPol',f));
   const bd=()=> $('[name=birth_date]',f), isPackage=()=>Boolean((typeof target==='function' ? target() : target)?.plan_id || f.querySelector('[name=en_kind]:checked')?.value==='plan'), minor=()=>isMinor(bd()?.value||'', riyadhNow().date);
-  const syncFields=()=>{ const box=$('#rfProgramFields',f); if(!box) return; if(isPackage()) box.replaceChildren(); else if(!box.childElementCount){ box.innerHTML=programRegistrationFieldsHtml(); wireFormA11y(f,'rf'); } };
+  const syncFields=()=>{ const birthBox=$('#rfBirthField',f), locationBox=$('#rfProgramFields',f); if(!birthBox||!locationBox) return;
+    if(isPackage()){ birthBox.replaceChildren(); locationBox.replaceChildren(); }
+    else { let changed=false;
+      if(!birthBox.childElementCount){ birthBox.innerHTML=programBirthFieldHtml(); changed=true; }
+      if(!locationBox.childElementCount){ locationBox.innerHTML=programLocationFieldsHtml(); changed=true; }
+      if(changed) wireFormA11y(f,'rf');
+    }
+  };
   const birthMsg=v=>{ const a=ageOn(v, riyadhNow().date); return !v ? 'اختر تاريخ الميلاد.' : a==null||v>riyadhNow().date||a<MIN_AGE||a>100 ? 'تاريخ الميلاد غير صحيح.' : ''; };
   const child=()=>isChild(bd()?.value||'', riyadhNow().date);
   const syncGuard=()=>{ if(isPackage()){ $('#rfGuard',f).hidden=false; $('#rfChild',f).hidden=true; return; } const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
@@ -265,7 +274,7 @@ export function bindRegForm(target, cohortsFn){
     $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
     Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
     (isPackage()?['gender']:['gender','city','education']).forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
-    if(isPackage()){ delete F.birth_date; delete F.city; delete F.education; delete F.employer; }
+    if(isPackage()){ delete F.birth_date; delete F.city; delete F.education; }
     else { const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
     const tg = typeof target==='function' ? target() : target;
     if(!tg){ ok=false; const el=$('#en-item',f)||$('#en-kind-program',f); errs.push({id:el?.id||'rf-full_name',label:'البرنامج أو الباقة',msg:'اختر ما تريد التسجيل فيه.'}); const e2=$('[data-e=en_item]',f); if(e2) e2.textContent='اختر ما تريد التسجيل فيه.'; }
