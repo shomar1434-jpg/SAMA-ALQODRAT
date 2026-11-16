@@ -230,7 +230,7 @@ export function bindRegForm(target, cohortsFn){
   const syncGuard=()=>{ if(isPackage()){ $('#rfGuard',f).hidden=false; $('#rfChild',f).hidden=true; return; } const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
   const wireBirth=()=>{ const input=bd(); if(!input||input.dataset.regBound) return; input.dataset.regBound='1';
     input.addEventListener('change',()=>{ const m=birthMsg(input.value); $('[data-e=birth_date]',f).textContent=m; input.classList.toggle('err',!!m); m?input.setAttribute('aria-invalid','true'):input.removeAttribute('aria-invalid'); syncGuard(); }); input.addEventListener('input',syncGuard);
-    $('select.inp','#rfProgramFields').forEach(el=>el.addEventListener('change',()=>{ el.classList.remove('err'); el.removeAttribute('aria-invalid'); const err=$(`[data-e=${el.name}]`,f); if(err) err.textContent=''; })); };
+    $('select.inp',$('#rfProgramFields',f)).forEach(el=>el.addEventListener('change',()=>{ el.classList.remove('err'); el.removeAttribute('aria-invalid'); const err=$(`[data-e=${el.name}]`,f); if(err) err.textContent=''; })); };
   syncFields(); wireBirth(); syncGuard(); f.addEventListener('sama-registration-kind',()=>{ syncFields(); wireBirth(); syncGuard(); });
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
