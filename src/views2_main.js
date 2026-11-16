@@ -504,7 +504,7 @@ export function todaySessions(D, today=riyadhNow().date){
 export async function viewDisplay(){
   const app=$('#app'); const D=await Store.adminData(); const today=riyadhNow().date, url=baseUrl(D.settings)+'#checkin';
   const L=todaySessions(D, today), now=toMin(riyadhNow().hm);
-  app.innerHTML = `<div class="wrap">${titleBar(`${ic('calendar')}${fmtDate(today)}`,'محاضرات اليوم، <em>بباركود حضور واحد</em>','باركود واحد ثابت لكل الدورات وباقات القدرات والتحصيلي: يفتح صفحة «تسجيل الحضور»، ويتعرف النظام من السجل المدني على جلسة المتدرب الآن. اطبعه مرة واحدة وعلّقه، أو اعرضه على شاشة القاعة.',`<a class="btn sm" href="#admin-attendance">${ic('prev')} الحضور اليومي</a>`)}
+  app.innerHTML = `<div class="wrap">${titleBar(`${ic('calendar')}${fmtDate(today)}`,'محاضرات اليوم، <em>بباركود حضور واحد</em>','باركود واحد ثابت لكل الدورات وباقات القدرات والتحصيلي: يفتح صفحة «تسجيل الحضور»، ويتعرف النظام من السجل المدني على جلسة المتدرب الآن. اطبعه مرة واحدة وعلّقه، أو اعرضه على شاشة القاعة.',`<a class="btn sm" href="#admin-attendance">${ic('prev')} حضور البرامج التدريبية</a>`)}
     <div class="card pad rv" style="--i:1;display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;margin-bottom:16px">
       <div class="qrmini" id="uQR"></div>
       <div style="flex:1;min-width:220px;display:grid;gap:8px"><span class="hero-pill" style="justify-self:start;color:var(--brand)">${ic('qr')}باركود الحضور الموحد</span>
