@@ -28,6 +28,7 @@ await go('plan-' + ids.remote); ok(/قريبًا/.test(await text('#plReg')) && 
 const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 const subscribe = async () => {
   await go('plan-' + ids.silver);
+  ok(await p.evaluate(() => ['birth_date','city','education','employer'].every(n => !document.querySelector(`#rf [name="${n}"]`))), 'صفحة باقة الفضية لا تنشئ حقول الميلاد والمدينة والمؤهل وجهة العمل');
   await p.fill('[name=full_name]', 'سلمان أحمد علي الشهري'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0551112233');
   await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=guardian_phone]', '0509000088');
   await p.check('[name=agree]'); if (await p.$('#rf-pol')) await p.check('#rf-pol'); await p.click('#rfGo'); await p.waitForTimeout(700);
