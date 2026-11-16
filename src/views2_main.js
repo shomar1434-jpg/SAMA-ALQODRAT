@@ -3,7 +3,7 @@ import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
 import { PAGE, adminBase, publicBase, portalBase } from './config.js';
 import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
-import { liveSay, setBusy, showErrorSummary, toLatin, viewVerify, wireFormA11y } from './features.js';
+import { liveSay, setBusy, showErrorSummary, toLatin, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
 import { closePrint } from './print.js';
 import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
@@ -50,7 +50,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 /* حالة قاعدة البيانات: أيقونة خضراء متصلة، حمراء غير متصلة (لا شبكة)، ذهبية للبيانات التجريبية */
@@ -73,12 +73,11 @@ export async function route(){
   if(PAGE==='public' && adminRoute){ location.replace(adminBase()+'#'+h); return; }
   if(PAGE==='admin' && h && !adminRoute){ location.replace(publicBase()+'#'+h); return; }
   if(PAGE==='admin' && !h) h='admin';
-  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : ['contact','verify'].includes(h)||h.startsWith('verify') ? '' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
+  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : h==='contact' ? '' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
   syncDb();
   window.scrollTo(0,0);
-  if(/^v-[A-Za-z0-9-]+$/.test(h)) return viewVerify(h.slice(2));
-  if(h==='verify') return viewVerify('');
+  if(/^v-[A-Za-z0-9-]+$/.test(h) || h==='verify'){ location.replace(publicBase()+'#home'); return; }
   if(h==='me'){ history.replaceState(null,'','#portals'); return viewPortals(); }   // «حضوري» انتقلت إلى بوابة المتدرب
   if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
   if(h==='enroll' || h.startsWith('enroll-')) return viewEnroll(h.slice(7));
@@ -212,7 +211,7 @@ export function regFormHtml(title, sub, chooser=''){
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
       <div id="rfPol" style="grid-column:1/-1" hidden></div>
-      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود المركز الموحد والتحقق برقم سجلي المدني.</span></label>
+      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقر بصحة البيانات أعلاه</span></label>
     </form>
     <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
     <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;
@@ -269,8 +268,8 @@ export function bindRegForm(target, cohortsFn){
     setBusy(b,true,'جارٍ حفظ التسجيل');
     try{
       delete F.en_kind; delete F.en_item;
-      const waBtn = (ref, what) => `<p style="margin:14px 0 0"><a class="btn sm" target="_blank" rel="noopener" href="${waLink(`السلام عليكم، سجّلت في ${what} عبر المنصة.\nرقم المرجع: ${ref}\nالاسم: ${F.full_name}`)}">${WA_LOGO} تواصل مع المركز عبر واتساب</a></p>`;
-      const manarNote = `<p class="hint" style="max-width:480px;margin:10px auto 0">${ic('award')} شهادتك المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:500">منصة منار</a> التابعة للمؤسسة العامة للتدريب التقني والمهني. أنشئ حسابك فيها بنفس بياناتك.</p>`;
+      const waBtn = (ref, what) => `<p style="margin:14px 0 0"><a class="btn sm" target="_blank" rel="noopener" href="${waLink(`السلام عليكم، سجّلت في ${what} لدى مركز سما القدرات للتدريب.\nرقم المرجع: ${ref}\nالاسم: ${F.full_name}`)}">${WA_LOGO} تواصل مع المركز عبر واتساب</a></p>`;
+      const manarNote = '';
       const gNote = F.guardian_phone ? `<p class="hint" style="max-width:480px;margin:10px auto 0">${ic('users')} لمتابعة ولي الأمر: يدخل «بوابة ولي الأمر» بجواله ${esc(F.guardian_phone)}، ثم يكتب رقم سجلك المدني مرة واحدة.</p>` : '';
       if(tg.plan_id){
         const r = await Store.registerSubscription({...F, ...tg});
@@ -393,7 +392,7 @@ export async function viewProgramPage(code, tab){
       <span class="hero-pill">${ic(CAT_ICON[p.category]||'book')}${esc(p.category)}${p.accreditation_no?` · رقم الاعتماد ${esc(p.accreditation_no)}`:''}</span>
       <h1>${esc(p.name)}</h1>
       ${p.description?`<p>${esc(p.description)}</p>`:''}
-      <p class="hero-note">${ic('award')} الشهادة المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener">منصة منار</a> (المؤسسة العامة للتدريب التقني والمهني)؛ يلزم المتدرب إنشاء حساب فيها.</p>
+
       <ul class="stats" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
         <li>${ic('hourglass')}<b>${p.hours==null?'—':fmtNum(p.hours)}</b><span>ساعة تدريبية</span></li>
         <li>${ic('calendar')}<b>${p.duration_days==null?'—':fmtNum(p.duration_days)}</b><span>أيام</span></li>
@@ -529,7 +528,7 @@ export async function viewDisplay(){
    ===================================================================== */
 /* اختيار كلمة المرور: للمدعوّ برابط البريد، ولمن أُنشئ حسابه بكلمة مؤقتة (أول دخول)، ولاستعادة كلمة المرور */
 export function viewSetPassword(kind){
-  const T={invite:['مرحبًا بك مسؤولًا في المنصة','اختر كلمة مرور لحسابك، ثم تدخل لوحة الإدارة بالدور الذي حدده لك مدير النظام.'],
+  const T={invite:['مرحبًا بك مسؤولًا في مركز سما القدرات للتدريب','اختر كلمة مرور لحسابك، ثم تدخل لوحة الإدارة بالدور الذي حدده لك مدير النظام.'],
     first:['غيّر كلمة المرور المؤقتة','دخلت بكلمة مرور مؤقتة. اختر كلمة مرور خاصة بك قبل المتابعة.'],
     recovery:['كلمة مرور جديدة','اختر كلمة مرور جديدة لحسابك.']}[kind]||['كلمة مرور جديدة',''];
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
