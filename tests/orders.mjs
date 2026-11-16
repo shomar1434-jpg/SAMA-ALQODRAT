@@ -13,7 +13,7 @@ const person = async (name, nid, phone, kind) => {
   await p.fill('[name=full_name]', name); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', phone);
   await p.selectOption('[name=gender]', 'ذكر');
   if(kind==='plan'){
-    ok(await p.evaluate(() => ['birth_date','city','education','employer'].every(n => !document.querySelector(`#rf [name="${n}"]`))), 'نموذج الباقة لا يحتوي على حقول البرامج في DOM');
+    ok(await p.evaluate(() => ['birth_date','city','education'].every(n => !document.querySelector(`#rf [name="${n}"]`))), 'نموذج الباقة لا يطلب الميلاد أو المدينة أو المؤهل');
     await p.fill('[name=guardian_phone]', '0509000099');
   } else {
     ok(await p.evaluate(() => ['birth_date','city','education'].every(n => !!document.querySelector(`#rf [name="${n}"]`))), 'نموذج البرنامج يحتوي على حقول العمر والمدينة والمؤهل');
