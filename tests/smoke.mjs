@@ -12,8 +12,9 @@ let fail = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); i
 
 await p.goto(U + '#home'); await p.waitForTimeout(1500);
 ok(await p.$('.pt-card'), 'شريط شركاء النجاح');
-for (const r of ['register', 'checkin', 'verify']) { await go(r); ok(await p.$('#app *'), 'صفحة ' + r); }
+for (const r of ['register', 'checkin']) { await go(r); ok(await p.$('#app *'), 'صفحة ' + r); }
 
+await go('verify'); ok(await p.evaluate(() => location.hash) === '#home', 'الرابط القديم للتحقق يعود للرئيسية');
 await go('me'); ok(await p.evaluate(() => location.hash) === '#portals', 'الرابط القديم #me يفتح البوابات');
 
 const code = await p.evaluate(() => { const { LocalStore, cohortArchived, progCode } = window.__SAMA__; const D = LocalStore.data; const c = D.cohorts.find(c => !cohortArchived(c) && c.reg_open); return progCode(D.programs.find(x => x.id === c.program_id)); });
