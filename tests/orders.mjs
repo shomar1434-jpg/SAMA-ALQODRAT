@@ -9,16 +9,25 @@ const errs = []; p.on('pageerror', e => errs.push(e.message));
 const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat_v4')));
 const text = async s => ((await p.textContent(s).catch(() => '')) || '').trim();
 const years = n => { const d = new Date(Date.now() + 3 * 3600e3); d.setUTCFullYear(d.getUTCFullYear() - n); return d.toISOString().slice(0, 10); };
-const person = async (name, nid, phone) => { await p.fill('[name=full_name]', name); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', phone);
-  await p.selectOption('[name=gender]', 'ذكر'); if (await p.locator('[name=birth_date]').isVisible()) { await p.fill('[name=birth_date]', years(25)); await p.dispatchEvent('[name=birth_date]', 'change'); } else { await p.fill('[name=guardian_phone]', '0509000099'); }
-  if (await p.locator('[name=city]').isVisible()) await p.selectOption('[name=city]', { index: 1 });
-  if (await p.locator('[name=education]').isVisible()) await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); };
+const person = async (name, nid, phone, kind) => {
+  await p.fill('[name=full_name]', name); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', phone);
+  await p.selectOption('[name=gender]', 'ذكر');
+  if(kind==='plan'){
+    ok(await p.evaluate(() => ['birth_date','city','education','employer'].every(n => !document.querySelector(`#rf [name="${n}"]`))), 'نموذج الباقة لا يحتوي على حقول البرامج في DOM');
+    await p.fill('[name=guardian_phone]', '0509000099');
+  } else {
+    ok(await p.evaluate(() => ['birth_date','city','education'].every(n => !!document.querySelector(`#rf [name="${n}"]`))), 'نموذج البرنامج يحتوي على حقول العمر والمدينة والمؤهل');
+    await p.fill('[name=birth_date]', years(25)); await p.dispatchEvent('[name=birth_date]', 'change');
+    await p.selectOption('[name=city]', { index:1 }); await p.selectOption('[name=education]', { index:1 });
+  }
+  await p.check('[name=agree]');
+};
 const admin = async r => { await p.goto(U + 'admin/#' + r); await p.reload(); await p.waitForTimeout(500);
   if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200); } await p.waitForSelector('#main'); };
 
 // تسجيل في باقة: طلب برقم فريد، والحساب البنكي مخفي
 await p.goto(U + '#enroll'); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.waitForTimeout(200);
-await p.selectOption('#en-item', { index: 1 }); await person('فهد خالد علي العتيبي', '1000000511', '0556661001'); await p.click('#rfGo'); await p.waitForSelector('.ord');
+await p.selectOption('#en-item', { index: 1 }); await person('فهد خالد علي العتيبي', '1000000511', '0556661001', 'plan'); await p.click('#rfGo'); await p.waitForSelector('.ord');
 let D = await data(); const t = D.trainees.find(x => x.national_id === '1000000511'); let o = D.orders.find(x => x.trainee_id === t.id);
 const plan = D.plans.find(x => x.id === D.subscriptions.find(s => s.id === o.subscription_id).plan_id);
 ok(o && /^SAMA-\d{4}-\d{6}$/.test(o.number) && (await text('.ord-no')) === o.number, 'يُنشأ مع التسجيل طلب برقم فريد يظهر لصاحبه');
@@ -55,7 +64,7 @@ ok((await data()).settings.bank.enabled === true, 'تفعيل عرض الحسا�
 
 // برنامج تدريبي: طلب ثانٍ برقم جديد، والحساب ظاهر الآن
 await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-program', { force: true }); await p.selectOption('#en-item', { index: 1 });
-await person('فهد خالد علي العتيبي', '1000000511', '0556661001'); await p.click('#rfGo'); await p.waitForSelector('.ord');
+await person('فهد خالد علي العتيبي', '1000000511', '0556661001', 'program'); await p.click('#rfGo'); await p.waitForSelector('.ord');
 D = await data(); const o2 = D.orders.find(x => x.trainee_id === t.id && x.kind === 'program');
 ok(o2 && o2.number !== o.number && o2.enrollment_ids.length >= 1 && /SA1210000001400012583008/.test(await text('.ord-bank')), 'طلب مستقل للبرنامج، وبيانات التحويل تظهر بعد التفعيل');
 
