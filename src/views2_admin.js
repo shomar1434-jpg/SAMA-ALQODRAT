@@ -223,7 +223,7 @@ export function pageAttendance(){
   const rosterOf = c => enrollsOf(AD,c.id).filter(e=>e.created_at.slice(0,10)<=attDate);
   const totalExp = sess.reduce((s,c)=>s+rosterOf(c).length,0);
   const late = dayAtt.filter(a=>a.status==='متأخر').length;
-  m.innerHTML = titleBar(`${ic('calendar')}${fmtDate(attDate)}`, `حضور اليوم، <em>${fmtNum(dayAtt.length)} من ${fmtNum(totalExp)}</em>`, 'لكل دفعة منعقدة كشفها: الحاضرون أولًا بترتيب وقت الدخول، ثم الغائبون. يمكنك التحضير اليدوي وطباعة الكشوف كنماذج إثبات.', `${sess.length&&!future?`<button class="btn pri sm" id="prAll">${ic('form')} طباعة كشوف اليوم</button>`:''}<a class="btn sm" href="#display">${ic('qr')} باركود محاضرات اليوم</a>`)+
+  m.innerHTML = titleBar(`${ic('calendar')}${fmtDate(attDate)}`, `حضور البرامج التدريبية، <em>${fmtNum(dayAtt.length)} من ${fmtNum(totalExp)}</em>`, 'لكل دفعة منعقدة كشفها: الحاضرون أولًا بترتيب وقت الدخول، ثم الغائبون. يمكنك التحضير اليدوي وطباعة الكشوف كنماذج إثبات.', `${sess.length&&!future?`<button class="btn pri sm" id="prAll">${ic('form')} طباعة كشوف اليوم</button>`:''}<a class="btn sm" href="#display">${ic('qr')} باركود محاضرات اليوم</a>`)+
     `<div class="filters rv" style="--i:1"><button class="btn sm" id="pd">${ic('prev')} السابق</button><input type="date" class="inp" id="ad" value="${attDate}"><button class="btn sm" id="nd">التالي ${ic('next')}</button>
       <button class="btn sm" id="td">اليوم</button><span style="flex:1"></span><input class="inp" id="aq" placeholder="بحث بالاسم أو السجل المدني" value="${esc(attQ)}" style="min-width:230px"></div>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
