@@ -188,8 +188,8 @@ export async function viewEnroll(pre=''){
       : kind==='program' && !isOpen(x) ? `لا توجد دفعة مفتوحة الآن: سجّل مبدئيًا ويتواصل معك المركز عند فتح الدفعة، ولا يُطلب منك سداد قبل ذلك · ${priceTxt(x.price)} · <a href="#${x.code}" style="color:var(--brand)">صفحة البرنامج</a>`
       : kind==='program' ? `${fmtShort(x.cohort.start_date)} – ${fmtShort(x.cohort.end_date)} · ${t12(x.cohort.start_time)} · ${priceTxt(x.price)} · <a href="#${x.code}" style="color:var(--brand)">صفحة البرنامج</a>`
       : `يبدأ اشتراكك من أول يوم تحضر فيه · <a href="#plan-${x.id}" style="color:var(--brand)">صفحة الباقة</a>`; };
-  $$('[name=en_kind]').forEach(r=>r.onchange=()=>{ kind=r.value; item=''; sel.innerHTML=opts(); $('#en-lbl').innerHTML=`${kind==='program'?'البرنامج التدريبي':'الباقة'} <i>*</i>`; info(); });
-  sel.onchange=()=>{ item=sel.value; $('[data-e=en_item]').textContent=''; info(); }; info();
+  $$('[name=en_kind]').forEach(r=>r.onchange=()=>{ kind=r.value; item=''; sel.innerHTML=opts(); $('#en-lbl').innerHTML=`${kind==='program'?'البرنامج التدريبي':'الباقة'} <i>*</i>`; info(); $('#rf')?.dispatchEvent(new Event('sama-registration-kind')); });
+  sel.onchange=()=>{ item=sel.value; $('[data-e=en_item]').textContent=''; info(); $('#rf')?.dispatchEvent(new Event('sama-registration-kind')); }; info();
   bindRegForm(()=> !item ? null : kind==='program' ? {program_id:item} : {plan_id:item}, ()=>{ const p=progs.find(x=>x.id===item); return p&&isOpen(p)?[p.cohort]:[]; });
 }
 
@@ -219,10 +219,12 @@ export function regFormHtml(title, sub, chooser=''){
 }
 export function bindRegForm(target, cohortsFn){
   const f=$('#rf'); wireFormA11y(f,'rf'); bindPolicyConsent($('#rfPol',f));
-  const bd=$('[name=birth_date]',f), minor=()=>isMinor(bd.value, riyadhNow().date);
+  const bd=$('[name=birth_date]',f), isPackage=()=>!!(typeof target==='function' ? target() : target)?.plan_id, minor=()=>isMinor(bd.value, riyadhNow().date);
+  const syncFields=()=>{ const pkg=isPackage(); ['birth_date','city','education','employer'].forEach(n=>{ const field=$(`[name=${n}]`,f)?.closest('.field'); if(field){ field.hidden=pkg; field.style.display=pkg?'none':''; } }); };
   const birthMsg=v=>{ const a=ageOn(v, riyadhNow().date); return !v ? 'اختر تاريخ الميلاد.' : a==null||v>riyadhNow().date||a<MIN_AGE||a>100 ? 'تاريخ الميلاد غير صحيح.' : ''; };
   const child=()=>isChild(bd.value, riyadhNow().date);
-  const syncGuard=()=>{ const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
+  const syncGuard=()=>{ if(isPackage()){ $('#rfGuard',f).hidden=false; $('#rfChild',f).hidden=true; return; } const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
+  syncFields(); syncGuard(); f.addEventListener('sama-registration-kind',()=>{ syncFields(); syncGuard(); });
   bd.addEventListener('change',()=>{ const m=birthMsg(bd.value); $('[data-e=birth_date]',f).textContent=m; bd.classList.toggle('err',!!m); m?bd.setAttribute('aria-invalid','true'):bd.removeAttribute('aria-invalid'); syncGuard(); }); bd.addEventListener('input',syncGuard);
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
@@ -239,7 +241,7 @@ export function bindRegForm(target, cohortsFn){
       if(/[a-zA-Z]/.test(v) && /[\u0621-\u06FF]/.test(v)) return 'اكتب الاسم بلغة واحدة: العربية أو الإنجليزية.'; if(parts.length<3) return 'اكتب الاسم الثلاثي على الأقل.'; if(parts.some(x=>x.replace(/[\u064B-\u0652]/g,'').length<2)) return 'كل مقطع في الاسم حرفان على الأقل.'; return ''; },
     national_id: v => !v ? 'اكتب رقم السجل المدني.' : !/^\d+$/.test(v) ? blocked.national_id : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : !/^[12]/.test(v) ? 'يبدأ رقم السجل بـ 1 أو 2.' : !validSaudiId(v) ? 'رقم السجل غير صحيح. تحقق من الأرقام.' : '',
     phone: v => !v ? 'اكتب رقم الجوال.' : !/^\d+$/.test(v) ? blocked.phone : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
-    guardian_phone: v => !minor()||child() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
+    guardian_phone: v => !isPackage() && (!minor()||child()) ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
     email: v => !v ? '' : !v.includes('@') ? 'البريد يجب أن يحوي علامة @' : (v.match(/@/g)||[]).length>1 ? 'البريد يحوي علامة @ واحدة فقط.' : !/^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(v) ? 'صيغة البريد غير صحيحة، مثل name@gmail.com' : ''
   };
   const setState=(el,msg)=>{ const n=el.name, e=$(`[data-e=${n}]`,f); e.textContent=msg; el.classList.toggle('err',!!msg); el.classList.toggle('ok',!msg && !!el.value); msg?el.setAttribute('aria-invalid','true'):el.removeAttribute('aria-invalid'); };
@@ -256,8 +258,9 @@ export function bindRegForm(target, cohortsFn){
     const err=(n,m)=>{ ok=false; const el=$(`[name=${n}]`,f); $(`[data-e=${n}]`,f).textContent=m; el.classList.add('err'); el.setAttribute('aria-invalid','true'); errs.push({id:el.id,label:$(`label[for="${el.id}"]`,f)?.textContent.replace('*','').trim()||n,msg:m}); };
     $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
     Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
-    ['gender','city','education'].forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
-    { const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
+    (isPackage()?['gender']:['gender','city','education']).forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
+    if(isPackage()){ delete F.birth_date; delete F.city; delete F.education; delete F.employer; }
+    else { const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
     const tg = typeof target==='function' ? target() : target;
     if(!tg){ ok=false; const el=$('#en-item',f)||$('#en-kind-program',f); errs.push({id:el?.id||'rf-full_name',label:'البرنامج أو الباقة',msg:'اختر ما تريد التسجيل فيه.'}); const e2=$('[data-e=en_item]',f); if(e2) e2.textContent='اختر ما تريد التسجيل فيه.'; }
     if($('#rf-pol',f) && !F.policies){ ok=false; errs.push({id:'rf-pol',label:'السياسات',msg:'اقرأ السياسات ووافق عليها للمتابعة.'}); $('#rfE').textContent='اقرأ السياسات ووافق عليها للمتابعة.'; }
