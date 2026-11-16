@@ -49,7 +49,7 @@ const silver = await S(() => window.__SAMA__.LocalStore.data.plans.find(x => x.t
 const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 await go('plan-' + silver);
 await p.fill('[name=full_name]', 'ماجد سعيد علي القحطاني'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0554443322');
-await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
+await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=guardian_phone]', '0509000077'); await p.check('[name=agree]');
 ok(!(await p.$('#rf-pol')) && await p.$('#rfPol .pol-note a[href="#policies"]'), 'رابط السياسات للاطلاع دون خانة إلزام');
 ok(!/يلزم قبولها/.test(await p.innerText('body')), 'لا عبارة «يلزم قبولها»');
 await p.click('#rfGo'); await p.waitForTimeout(800);
