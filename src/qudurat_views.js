@@ -242,16 +242,17 @@ function tabSubs(){
 }
 
 /* كشف اليوم لكل قسم: من حضر، ومن تأخر، ومن لم يسجل بعد */
-let tdQ = '', tdSt = 'all', tdSc = 'all';   // بحث وتصفية «حضور اليوم»
+let tdQ = '', tdSt = 'all', tdSc = 'all', tdPlan = 'all';   // بحث وتصفية «حضور اليوم»
 function tabToday(){
   const D = AD, n = riyadhNow(), body = $('#qBody');
-  const pass = (t, a) => matchPerson(tdSc, tdQ, t) && (tdSt === 'all' || (tdSt === 'present' ? !!a : !a));
+  const pass = (t, a, s) => matchPerson(tdSc, tdQ, t) && (tdPlan === 'all' || s.plan_id === tdPlan) && (tdSt === 'all' || (tdSt === 'present' ? !!a : !a));
   body.innerHTML = `<div class="filters" style="margin-bottom:12px"><label class="sr-only" for="tdq">بحث</label><input class="inp" id="tdq" type="search" placeholder="بحث بأي جزء من الاسم أو السجل أو الجوال" value="${esc(tdQ)}" style="flex:1;min-width:200px" autocomplete="off">${scopeSelect('tdsc', tdSc)}
+    <label class="sr-only" for="tdplan">الباقة</label><select class="inp" id="tdplan" aria-label="تصفية حسب الباقة"><option value="all">جميع الباقات</option>${(D.plans || []).map(p => `<option value="${p.id}" ${tdPlan === p.id ? 'selected' : ''}>${esc(planName(p))}</option>`).join('')}</select>
     <label class="sr-only" for="tds">الحالة</label><select class="inp" id="tds">${[['all', 'الكل'], ['present', 'الحاضرون'], ['absent', 'لم يحضروا']].map(([k, v]) => `<option value="${k}" ${tdSt === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>` + Object.keys(SECTIONS).map((sec, i) => {
     const ses = sessionOn(D, sec, n.date);
     const list = (D.subscriptions || []).filter(s => s.section === sec && ['pending', 'active'].includes(subStatus(s, n.date)))
       .map(s => ({ s, t:D.trainees.find(x => x.id === s.trainee_id), a:(D.sub_attendance || []).find(a => a.subscription_id === s.id && a.att_date === n.date) }));
-    const shown = list.filter(x => pass(x.t, x.a)), done = ses && n.hm >= ses.end;
+    const shown = list.filter(x => pass(x.t, x.a, x.s)), done = ses && n.hm >= ses.end;
     return `<div class="card pad rv" style="--i:${i};margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       <h3 class="ctitle">${ic('users')}${SECTIONS[sec]}</h3><span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="pill ${ses ? 'info' : 'g'}">${ses ? `جلسة اليوم ${t12(ses.start)} – ${t12(ses.end)}` : 'لا توجد جلسة اليوم'}</span>${ses && n.hm >= ses.start ? `<button class="btn sm" data-abs="${sec}:${done ? 1 : 0}">${ic('send')} إبلاغ أولياء أمور الغائبين</button>` : ''}</span></div>
       ${!ses ? '' : list.length ? `${shown.length !== list.length ? `<p class="hint" style="margin:0 0 8px">${fmtNum(shown.length)} من ${fmtNum(list.length)} حسب البحث</p>` : ''}<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>الحالة</th><th>وقت الحضور</th><th>تعديل</th></tr></thead><tbody>
@@ -261,6 +262,7 @@ function tabToday(){
           <td style="white-space:nowrap"><button class="btn sm" data-mk="${s.id}" data-st="حاضر">حاضر</button> <button class="btn sm" data-mk="${s.id}" data-st="متأخر">متأخر</button>${a ? ` <button class="btn sm danger soft" data-mk="${s.id}" data-st="">إلغاء</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div>` : emptyBox('لا يوجد مشتركون في هذا القسم')}</div>`; }).join('');
   $('#tdsc').onchange = e => { tdSc = e.target.value; tabToday(); };
+  $('#tdplan').onchange = e => { tdPlan = e.target.value; tabToday(); };
   let tdT; $('#tdq').oninput = e => { tdQ = e.target.value; clearTimeout(tdT); tdT = setTimeout(() => { tabToday(); const el = $('#tdq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
   $('#tds').onchange = e => { tdSt = e.target.value; tabToday(); };
   $$('[data-abs]').forEach(b => b.onclick = () => { const [sec, e] = b.dataset.abs.split(':'); absenceModal(AD, 'pkg', sec, riyadhNow().date, e === '1'); });
