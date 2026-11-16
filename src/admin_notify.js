@@ -18,7 +18,7 @@ export function pageNotify(){
     .sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   const progs = (AD.programs || []).filter(p => (AD.cohorts || []).some(c => c.program_id === p.id && !c.archived_at && c.end_date >= today));
   m.innerHTML = titleBar(`${ic('alert')}الإشعارات والرسائل`, 'رسائل الإدارة <em>والتنبيهات</em>',
-      'تصل الرسالة إلى صندوق الوارد في بوابة المستلم مع صوت التنبيه، وتظهر إشعارًا على جهازه إن ثبّت المنصة وفعّل الإشعارات.') +
+      'تصل الرسالة إلى صندوق الوارد في بوابة المستلم مع صوت التنبيه، وتظهر إشعارًا على جهازه إن ثبّت المركز وفعّل الإشعارات.') +
     `<div class="grid g2" style="align-items:start">
       <form class="card pad rv" id="nf" novalidate><h3 class="ctitle">${ic('send')}رسالة جديدة</h3>
         <div class="field"><label for="nf-aud">إلى</label><select class="inp" id="nf-aud" name="audience">${Object.entries(AUDIENCE_TXT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
