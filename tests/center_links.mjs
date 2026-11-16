@@ -36,7 +36,11 @@ let D = await data(); const kid = D.trainees.find(t => t.national_id === '100000
 ok(kid && kid.guardian_phone === '0556660011' && kid.phone === '0556660011', 'جوال التواصل للطفل هو جوال ولي الأمر');
 const card = await text('#regCard'), wa = await p.getAttribute('#regCard a[href*="wa.me"]', 'href');
 const order = D.orders.find(o => o.trainee_id === kid.id);
-ok(/منصة منار/.test(card) && wa && (order ? decodeURIComponent(wa).includes(order.number) : /رقم المرجع/.test(decodeURIComponent(wa)) && /تسجيل مبدئي/.test(card)), 'رسالة النجاح: منار وواتساب برقم طلب شراء عند وجوده أو برقم مرجع للتسجيل المبدئي');
+const waText = wa ? decodeURIComponent(wa) : '';
+ok(/منصة منار/.test(card), 'رسالة تسجيل الطفل توضح إصدار الشهادة من منصة منار');
+ok(!!wa, 'رسالة تسجيل الطفل تتضمن رابط تواصل واتساب');
+ok(order ? waText.includes(order.number) : waText.includes('رقم المرجع'), 'رابط واتساب يتضمن الرقم الفعلي للطلب أو للتسجيل المبدئي');
+ok(!!order || /تسجيل مبدئي/.test(card), 'تسجيل الطفل دون دفعة مفتوحة يعرض وصف التسجيل المبدئي');
 await p.fill('[name=birth_date]', years(2)).catch(() => {});
 
 // دون 3 سنوات يُرفض
