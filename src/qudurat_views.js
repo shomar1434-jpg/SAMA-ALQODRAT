@@ -151,7 +151,7 @@ export async function viewPlanPage(id){
   const box = $('#plReg');
   if(soon){ box.innerHTML = `<div class="card pad rv" style="text-align:center">${emptyBox('تُتاح قريبًا', 'التسجيل في باقات الحضور عن بُعد سيُفتح قريبًا. يمكنك التسجيل الآن في الباقة الحضورية المماثلة.')}</div>`; return; }
   if(!planOpen(p)){ box.innerHTML = emptyBox('التسجيل مغلق حاليًا', 'تواصل مع المركز لمعرفة موعد فتح التسجيل.'); return; }
-  box.innerHTML = regFormHtml(`الاشتراك في ${p.name}`, 'يبدأ اشتراكك من أول يوم تحضر فيه');
+  box.innerHTML = regFormHtml(`الاشتراك في ${p.name}`, 'يبدأ اشتراكك من أول يوم تحضر فيه', '', 'plan');
   bindRegForm({ plan_id:p.id }, () => []);
 }
 
