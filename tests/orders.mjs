@@ -30,6 +30,7 @@ await p.goto(U + '#enroll'); await p.waitForSelector('#en-item'); await p.check(
 await p.selectOption('#en-item', { index: 1 }); await person('فهد خالد علي العتيبي', '1000000511', '0556661001', 'plan'); await p.click('#rfGo'); await p.waitForSelector('.ord');
 let D = await data(); const t = D.trainees.find(x => x.national_id === '1000000511'); let o = D.orders.find(x => x.trainee_id === t.id);
 const plan = D.plans.find(x => x.id === D.subscriptions.find(s => s.id === o.subscription_id).plan_id);
+ok(t.full_name === 'فهد خالد علي العتيبي' && t.phone === '0556661001' && t.guardian_phone === '0509000099', 'طلب الباقة مرتبط بالمتدرب وبجوال ولي الأمر المرسل من النموذج');
 ok(o && /^SAMA-\d{4}-\d{6}$/.test(o.number) && (await text('.ord-no')) === o.number, 'يُنشأ مع التسجيل طلب برقم فريد يظهر لصاحبه');
 ok(o.due_now === +plan.reg_fee && o.total === +plan.reg_fee + plan.installments * plan.installment_amount && o.approval === 'pending_review' && o.payment === 'unpaid', 'المطلوب الآن رسوم التسجيل بأسعار المنصة، والحالتان ابتدائيتان');
 ok(!(await p.$('.ord-bank')) && !/SA12/.test(await text('#ordBox')), 'الحساب البنكي لا يظهر قبل تفعيله من الإدارة');
@@ -66,6 +67,8 @@ ok((await data()).settings.bank.enabled === true, 'تفعيل عرض الحسا�
 await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-program', { force: true }); await p.selectOption('#en-item', { index: 1 });
 await person('فهد خالد علي العتيبي', '1000000511', '0556661001', 'program'); await p.click('#rfGo'); await p.waitForSelector('.ord');
 D = await data(); const o2 = D.orders.find(x => x.trainee_id === t.id && x.kind === 'program');
+const profile = D.trainees.find(x => x.id === t.id);
+ok(!!profile.city && !!profile.education && profile.guardian_phone === '0509000099', 'التسجيل في برنامج يستكمل حقوله من النموذج ويحافظ على جوال ولي الأمر الموجود دون محوه');
 ok(o2 && o2.number !== o.number && o2.enrollment_ids.length >= 1 && /SA1210000001400012583008/.test(await text('.ord-bank')), 'طلب مستقل للبرنامج، وبيانات التحويل تظهر بعد التفعيل');
 
 // منع الحضور: معطّل افتراضيًا، وعند تفعيله يُمنع غير المستوفي إلا بقبول مؤقت
