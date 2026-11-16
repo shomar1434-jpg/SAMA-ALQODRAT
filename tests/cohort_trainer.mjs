@@ -15,7 +15,10 @@ const login = async (role, phone) => { await p.goto(U + role + '/'); await p.wai
 await p.goto(U); await p.waitForTimeout(800);
 let D = await data();
 const kid = D.trainees.find(t => t.phone === '0550000003');                       // متدرب برنامج تدريبي تجريبي
-const enr = D.enrollments.find(e => e.trainee_id === kid.id && e.status !== 'ملغى'), co = D.cohorts.find(c => c.id === enr.cohort_id);
+const today = new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
+const enr = D.enrollments.find(e => e.trainee_id === kid.id && e.status !== 'ملغى' && D.cohorts.some(c => c.id === e.cohort_id && !c.archived_at && c.start_date <= today && c.end_date >= today));
+if (!enr) throw new Error('لا توجد دفعة جارية مرتبطة بمتدرب البرامج التجريبي');
+const co = D.cohorts.find(c => c.id === enr.cohort_id);
 const T = D.teachers.find(t => t.phone === '0501000003');
 
 // مدرب جديد للبرامج فقط (بلا مقررات)، ثم إسناد الدفعة
