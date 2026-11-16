@@ -222,7 +222,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
       const mode = () => { const p = pickOn(); $('[data-qpk]').hidden = !p; $('#hf-n').closest('.field').hidden = p || $('[data-qk]').hidden; if(p) skills(); };
       $('#hf-m').onchange = mode; $('#hf-u').addEventListener('change', () => { if(pickOn()) skills(); }); $('#hf-k').onchange = drawPick;
       const kind = () => { const q = $('#hf [name=kind]:checked').value === 'quiz'; $$('[data-qk]').forEach(x => x.hidden = !q); if(q) units(); mode(); };
-      $$('#hf [name=kind]').forEach(r => r.onchange = kind); $('#hf-s').addEventListener('change', () => { if(!$('[data-qk]').hidden) units(); });
+      $$('#hf [name=kind]').forEach(r => r.onchange = kind); $('#hf-s').addEventListener('change', () => { chosen.length=0; if(!$('[data-qk]').hidden){ units(); mode(); } count(); });
       $('#hfPreview').onclick=()=>{ const quiz=$('#hf [name=kind]:checked').value==='quiz', qs=chosenQuestions(); if(quiz && ($('#hf-m').value!=='pick'||!qs.length)){ $('#hfE').textContent='للمعاينة الدقيقة انتقِ الأسئلة بنفسك من أقسام البنك أولًا.'; return; }
         const editor=$('#hf').closest('.modal'); if(!editor)return; editor.style.position='relative';
         const title=esc($('#hf-t').value||'الاختبار أو الواجب الجديد');
