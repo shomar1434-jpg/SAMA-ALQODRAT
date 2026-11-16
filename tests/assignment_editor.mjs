@@ -101,7 +101,7 @@ D=await data(); const mixed=D.assignments.find(a=>a.title==='واجب اختبا
 ok(mixed?.quiz?.length===2 && new Set(mixed.quiz.map(q=>q.unit)).size===2,'نُشر الواجب بسؤالين من وحدتين مختلفتين');
 await login('student',A.phone); await tab('data-st','hw'); await p.click(`[data-qs="${mixed.id}"]`); await p.click('#qsGo');
 await p.waitForSelector(`.hw-quiz[data-qz="${mixed.id}"]`);
-await p.locator(`.hw-quiz[data-qz="${mixed.id}"] input[type=radio]`).first().check();
+for (const group of await p.locator(`.hw-quiz[data-qz="${mixed.id}"] fieldset.q`).all()) await group.locator('input[type=radio]').first().check();
 await p.click(`.hw-quiz[data-qz="${mixed.id}"] button.pri`); await p.waitForTimeout(650);
 await login('teacher',T.phone); await tab('data-tt','hw');
 await p.click(`[data-qa="${(await data()).submissions.find(x=>x.assignment_id===mixed.id&&x.trainee_id===A.id).id}"]`);
