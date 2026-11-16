@@ -45,15 +45,15 @@ begin
   perform set_config('app.uid', '', true);
 end $$;
 
--- الخطوة B: تاريخ الميلاد إلزامي، وجوال ولي الأمر لمن هم دون 19، ولا يُستبدل في إعادة التسجيل
+-- الخطوة B: باقات الثانوية دون تاريخ ميلاد، لكن جوال ولي الأمر إلزامي؛ برامج الأطفال تظل مرتبطة بالعمر
 do $$
 declare d date := riyadh_now()::date; ok boolean; v_t uuid; minor date := (riyadh_now()::date - interval '16 years')::date;
         base jsonb := jsonb_build_object('national_id','1999999970','full_name','ريان سعد علي القرني','phone','0553330001','gender','ذكر',
           'plan_id',(select id from plans where tier='basic' and mode='in_person'),
           'accepted_policies',(select coalesce(jsonb_agg(id), '[]') from current_policies(riyadh_now()::date) where requires_acceptance));
 begin
-  begin perform register_subscription(base); ok := false; exception when others then ok := sqlerrm like '%تاريخ الميلاد مطلوب%'; end;
-  assert ok, 'تاريخ الميلاد إلزامي';
+  begin perform register_subscription(base); ok := false; exception when others then ok := sqlerrm like '%جوال ولي الأمر مطلوب%'; end;
+  assert ok, 'باقات الثانوية تتطلب جوال ولي الأمر دون طلب تاريخ الميلاد';
   begin perform register_subscription(base || jsonb_build_object('birth_date', minor)); ok := false; exception when others then ok := sqlerrm like '%جوال ولي الأمر مطلوب%'; end;
   assert ok, 'جوال ولي الأمر إلزامي دون 19';
   assert age_on((d - interval '19 years')::date, d) = 19 and age_on((d - interval '19 years' + interval '1 day')::date, d) = 18, 'حد العمر 19';
