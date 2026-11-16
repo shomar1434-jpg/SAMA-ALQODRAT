@@ -440,7 +440,7 @@ export const LocalStore = {
     const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا'); checkAcceptance(D.policies, riyadhNow().date, f.accepted_policies);
     let t=D.trainees.find(x=>x.national_id===f.national_id);
     if(t && D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`هذا السجل المدني مشترك مسبقًا في ${planName(plan)}`);
-    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date)};
+    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:(()=>{ const ph=normPhone(f.guardian_phone); if(!/^05[0-9]{8}$/.test(ph)) throw new Error('أدخل رقم جوال ولي الأمر مستقلًا عن رقم جوال الطالب.'); return ph; })()};
     if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
     acceptPolicies(D, f, t.id, 'subscription');
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:'pending', start_date:null, end_date:null, created_at:new Date().toISOString()};
