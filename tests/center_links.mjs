@@ -27,7 +27,7 @@ await p.click('#kids .kid a.btn.pri'); await p.waitForSelector('.hero-note');
 ok(/منصة منار/.test(await text('.hero-note')) && /القراءة والكتابة/.test(await text('h1')), `صفحة البرنامج تشرح أن الشهادة تصدر عبر منار (${kidHref})`);
 
 // تسجيل طفل عمره 5 سنوات بجوال ولي أمره
-await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 1 });
+await p.goto(U + kidHref); await p.waitForSelector('.tab[data-t=reg]'); await p.click('.tab[data-t=reg]'); await p.waitForSelector('#rf');
 await p.fill('[name=full_name]', 'يوسف خالد علي النعمي'); await p.fill('[name=national_id]', '1000000511'); await p.fill('[name=phone]', '0556660011');
 await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(5)); await p.dispatchEvent('[name=birth_date]', 'change'); await p.waitForTimeout(150);
 ok(!(await p.$eval('#rfChild', e => e.hidden)) && await p.$eval('#rfGuard', e => e.hidden), 'للطفل: تنبيه «اكتب جوال ولي الأمر» دون حقل ثانٍ');
@@ -39,7 +39,7 @@ ok(/منصة منار/.test(card) && wa && /طلب الشراء رقم SAMA-\d{4
 await p.fill('[name=birth_date]', years(2)).catch(() => {});
 
 // دون 3 سنوات يُرفض
-await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.fill('[name=birth_date]', years(2)); await p.dispatchEvent('[name=birth_date]', 'change');
+await p.goto(U + kidHref); await p.waitForSelector('.tab[data-t=reg]'); await p.click('.tab[data-t=reg]'); await p.waitForSelector('#rf'); await p.fill('[name=birth_date]', years(2)); await p.dispatchEvent('[name=birth_date]', 'change');
 ok(/غير صحيح/.test(await text('[data-e=birth_date]')), 'دون 3 سنوات: تاريخ الميلاد مرفوض');
 
 // بوابة المتدرب: قناة تيليجرام ومساعدة واتساب
