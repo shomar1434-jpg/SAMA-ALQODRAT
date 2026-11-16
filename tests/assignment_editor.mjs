@@ -74,6 +74,38 @@ await p.fill('#hf-t', 'اختبار رسمي معتمد'); await p.selectOption(
 await p.selectOption('#hf-u', 'النموذج 1'); await p.click('#hfS'); await p.waitForTimeout(800);
 D = await data();
 ok(D.assignments.some(a => a.title === 'اختبار رسمي معتمد' && a.type === 'exam' && a.reveal === 'never' && !a.targets), 'بعد الاعتماد يُنشر الاختبار الرسمي لكل متدربي المقرر');
+
+// اختبار واجهة المدرب: اختيار سؤالين من قسمين ووحدتين، معاينة الإجابة الصحيحة، ثم مراجعة تسليم المتدرب.
+await p.evaluate(() => {
+  const key='sama_qudrat_v4', D=JSON.parse(localStorage.getItem(key));
+  const base=D.questions.find(q=>q.subject==='كمي'&&q.status==='published');
+  if(!base) throw new Error('لا توجد أسئلة كمي للتجربة');
+  D.questions.push({...base,id:crypto.randomUUID(),code:'QA-MULTI-2',unit:'النموذج 2',skill:'القسم الثاني',correct:2,order:999,shared:true,status:'published',key_status:'approved'});
+  localStorage.setItem(key,JSON.stringify(D));
+});
+await p.reload(); await p.waitForTimeout(650); await tab('data-tt','hw'); await p.click('#hwAdd');
+await p.fill('#hf-t','واجب اختبار متعدد الأقسام'); await p.check('#hf [name=kind][value=quiz]');
+await p.selectOption('#hf-m','pick'); await p.selectOption('#hf-u','النموذج 1'); await p.waitForTimeout(200);
+const qOne=await p.$eval('#hfPick input[type=checkbox]',el=>el.value); await p.check(`#hfPick input[value="${qOne}"]`);
+await p.selectOption('#hf-u','النموذج 2'); await p.waitForTimeout(200);
+const qTwo=await p.$eval('#hfPick input[type=checkbox]',el=>el.value); await p.check(`#hfPick input[value="${qTwo}"]`);
+ok(/٢ سؤالًا/.test(await text('#hfPn')),'اختيار سؤالين من وحدتين مختلفتين دون فقد الاختيار الأول');
+await p.click('#hfPreview');
+ok(/الإجابة الصحيحة/.test(await text('#hfPreviewLayer')),'المعاينة قبل الإرسال تعرض مفاتيح الإجابة للمدرب');
+await p.click('#hfPreviewBack');
+ok(!!(await p.$('#hfS')) && !!(await p.$('#hf-t')),'العودة من المعاينة تحفظ نموذج الواجب ومحتوياته');
+await p.click('#hfS'); await p.waitForTimeout(850);
+D=await data(); const mixed=D.assignments.find(a=>a.title==='واجب اختبار متعدد الأقسام');
+ok(mixed?.quiz?.length===2 && new Set(mixed.quiz.map(q=>q.unit)).size===2,'نُشر الواجب بسؤالين من وحدتين مختلفتين');
+await login('student',A.phone); await tab('data-st','hw'); await p.click(`[data-qs="${mixed.id}"]`); await p.click('#qsGo');
+await p.waitForSelector(`.hw-quiz[data-qz="${mixed.id}"]`);
+await p.check(`.hw-quiz[data-qz="${mixed.id}"] input[type=radio]`);
+await p.click(`.hw-quiz[data-qz="${mixed.id}"] button.pri`); await p.waitForTimeout(650);
+await login('teacher',T.phone); await tab('data-tt','hw');
+await p.click(`[data-qa="${(await data()).submissions.find(x=>x.assignment_id===mixed.id&&x.trainee_id===A.id).id}"]`);
+ok(/اختيار المتدرب/.test(await text('.hw-review')) && /الإجابة الصحيحة/.test(await text('.hw-review')),'المدرب يرى إجابة المتدرب مقابل الإجابة الصحيحة');
+await p.fill('#qReviewFeedback','أحسنت، راجع شرح النسب والتناسب.'); await p.click('#qReviewSave'); await p.waitForTimeout(700);
+D=await data(); ok(D.submissions.some(x=>x.assignment_id===mixed.id&&x.feedback==='أحسنت، راجع شرح النسب والتناسب.'),'تُحفظ التغذية الراجعة على تسليم المتدرب');
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
 if (failed()) process.exit(1);
