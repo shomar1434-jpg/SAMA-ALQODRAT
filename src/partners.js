@@ -26,7 +26,7 @@ export function aboutSectionHtml(about, P){
   return `<section class="intro">
     <div class="intro-grid">
       <div class="intro-text" data-reveal><span class="kicker">نبذة تعريفية</span><h2>${CENTER.name}</h2>${paras.map(p=>`<p>${esc(p)}</p>`).join('')}
-        <div class="intro-cta"><a class="btn pri" href="#register">${ic('book')} استعرض البرامج</a><a class="btn" href="#verify">${ic('award')} التحقق من شهادة</a></div></div>
+        <div class="intro-cta"><a class="btn pri" href="#register">${ic('book')} استعرض البرامج</a></div></div>
       <ul class="intro-facts">
         <li data-reveal style="--i:1"><span class="kic-lg t-info">${ic('pin')}</span><div><span>الموقع</span><b>جازان · حي الصفا</b></div></li>
         <li data-reveal style="--i:2"><span class="kic-lg t-success">${ic('book')}</span><div><span>برامج معتمدة</span><b data-count="${P.length}">0</b></div></li>
