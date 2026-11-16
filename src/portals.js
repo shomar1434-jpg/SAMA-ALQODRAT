@@ -183,9 +183,9 @@ export function programPanelHtml(x, threshold = 75){
         ${x.held ? `<div class="ind-ring">${ringSvg(rate ?? 0, 92, 9, tone)}</div><div class="ind-nums"><span><b>${fmtNum(x.attended)}</b>حضور</span><span><b>${fmtNum(x.late)}</b>تأخر</span><span><b>${fmtNum(x.absent)}</b>غياب</span></div>
           <p class="hint">من ${fmtNum(x.held)} محاضرة منعقدة، ويتبقى ${fmtNum(x.remaining)} محاضرة.</p>` : `<p class="ind-empty">${x.state === 'upcoming' ? 'تبدأ الدفعة ' + fmtShort(x.start_date) : 'لا توجد محاضرات منعقدة بعد'}</p>`}</div>
       <div class="card pad ind rv" style="--i:2"><div class="ind-h">${ic('award')}<b>الشهادة</b></div>
-        ${x.cert ? `<div class="ind-big"><b>${ic('check')}</b> صدرت إفادة حضورك</div><p class="hint">الرقم التسلسلي <b dir="ltr">${esc(x.cert)}</b></p><a class="btn sm" href="${publicBase()}#v-${encodeURIComponent(x.cert)}" target="_blank" rel="noopener">${ic('expand')} التحقق من إفادة الحضور</a>`
+        ${x.cert ? `<div class="ind-big"><b>${ic('check')}</b> صدرت إفادة حضورك</div><p class="hint">الرقم التسلسلي <b dir="ltr">${esc(x.cert)}</b></p>`
           : x.state === 'archived' ? `<p class="ind-empty">انتهت الدفعة دون بلوغ حد الشهادة ${fmtNum(threshold)}٪</p>`
-          : `<p class="ind-big"><b>${fmtNum(threshold)}٪</b> حد الشهادة</p><p class="hint">الشهادة المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:500">منصة منار</a>؛ أنشئ حسابك فيها.</p><p class="hint">${x.needed ? `يلزمك حضور ${fmtNum(x.needed)} من ${fmtNum(x.remaining)} محاضرة متبقية.` : 'بلغت حد الشهادة، وتصدر عند انتهاء الدفعة.'}</p>`}</div>
+          : `<p class="ind-big"><b>${fmtNum(threshold)}٪</b> حد الشهادة</p><p class="hint">${x.needed ? `يلزمك حضور ${fmtNum(x.needed)} من ${fmtNum(x.remaining)} محاضرة متبقية.` : 'بلغت حد الشهادة، وتصدر عند انتهاء الدفعة.'}</p>`}</div>
       <div class="card pad ind rv" style="--i:3"><div class="ind-h">${ic('hourglass')}<b>مدة البرنامج</b></div>
         ${x.total ? `<div class="ind-big"><b>${fmtNum(x.remaining)}</b> محاضرة متبقية</div><div class="tbar big" role="img" aria-label="انعقد ${fmtNum(x.held)} من ${fmtNum(x.total)}"><i style="width:${Math.round(x.held / x.total * 100)}%"></i></div>
           <p class="hint">انعقد ${fmtNum(x.held)} من ${fmtNum(x.total)} محاضرة.</p>` : '<p class="ind-empty">—</p>'}</div>
@@ -280,7 +280,7 @@ function bindLinkForm(){
 
 /* ---------- المدرب ---------- */
 /* مساعدة: واتساب المركز واتصال — في أسفل لوحات البوابات */
-const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي على منصة مركز سما القدرات.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
+const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي لدى مركز سما القدرات للتدريب.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
 /* تبويبات المدرب حسب ما أُسند إليه: مقررات الباقات، أو دفعات البرامج، أو كلاهما */
 const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'profile' ? true : x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
 function viewTeacher(D, quiet){
