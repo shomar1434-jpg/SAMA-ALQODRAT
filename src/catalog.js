@@ -12,7 +12,7 @@ export const CENTER = {
   // قنوات المركز الرسمية (من صفحة روابط المركز linktr.ee/Samagodrat.sa)
   whatsapp:'966561606878', whatsappLink:'https://wa.me/message/5ZOKSPSQLWEBO1', map:'https://share.google/PhsXYhqsEzgXpO8Rf',
   social:{ snapchat:'https://www.snapchat.com/add/samagodrat.sa', tiktok:'https://www.tiktok.com/@samagodrat.sa', instagram:'https://www.instagram.com/samagodrat.sa' },
-  telegram:'https://t.me/+PSnecqWQioc3M2Vk', manar:'https://mnar.sa',
+  telegram:'https://t.me/+PSnecqWQioc3M2Vk',
   vision:'أن نكون بيت الخبرة الأول في منطقة جازان والذي يسهم في التقدم العلمي والمهاري لأفراد المجتمع',
   mission:'نحو دعم أفراد المجتمع بأحدث المعارف والمهارات اللازمة من خلال التدريب البنّاء على يد كفاءات علمية متخصصة'
 };
