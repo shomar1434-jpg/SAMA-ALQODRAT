@@ -4,7 +4,7 @@ import { POLICY_KINDS } from '../src/policy_logic.js';
 import { POLICY_TEXTS, POLICY_APPROVER, POLICY_EFFECTIVE, POLICY_SOURCE } from '../src/policy_texts.js';
 import { defaultPartners } from '../src/site_partners.js';
 const q = s => s == null ? 'null' : "'" + String(s).replace(/'/g, "''") + "'";
-const pol = POLICY_KINDS.map(k => `insert into policies(slug, title, body, version, status, effective_date, approved_by, requires_acceptance, published_at)
+const pol = POLICY_KINDS.filter(k => k.seed !== false).map(k => `insert into policies(slug, title, body, version, status, effective_date, approved_by, requires_acceptance, published_at)
 select ${q(k.slug)}, ${q(k.title)}, ${q(POLICY_TEXTS[k.slug])}, 1, 'published', ${q(POLICY_EFFECTIVE)}, ${q(POLICY_APPROVER)}, ${k.acceptance}, now()
 where not exists (select 1 from policies where slug = ${q(k.slug)});`);
 const pts = defaultPartners().map(p => `(${q(p.name)}, ${q(p.name_en)}, ${q(p.type)}, ${q(p.logo)}, ${q(p.description)}, ${q(p.website)}, ${p.order})`);

@@ -1,6 +1,6 @@
 // قنوات المركز: صفحة تواصل معنا، واتساب، منصات التواصل، منار، برامج الأطفال وتسجيل طفل بجوال ولي أمره، وقناة تيليجرام للمشتركين
 import { chromium } from 'playwright';
-import { serveDist, reporter } from './_server.mjs';
+import { serveDist, reporter, autoConsent } from './_server.mjs';
 const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
@@ -33,14 +33,14 @@ await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item
 await p.fill('[name=full_name]', 'يوسف خالد علي النعمي'); await p.fill('[name=national_id]', '1000000511'); await p.fill('[name=phone]', '0556660011');
 await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(5)); await p.dispatchEvent('[name=birth_date]', 'change'); await p.waitForTimeout(150);
 ok(!(await p.$eval('#rfChild', e => e.hidden)) && await p.$eval('#rfGuard', e => e.hidden), 'للطفل: تنبيه «اكتب جوال ولي الأمر» دون حقل ثانٍ');
-await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); await p.click('#rfGo'); await p.waitForSelector('.refbox');
+await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); await autoConsent(p); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 let D = await data(); const kid = D.trainees.find(t => t.national_id === '1000000511');
 ok(kid && kid.guardian_phone === '0556660011' && kid.phone === '0556660011', 'جوال التواصل للطفل هو جوال ولي الأمر');
 ok(/منصة منار/.test(await text('#regCard')), 'رسالة النجاح تذكّر بمنصة منار');
 
 // اشتراك في باقة: زر واتساب برسالة مجهزة فيها رقم طلب الشراء
 await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 1 });
-await p.fill('[name=full_name]', 'خالد يوسف علي النعمي'); await p.fill('[name=national_id]', '1000000529'); await p.fill('[name=phone]', '0556660012'); await p.selectOption('[name=gender]', 'ذكر'); await p.check('[name=agree]'); await p.click('#rfGo'); await p.waitForSelector('.refbox');
+await p.fill('[name=full_name]', 'خالد يوسف علي النعمي'); await p.fill('[name=national_id]', '1000000529'); await p.fill('[name=phone]', '0556660012'); await p.selectOption('[name=gender]', 'ذكر'); await p.check('[name=agree]'); await autoConsent(p); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 const card = await text('#regCard'), wa = await p.getAttribute('#regCard a[href*="wa.me"]', 'href');
 ok(/منصة منار/.test(card) && wa && /طلب الشراء رقم SAMA-\d{4}-\d{6}/.test(decodeURIComponent(wa)), 'رسالة النجاح: خطوة منار وزر واتساب برسالة مجهزة فيها رقم طلب الشراء');
 

@@ -1,6 +1,6 @@
 // مركز السياسات: مسودة ← نشر بإصدار، وثبات المنشور، والإصدارات القادمة. السياسات للاطلاع ولا تُلزم عند التسجيل.
 import { chromium } from 'playwright';
-import { serveDist, reporter } from './_server.mjs';
+import { serveDist, reporter, autoConsent } from './_server.mjs';
 
 const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
@@ -22,7 +22,7 @@ await go('policy-attendance'); ok(/75%/.test(await text('.pol-body')) && /الإ
 // ---------- الإدارة ----------
 await p.goto(U + 'admin/#admin-policies'); await p.waitForTimeout(900);
 if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200); }
-ok((await p.$$('#main tr[data-slug]')).length === 6, 'ست سياسات في الإدارة');
+ok((await p.$$('#main tr[data-slug]')).length === 7 && await p.$('#main tr[data-slug=terms] [data-pn=terms]'), 'سبع سياسات في الإدارة، ومنها الشروط والأحكام بلا إصدار منشور');
 const v1 = (await pols()).find(x => x.slug === 'privacy');
 let threw = await S(id => window.__SAMA__.LocalStore.savePolicy({ ...window.__SAMA__.LocalStore.data.policies.find(x => x.id === id), body:'تعديل على النص المنشور بعد نشره' }).then(() => false, () => true), v1.id);
 ok(threw, 'النسخة المنشورة لا تُعدَّل');
@@ -53,7 +53,7 @@ await p.fill('[name=full_name]', 'ماجد سعيد علي القحطاني'); a
 await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01', { timeout: 400 }).catch(() => {}); await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.check('[name=agree]');
 ok(!(await p.$('#rf-pol')) && await p.$('#rfPol .pol-note a[href="#policies"]'), 'رابط السياسات للاطلاع دون خانة إلزام');
 ok(!/يلزم قبولها/.test(await p.innerText('body')), 'لا عبارة «يلزم قبولها»');
-await p.click('#rfGo'); await p.waitForTimeout(800);
+await autoConsent(p); await p.click('#rfGo'); await p.waitForTimeout(800);
 ok(await p.$('.refbox'), 'التسجيل دون موافقة على السياسات');
 await go('policies'); ok(!/يلزم قبولها/.test(await text('#app')), 'صفحة السياسات بلا إلزام');
 

@@ -18,7 +18,7 @@ import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL,
 import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
-import { checkBirthGuardian, isKidsProgram, selfLinkLogic, LINK_FAIL, LINK_LOCKED } from './identity_logic.js';
+import { checkBirthGuardian, isKidsProgram, selfLinkLogic, LINK_FAIL, LINK_LOCKED, checkMinorConsent } from './identity_logic.js';
 import { weeklyNotes } from './weekly_logic.js';
 import { catOk, simOpen, simExpired, simsToday, SIM_DAILY_MAX, sortSubjects, buildSim, cleanAnswers, CATEGORIES } from './sim_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, backfillCategories, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf, snapOf, liveSubsOf } from './learning_logic.js';
@@ -342,8 +342,9 @@ export const LocalStore = {
     checkAcceptance(D.policies, today, f.accepted_policies);
     let t = D.trainees.find(x=>x.national_id===f.national_id);
     for(const {p,c} of targets){ if(t && D.enrollments.some(e=>e.cohort_id===c.id && e.trainee_id===t.id && e.status!=='ملغى')) throw new Error(`هذا السجل المدني مسجّل مسبقًا في الدفعة ${c.number} من «${p.name}»`); }
-    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date, targets.some(({p})=>isKidsProgram(p)))};
+    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date, targets.some(({p})=>isKidsProgram(p)))}; const consent = checkMinorConsent(f, riyadhNow().date);
     if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    if(consent && !t.guardian_consent_at) t.guardian_consent_at = new Date().toISOString();
     acceptPolicies(D, f, t.id, 'registration');
     const ref = newRef();
     targets.forEach(({c})=>D.enrollments.push({id:uid(), ref, cohort_id:c.id, program_id:c.program_id, trainee_id:t.id, package_id:f.package_id||null, status:'مسجل', created_at:new Date().toISOString()}));
@@ -359,8 +360,9 @@ export const LocalStore = {
     checkAcceptance(D.policies, today, f.accepted_policies);
     let t = D.trainees.find(x=>x.national_id===f.national_id);
     if(t && D.program_requests.some(r=>r.program_id===p.id && r.trainee_id===t.id && r.status==='pending')) throw new Error(`سبق تسجيلك المبدئي في «${p.name}»؛ يتواصل معك المركز عند فتح الدفعة`);
-    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, today, isKidsProgram(p))};
+    const person = {national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, today, isKidsProgram(p))}; const consent = checkMinorConsent(f, today);
     if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    if(consent && !t.guardian_consent_at) t.guardian_consent_at = new Date().toISOString();
     acceptPolicies(D, f, t.id, 'registration');
     const ref = 'SR-'+String(Math.floor(Math.random()*900000)+100000);
     D.program_requests.push({id:uid(), ref, program_id:p.id, trainee_id:t.id, status:'pending', cohort_id:null, enrollment_id:null, note:'', created_at:new Date().toISOString()});
@@ -486,8 +488,9 @@ export const LocalStore = {
     const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا'); checkAcceptance(D.policies, riyadhNow().date, f.accepted_policies);
     let t=D.trainees.find(x=>x.national_id===f.national_id);
     if(t && D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`هذا السجل المدني مشترك مسبقًا في ${planName(plan)}`);
-    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date, false)};
+    const person={national_id:f.national_id, full_name:f.full_name, phone:f.phone, email:f.email||'', gender:f.gender, birth_date:f.birth_date||'', city:f.city, education:f.education, employer:f.employer||'', guardian_phone:checkBirthGuardian(f, riyadhNow().date, false)}; const consent = checkMinorConsent(f, riyadhNow().date);
     if(t) mergeOnRegister(D, t, person); else { t={id:uid(), ...person, created_at:new Date().toISOString()}; D.trainees.push(t); }
+    if(consent && !t.guardian_consent_at) t.guardian_consent_at = new Date().toISOString();
     acceptPolicies(D, f, t.id, 'subscription');
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:'pending', start_date:null, end_date:null, created_at:new Date().toISOString()};
     D.subscriptions.push(s);
