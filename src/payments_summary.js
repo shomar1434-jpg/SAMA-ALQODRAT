@@ -35,7 +35,7 @@ export function paymentRows(D){
   for(const e of (D.enrollments || []).filter(x => x.status !== 'ملغى' && !seenEnr.has(x.id))){ const c = (D.cohorts || []).find(x => x.id === e.cohort_id), p = c && progs.find(x => x.id === c.program_id);
     rows.push({ key:'e' + e.id, order:null, t:tr(e.trainee_id), type:'program', item:p?.id || '', item_name:p?.name || '', cohort:c?.number ?? null,
       total:r2(p?.price), paid:0, remaining:0, ins:null, status:'no_order', claimed:0, date:(e.created_at || '').slice(0, 10) }); }
-  return rows.sort((a, b) => b.date.localeCompare(a.date) || (a.t?.full_name || '').localeCompare(b.t?.full_name || '', 'ar'));
+  return rows.filter(r => !r.t?.is_test).sort((a, b) => b.date.localeCompare(a.date) || (a.t?.full_name || '').localeCompare(b.t?.full_name || '', 'ar'));
 }
 export function filterRows(rows, f){
   return rows.filter(r => (f.type === 'all' || r.type === f.type) && (!f.item || r.item === f.item) && (f.st === 'all' || r.status === f.st)

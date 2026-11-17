@@ -243,7 +243,7 @@ export function pageAttendance(){
       <div style="flex:1;min-width:200px"><h3>${esc(progName(c.program_id))} · ${cohortLabel(c)}</h3><div class="hint" style="display:flex;gap:12px;flex-wrap:wrap"><span>${ic('clock')} ${t12(c.start_time)} – ${t12(c.end_time)}</span>${c.hall?`<span>${ic('pin')} ${esc(c.hall)}</span>`:''}<span class="pill dot ${STATE_PILL[cohortState(c)]}">${STATE_TXT[cohortState(c)]}</span></div></div>
       <span class="pill dot ok">${fmtNum(present.length)} حاضر</span><span class="pill dot bad">${fmtNum(roster.length-present.length)} غائب</span>${future?'':`<button class="btn sm" data-pr="${c.id}">${ic('form')} طباعة</button>`}<button class="btn sm" data-cv="${c.id}">${ic('users')} كشف الدفعة</button></div>
       <div style="overflow:auto"><table class="tb"><thead><tr><th>المتدرب</th><th>السجل المدني</th><th>وقت الحضور</th><th>الحالة</th><th></th></tr></thead><tbody>
-      ${rows.map(({e,t,a})=>`<tr><td><div class="who"><span class="avatar ${t.gender==='أنثى'?'f':''}">${esc(t.full_name[0])}</span><b style="font-weight:500">${esc(t.full_name)}</b></div></td>
+      ${rows.map(({e,t,a})=>`<tr><td><div class="who"><span class="avatar ${t.gender==='أنثى'?'f':''}">${esc(t.full_name[0])}</span><b style="font-weight:500">${esc(t.full_name)}</b>${t.is_test?' <span class="pill warn">تجريبي</span>':''}</div></td>
         <td dir="ltr" style="text-align:right">${esc(t.national_id)}</td><td dir="ltr" style="text-align:right">${a?t12(a.time.slice(0,5)):'—'}${a?.manual?' <span class="pill g">يدوي</span>':''}</td>
         <td>${a?`<span class="pill dot ${statusPill(a.status)}">${a.status==='متأخر'?'متأخر':'في الوقت'}</span>`:`<span class="pill dot ${future?'g':'bad'}">${future?'لم يبدأ':'غائب'}</span>`}</td>
         <td style="white-space:nowrap">${future?'':a?`<button class="btn sm danger soft" data-un="${e.id}">${ic('x')} إلغاء التحضير</button>`:`<button class="btn sm" data-mk="${e.id}">${ic('check')} تحضير يدوي</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="hint" style="text-align:center;padding:20px">لا نتائج</td></tr>'}
@@ -423,13 +423,32 @@ function bindChangeReq(){
     confirmBox(ok?'قبول تحديث البيانات':'رفض الطلب', ok?'سيُطبَّق التغيير على ملف المتدرب. إن كان فيه رقم جوال جديد فسيصبح هو مفتاح دخوله للبوابة. تأكد من هوية صاحب الطلب أولًا.':'يبقى ملف المتدرب كما هو.', async()=>{
       await Store.resolveProfileChange(b.dataset.pcr, ok); await reloadAD(); toast(ok?'طُبّق التحديث':'رُفض الطلب'); pageTrainees(); }, ok?'قبول':'رفض'); });
 }
+/* الحسابات التجريبية (البند 13): هوية وجوال اصطناعيان، خارج الإحصاءات والتقارير والرسائل والفوترة، وإزالة آمنة — لمدير النظام */
+function testAccountsHtml(){
+  if(!['owner','full'].includes(ME?.role)) return '';
+  const T=AD.trainees.filter(t=>t.is_test), plans=(AD.plans||[]).filter(p=>p.mode!=='remote'&&p.active!==false);
+  return `<details class="card pad rv" id="taBox" style="margin-bottom:14px" ${T.length?'':''}><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px"><b>${ic('settings')} الحسابات التجريبية</b><span class="pill g">${fmtNum(T.length)}</span></summary>
+    <p class="hint">للاختبار فقط: هوية لا تجتاز تحقق السجل المدني وجوال اصطناعي، باشتراك في باقة دون طلب شراء أو فاتورة. لا تدخل الإحصاءات ولا تقرير اليوم ولا ملخص المدفوعات، ولا تظهر في رسائل الغياب. الدخول ببوابة المتدرب برقم الهوية بعد «تفعيل» الجهاز من «تفعيل الأجهزة».</p>
+    <div class="filters" style="box-shadow:none;padding:0"><input class="inp" id="ta-n" placeholder="الاسم (اختياري)" style="flex:1;min-width:160px"><select class="inp" id="ta-g" aria-label="الجنس" style="width:auto"><option>ذكر</option><option>أنثى</option></select>
+      <select class="inp" id="ta-p" aria-label="الباقة" style="width:auto">${plans.map(p=>`<option value="${p.id}">${esc(planName(p))}</option>`).join('')}</select><input class="inp num" id="ta-ph" dir="ltr" placeholder="جوال اصطناعي (اختياري)" maxlength="10" style="width:auto">
+      <button class="btn pri sm" id="taAdd">${ic('plus')} إنشاء حساب تجريبي</button></div><div class="errtxt" id="taE" role="alert"></div>
+    ${T.length?`<div class="tblwrap"><table class="tb" id="taT"><thead><tr><th>الاسم</th><th>رقم الهوية (اصطناعي)</th><th>الجوال</th><th></th></tr></thead><tbody>${T.map(t=>`<tr><td>${esc(t.full_name)}</td><td class="num" dir="ltr">${esc(t.national_id)}</td><td class="num" dir="ltr">${esc(t.phone)}</td><td><button class="btn sm danger soft" data-tap="${t.id}">${ic('trash')} إزالة</button></td></tr>`).join('')}</tbody></table></div>`:''}</details>`;
+}
+function bindTestAccounts(){
+  if(!$('#taAdd')) return;
+  $('#taAdd').onclick=async e=>{ const b=e.currentTarget; $('#taE').textContent=''; setBusy(b,true,'جارٍ الإنشاء');
+    try{ const r=await Store.createTestTrainee({full_name:$('#ta-n').value, gender:$('#ta-g').value, plan_id:$('#ta-p').value, phone:$('#ta-ph').value.trim()}); await reloadAD(); toast(`أُنشئ: هوية ${r.national_id} · جوال ${r.phone}`); pageTrainees(); $('#taBox')?.setAttribute('open',''); }
+    catch(x){ setBusy(b,false); $('#taE').textContent=x.message; } };
+  $$('[data-tap]').forEach(b=>b.onclick=()=>confirmBox('إزالة الحساب التجريبي','تُحذف بيانات هذا الحساب التجريبي وحده (اشتراكه وحضوره وواجباته). الحسابات الحقيقية لا تتأثر.',async()=>{
+    await Store.purgeTestTrainee(b.dataset.tap); await reloadAD(); toast('أُزيل الحساب التجريبي'); setTimeout(()=>{ pageTrainees(); $('#taBox')?.setAttribute('open',''); },0); },'إزالة'));
+}
 export function pageTrainees(){
-  const m=$('#main'); queueMicrotask(bindChangeReq); const {programs,trainees,enrollments,attendance}=AD;
+  const m=$('#main'); queueMicrotask(bindChangeReq); queueMicrotask(bindTestAccounts); const {programs,trainees,enrollments,attendance}=AD;
   const ensOf = t => enrollments.filter(e=>e.trainee_id===t.id);
   const list = trainees.filter(t=>matchPerson(trSc,trQ,t,...ensOf(t).map(e=>e.ref)) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
     .sort((a,b)=>(ensOf(b).map(e=>e.created_at).sort().pop()||'').localeCompare(ensOf(a).map(e=>e.created_at).sort().pop()||''));
   m.innerHTML = titleBar(`${ic('id')}المتدربون`, `سجل المتدربين، <em>${fmtNum(list.length)} متدرب</em>`, 'كل متدرب بسجله المدني مرة واحدة، مع كل الدفعات التي سجّل فيها ونسبة حضوره في كل منها.', `<button class="btn sm" id="csvx">${ic('database')} تصدير Excel</button><button class="btn sm" id="csv">${ic('copy')} نسخ كجدول</button>`)+
-   `${changeReqHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="أي جزء من الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">${scopeSelect('tsc',trSc)}
+   `${changeReqHtml()}${testAccountsHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="أي جزء من الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">${scopeSelect('tsc',trSc)}
      <select class="inp" id="tp" style="max-width:280px"><option value="all">كل البرامج</option>${allCats().map(c=>{ const ps=programs.filter(p=>p.category===c&&enrollments.some(e=>e.program_id===p.id)); return ps.length?`<optgroup label="${esc(c)}">${ps.map(p=>`<option value="${p.id}" ${trP===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select></div>
    ${list.length?`<div class="tbw rv" style="--i:2"><table class="tb"><thead><tr><th>المتدرب</th><th>السجل المدني</th><th>الجوال</th><th>المدينة</th><th>الدفعات</th><th></th></tr></thead><tbody>
    ${list.slice(0,400).map(t=>`<tr><td><div class="who"><span class="avatar ${t.gender==='أنثى'?'f':''}">${esc(t.full_name[0])}</span><div><b style="font-weight:500">${esc(t.full_name)}</b><div class="hint">${esc(t.education||'')}${t.employer?` · ${esc(t.employer)}`:''}</div></div></div></td>
