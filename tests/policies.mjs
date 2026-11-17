@@ -6,6 +6,7 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1366, height: 900 } })).newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const go = async (h, w = 900) => { await p.evaluate(() => { location.hash = '#zz'; }); await p.waitForTimeout(150); await p.evaluate(x => { location.hash = '#' + x; }, h); await p.waitForTimeout(w); };
 const S = (fn, arg) => p.evaluate(fn, arg);
@@ -49,7 +50,7 @@ const silver = await S(() => window.__SAMA__.LocalStore.data.plans.find(x => x.t
 const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 await go('plan-' + silver);
 await p.fill('[name=full_name]', 'ماجد سعيد علي القحطاني'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0554443322');
-await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
+await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01', { timeout: 400 }).catch(() => {}); await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.check('[name=agree]');
 ok(!(await p.$('#rf-pol')) && await p.$('#rfPol .pol-note a[href="#policies"]'), 'رابط السياسات للاطلاع دون خانة إلزام');
 ok(!/يلزم قبولها/.test(await p.innerText('body')), 'لا عبارة «يلزم قبولها»');
 await p.click('#rfGo'); await p.waitForTimeout(800);

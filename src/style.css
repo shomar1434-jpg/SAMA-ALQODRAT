@@ -1474,3 +1474,7 @@ body.sim-on{overflow:hidden}
 .crs-empty{text-align:center;color:var(--ink-muted);padding:28px 10px;border:1px dashed var(--border);border-radius:var(--radius-lg)}
 .mnr-steps{padding-inline-start:36px;display:grid;gap:12px;line-height:1.9}
 .filters .field{min-width:0;max-width:100%}.filters select.inp{max-width:100%}
+/* شاشة التعليمات قبل التسجيل (الخطوة AY) */
+.reg-intro{border:1px solid var(--brand);background:var(--brand-tint)}.reg-intro p{line-height:1.9;margin:0 0 10px}
+.reg-intro-l{margin:0 0 10px;padding-inline-start:22px;display:grid;gap:4px;line-height:1.8}
+.reg-intro .row-actions .btn{white-space:normal;text-align:center}

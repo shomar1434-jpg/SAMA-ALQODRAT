@@ -6,6 +6,7 @@ const { server, origin: U } = serveDist();
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1366, height: 860 }, deviceScaleFactor: 1.5, locale: 'ar-SA' });
 const p = await ctx.newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const W = ms => p.waitForTimeout(ms);
 const S = (fn, a) => p.evaluate(fn, a);
@@ -71,6 +72,7 @@ await step('access issue', async () => { await admin('admin-access'); });
 // ===== المدرب (جوال) =====
 const mob = await b.newContext({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ar-SA' });
 const m = await mob.newPage(); m.on('pageerror', e => errs.push(e.message));
+await m.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const mshot = async (name, wait = 600) => { try { await m.waitForTimeout(wait); await m.screenshot({ path: OUT + name + '.png' }); done.push(name); } catch (e) { console.log('FAIL', name, e.message.split('\n')[0]); } };
 await m.goto(U); await m.waitForTimeout(1500);
 const T = await m.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); return D.teachers.find(t => t.section === 'boys' && t.subjects.includes('كمي')); });

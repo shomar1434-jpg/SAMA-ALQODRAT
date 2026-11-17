@@ -28,6 +28,7 @@ const audit = (p, touch) => p.evaluate(touch => {
 for (const [name, w, h, touch] of SIZES) {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, ...(touch && engine !== 'firefox' ? { hasTouch: true, isMobile: engine === 'chromium' } : {}) });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
   const bad = [];
   const check = async label => { await p.waitForTimeout(180); const r = await audit(p, touch);
     if (r.over > 1) bad.push(`${label}: تمرير أفقي ${r.over}px [${r.wide.join(', ')}]`); if (r.small.length) bad.push(`${label}: أهداف لمس صغيرة [${r.small.join(', ')}]`); if (r.tiny.length) bad.push(`${label}: خط مدخلات دون 16 [${r.tiny.join(', ')}]`); };

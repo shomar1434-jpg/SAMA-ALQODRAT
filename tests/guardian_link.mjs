@@ -5,6 +5,7 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const KEY = 'sama_qudrat_v4';
 const data = () => p.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
@@ -17,8 +18,8 @@ const login = async phone => { await p.goto(U + 'guardian/'); await p.waitForTim
 // تسجيل قاصر بجوال ولي أمره
 await p.goto(U + '#enroll'); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 1 });
 await p.fill('[name=full_name]', 'زياد عمر علي الشهري'); await p.fill('[name=national_id]', '1000000503'); await p.fill('[name=phone]', '0556660003');
-await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(15)); await p.dispatchEvent('[name=birth_date]', 'change');
-await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.fill('[name=guardian_phone]', '0508880003'); await p.check('[name=agree]');
+await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(15), { timeout: 400 }).catch(() => {}); await p.dispatchEvent('[name=birth_date]', 'change');
+await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.fill('[name=guardian_phone]', '0508880003'); await p.check('[name=agree]');
 await p.click('#rfGo'); await p.waitForSelector('.refbox');
 let D = await data(); const kid = D.trainees.find(t => t.national_id === '1000000503'), otherNid = D.trainees.find(t => t.id !== kid.id).national_id;
 

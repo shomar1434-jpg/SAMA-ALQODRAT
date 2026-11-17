@@ -5,6 +5,7 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat_v4')));
 const text = async s => ((await p.textContent(s).catch(() => '')) || '').trim();
@@ -26,20 +27,26 @@ const kidHref = await p.getAttribute('#kids .kid a.btn.pri', 'href');
 await p.click('#kids .kid a.btn.pri'); await p.waitForSelector('.hero-note');
 ok(/منصة منار/.test(await text('.hero-note')) && /القراءة والكتابة/.test(await text('h1')), `صفحة البرنامج تشرح أن الشهادة تصدر عبر منار (${kidHref})`);
 
-// تسجيل طفل عمره 5 سنوات بجوال ولي أمره
-await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 1 });
+// تسجيل طفل عمره 5 سنوات في برنامج الأطفال بجوال ولي أمره (تاريخ الميلاد لبرامج الأطفال وحدها)
+const kidsId = (await data()).programs.find(x => x.accreditation_no === '25194').id;
+await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-program', { force: true }); await p.selectOption('#en-item', kidsId); await p.waitForTimeout(150);
 await p.fill('[name=full_name]', 'يوسف خالد علي النعمي'); await p.fill('[name=national_id]', '1000000511'); await p.fill('[name=phone]', '0556660011');
 await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(5)); await p.dispatchEvent('[name=birth_date]', 'change'); await p.waitForTimeout(150);
 ok(!(await p.$eval('#rfChild', e => e.hidden)) && await p.$eval('#rfGuard', e => e.hidden), 'للطفل: تنبيه «اكتب جوال ولي الأمر» دون حقل ثانٍ');
 await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 let D = await data(); const kid = D.trainees.find(t => t.national_id === '1000000511');
 ok(kid && kid.guardian_phone === '0556660011' && kid.phone === '0556660011', 'جوال التواصل للطفل هو جوال ولي الأمر');
+ok(/منصة منار/.test(await text('#regCard')), 'رسالة النجاح تذكّر بمنصة منار');
+
+// اشتراك في باقة: زر واتساب برسالة مجهزة فيها رقم طلب الشراء
+await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 1 });
+await p.fill('[name=full_name]', 'خالد يوسف علي النعمي'); await p.fill('[name=national_id]', '1000000529'); await p.fill('[name=phone]', '0556660012'); await p.selectOption('[name=gender]', 'ذكر'); await p.check('[name=agree]'); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 const card = await text('#regCard'), wa = await p.getAttribute('#regCard a[href*="wa.me"]', 'href');
 ok(/منصة منار/.test(card) && wa && /طلب الشراء رقم SAMA-\d{4}-\d{6}/.test(decodeURIComponent(wa)), 'رسالة النجاح: خطوة منار وزر واتساب برسالة مجهزة فيها رقم طلب الشراء');
-await p.fill('[name=birth_date]', years(2)).catch(() => {});
 
-// دون 3 سنوات يُرفض
-await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.fill('[name=birth_date]', years(2)); await p.dispatchEvent('[name=birth_date]', 'change');
+// دون 3 سنوات يُرفض (في برنامج الأطفال)
+await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-program', { force: true }); await p.selectOption('#en-item', kidsId); await p.waitForTimeout(150);
+await p.fill('[name=birth_date]', years(2)); await p.dispatchEvent('[name=birth_date]', 'change');
 ok(/غير صحيح/.test(await text('[data-e=birth_date]')), 'دون 3 سنوات: تاريخ الميلاد مرفوض');
 
 // بوابة المتدرب: قناة تيليجرام ومساعدة واتساب
