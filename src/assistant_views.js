@@ -3,18 +3,26 @@ import { $, esc, fmtNum, uid, matchQ } from './utils.js';
 import { titleBar } from './views2_main.js';
 import { ic, toast, emptyBox } from './views2_head.js';
 import { matchResponse } from './assistant_logic.js';
+import { interestsTab } from './interest_views.js';
 
-const state = { query: '', selected: null };
+const state = { query: '', selected: null, tab: 'lib' };
 
+const tabsHtml = () => `<div class="tabs" role="tablist" style="margin:0 0 14px">${[['lib', 'book', 'مكتبة الردود'], ['int', 'users', 'المهتمون والطلب']].map(([k, i, t]) => `<button class="tab" role="tab" data-ast="${k}" aria-selected="${state.tab === k}">${ic(i)}${t}</button>`).join('')}</div>`;
+const bindTabs = () => document.querySelectorAll('[data-ast]').forEach(b => b.onclick = () => { state.tab = b.dataset.ast; pageAssistant(); });
 export async function pageAssistant() {
   const main = $('#main');
-  main.innerHTML = titleBar(`${ic('chat')} المساعد الذكي`, 'مكتبة الردود', 'أضف الردود وحسّن صياغتها والكلمات التي تساعد المساعد على اختيارها.', '<button class="btn pri" id="asAdd">إضافة رد</button>') +
+  if (state.tab === 'int') {
+    main.innerHTML = titleBar(`${ic('chat')} المساعد الذكي`, 'المهتمون والطلب', 'من طلب الإشعار من المساعد، وعدد الاستفسارات عن كل برنامج وباقة، وحملات الإبلاغ والعروض من واتساب المركز.') + tabsHtml() + '<div id="asInt"></div>';
+    bindTabs(); await interestsTab($('#asInt'), pageAssistant); return;
+  }
+  main.innerHTML = titleBar(`${ic('chat')} المساعد الذكي`, 'مكتبة الردود', 'أضف الردود وحسّن صياغتها والكلمات التي تساعد المساعد على اختيارها.', '<button class="btn pri" id="asAdd">إضافة رد</button>') + tabsHtml() +
     '<div class="grid g2"><section class="card pad"><label for="asSearch">البحث في الردود</label><input class="inp" type="search" id="asSearch" placeholder="العنوان أو التصنيف أو نص الرد"><p class="hint" id="asCount"></p><div id="asList"></div></section><section class="card pad" id="asEditor"></section></div>' +
     '<section class="card pad" style="margin-top:16px"><h3>معاينة إجابة المساعد</h3><form id="asPreview"><label for="asQuestion">اكتب سؤالًا</label><div style="display:flex;gap:8px"><input class="inp" id="asQuestion" maxlength="650" required><button class="btn">عرض الرد</button></div></form><div id="asResult" aria-live="polite" style="white-space:pre-wrap;margin-top:12px"></div></section>';
   let rows;
   try { rows = await Store.assistantResponses(); }
   catch (error) { main.innerHTML = emptyBox('تعذّر تحميل مكتبة الردود', esc(error.message)); return; }
   if (!main.isConnected || !$('#asList')) return;
+  bindTabs();
   const search = $('#asSearch');
   search.value = state.query;
   const list = () => {

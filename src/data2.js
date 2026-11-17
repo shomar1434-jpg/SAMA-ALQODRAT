@@ -1,4 +1,5 @@
 import { defaultResponses, validateResponse } from './assistant_logic.js';
+import { checkInterest, DEMAND_THRESHOLD } from './interest_logic.js';
 import { sessionReminders, inboxOf, adminRecipients } from './inbox_logic.js';
 import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './policy_logic.js';
 import { catalogPrograms, computeEnd } from './catalog.js';
@@ -407,6 +408,32 @@ export const LocalStore = {
     if(a.id===me.id) throw new Error('غيّر كلمة مرورك من «تغيير كلمة المرور»'); if(a.role==='owner') throw new Error('لا تُعاد كلمة مرور المالك الأساسي'); if(a.active===false) throw new Error('فعّل الحساب أولًا');
     this.audit('admins.password_reset', a.email); this.save(); return {ok:true, mode:'password', temp_password:'demo'+String(Math.floor(Math.random()*9e5)+1e5), email:a.email}; },
   async assistantResponses(){ return structuredClone(this.data.assistant_responses || []); },
+  /* الخطوة BE: المهتمون والطلب والحملات ↔ assistant_note_inquiry / assistant_register_interest / admin_assistant_* */
+  _ai(){ const D=this.data; ['assistant_inquiries','assistant_demand','assistant_interests','assistant_campaigns','assistant_sends'].forEach(k=>{ D[k]=D[k]||[]; }); return D; },
+  _prodName(kind, id){ const D=this.data; if(kind==='program'){ const p=D.programs.find(x=>x.id===id&&x.active!==false); return p?p.name:null; } if(kind==='plan'){ const p=(D.plans||[]).find(x=>x.id===id&&x.active!==false); return p?planName(p):null; } return null; },
+  async noteInquiry(session, kind, ref){ const D=this._ai(); if(!/^[A-Za-z0-9_-]{8,64}$/.test(String(session||''))||!this._prodName(kind, ref)) return {ok:false};
+    let d=D.assistant_demand.find(x=>x.kind===kind&&x.ref_id===ref); if(!d){ d={kind, ref_id:ref, cycle_started_at:new Date(0).toISOString(), alerted_at:null, handled_at:null}; D.assistant_demand.push(d); }
+    const day=Date.now()-864e5, mine=D.assistant_inquiries.filter(x=>x.session_id===session);
+    if(mine.filter(x=>Date.parse(x.created_at)>day).length<30 && !mine.some(x=>x.kind===kind&&x.ref_id===ref&&x.created_at>=d.cycle_started_at)) D.assistant_inquiries.push({id:uid(), session_id:session, kind, ref_id:ref, created_at:new Date().toISOString()});
+    const th=+D.settings.assistant_demand_threshold||DEMAND_THRESHOLD, n=D.assistant_inquiries.filter(x=>x.kind===kind&&x.ref_id===ref&&x.created_at>=d.cycle_started_at).length;
+    if(n>th && !d.alerted_at){ d.alerted_at=new Date().toISOString(); d.handled_at=null; } this.save(); return {ok:true, demand:n>th}; },
+  async registerInterest(f){ const D=this._ai(), x=checkInterest(f); if(!this._prodName(x.kind, x.ref_id)) throw new Error('اختر البرنامج أو الباقة');
+    const old=D.assistant_interests.find(i=>i.phone===x.phone&&i.kind===x.kind&&i.ref_id===x.ref_id), now=new Date().toISOString();
+    if(!old && D.assistant_interests.filter(i=>i.phone===x.phone&&Date.parse(i.created_at)>Date.now()-864e5).length>=5) throw new Error('تجاوزت عدد الطلبات المسموح اليوم؛ تواصل مع المركز');
+    if(old) Object.assign(old, {full_name:x.full_name, active:true, consent_at:now, updated_at:now}); else D.assistant_interests.push({id:uid(), ...x, active:true, consent_at:now, created_at:now, updated_at:now});
+    this.save(); return {ok:true}; },
+  async adminInterests(){ const D=this._ai(), nm=(k,id)=>this._prodName(k,id);
+    return { threshold:+D.settings.assistant_demand_threshold||DEMAND_THRESHOLD, demand:D.assistant_demand.map(d=>({...d, name:nm(d.kind,d.ref_id)})), inquiries:D.assistant_inquiries.map(({kind,ref_id,created_at})=>({kind,ref_id,created_at})),
+      interests:D.assistant_interests.map(i=>({...i, name:nm(i.kind,i.ref_id), registered:D.trainees.some(t=>t.phone===i.phone||t.guardian_phone===i.phone)})).sort((a,b)=>b.created_at.localeCompare(a.created_at)),
+      campaigns:D.assistant_campaigns.map(c=>({...c, name:c.ref_id?nm(c.product_kind,c.ref_id):null})).sort((a,b)=>b.created_at.localeCompare(a.created_at)), sends:D.assistant_sends.slice() }; },
+  async createCampaign(f){ const D=this._ai(); if(!['availability','offer'].includes(f.kind)) throw new Error('نوع غير صالح');
+    const ref=f.ref_id||null; if(ref && !this._prodName(f.product_kind, ref)) throw new Error('البرنامج أو الباقة غير موجود'); if(f.kind==='availability'&&!ref) throw new Error('اختر البرنامج أو الباقة');
+    if(f.kind==='offer' && (String(f.title||'').trim().length<3 || String(f.message||'').trim().length<5)) throw new Error('اكتب عنوان العرض وتفاصيله');
+    const c={id:uid(), kind:f.kind, product_kind:ref?f.product_kind:null, ref_id:ref, title:String(f.title||'').trim().slice(0,120), message:String(f.message||'').trim().slice(0,1000), created_at:new Date().toISOString()};
+    D.assistant_campaigns.push(c); const d=ref&&D.assistant_demand.find(x=>x.kind===f.product_kind&&x.ref_id===ref); if(d) d.handled_at=c.created_at; this.audit('assistant_campaigns.insert', c.id, {after:{kind:c.kind}}); this.save(); return {ok:true, id:c.id}; },
+  async markCampaignSent(cid, iid){ const D=this._ai(); if(!D.assistant_sends.some(s=>s.campaign_id===cid&&s.interest_id===iid)) D.assistant_sends.push({campaign_id:cid, interest_id:iid, sent_at:new Date().toISOString()}); this.save(); return {ok:true}; },
+  async setInterestActive(id, active){ const i=this._ai().assistant_interests.find(x=>x.id===id); if(!i) throw new Error('غير موجود'); i.active=!!active; i.updated_at=new Date().toISOString(); this.save(); return {ok:true}; },
+  async newDemandCycle(kind, ref){ const D=this._ai(); let d=D.assistant_demand.find(x=>x.kind===kind&&x.ref_id===ref); if(!d){ d={kind, ref_id:ref}; D.assistant_demand.push(d); } Object.assign(d,{cycle_started_at:new Date().toISOString(), alerted_at:null, handled_at:null}); this.save(); return {ok:true}; },
   async saveAssistantResponse(input){
     if(!await this.isAdmin()) throw new Error('غير مصرح بهذه العملية');
     const row=validateResponse(input), rows=this.data.assistant_responses;
@@ -959,6 +986,13 @@ export const CloudStore = {
       if(c==='23514'||/check constraint/.test(m)) throw new Error('إحدى القيم المدخلة غير صالحة؛ راجع الجوال ورقم الهوية والحقول المطلوبة');
       if(/row-level security/.test(m)) throw new Error('غير مصرح بهذه العملية؛ سجّل الدخول كمسؤول');
       throw new Error(/foreign key/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
+  async noteInquiry(session, kind, ref){ try{ return this._e(await this.sb.rpc('assistant_note_inquiry',{p_session:session, p_kind:kind, p_ref:ref})); }catch(e){ return {ok:false}; } },
+  async registerInterest(f){ const x=checkInterest(f); return this._e(await this.sb.rpc('assistant_register_interest',{p:{...x, consent:true}})); },
+  async adminInterests(){ return this._e(await this.sb.rpc('admin_assistant_interests')); },
+  async createCampaign(f){ return this._e(await this.sb.rpc('admin_assistant_campaign',{p:{kind:f.kind, product_kind:f.product_kind||null, ref_id:f.ref_id||null, title:f.title||'', message:f.message||''}})); },
+  async markCampaignSent(cid, iid){ return this._e(await this.sb.rpc('admin_assistant_mark_sent',{p_campaign:cid, p_interest:iid})); },
+  async setInterestActive(id, active){ return this._e(await this.sb.rpc('admin_assistant_interest_set',{p_id:id, p_active:!!active})); },
+  async newDemandCycle(kind, ref){ return this._e(await this.sb.rpc('admin_assistant_new_cycle',{p_kind:kind, p_ref:ref})); },
   async assistantResponses(){ return this._e(await this.sb.from('assistant_responses').select('*').order('created_at').order('id')); },
   async saveAssistantResponse(input){
     const row=validateResponse(input);
