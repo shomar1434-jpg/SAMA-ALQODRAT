@@ -12,7 +12,7 @@ import { countUp, emptyBox, ic, quiet, skeleton, toast } from './views2_head.js'
 import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
 import { planOpen, sessionOn, SECTIONS, subStatus } from './qudurat.js';
-import { ageOn, isMinor, isChild, MIN_AGE, isKidsProgram } from './identity_logic.js';
+import { ageOn, isMinor, isChild, MIN_AGE, isKidsProgram, CONSENT_TEXT } from './identity_logic.js';
 import { waLink, WA_LOGO, viewContact, viewManarGuide } from './landing.js';
 import { orderPanelHtml, bindOrderPanel } from './order_panel.js';
 import { viewPolicies, viewPolicy, bindPolicyConsent } from './policy_views.js';
@@ -225,11 +225,15 @@ export function regFormHtml(title, sub, chooser=''){
       ${fld('gender','الجنس',true,`<select class="inp" name="gender"><option value="">اختر</option><option>ذكر</option><option>أنثى</option></select>`)}
       ${fld('birth_date','تاريخ الميلاد',true,`<input class="inp" name="birth_date" type="date" min="1930-01-01" max="${riyadhNow().date}" autocomplete="bday">`,'لمن هم دون 19 سنة يُطلب جوال ولي الأمر.')}
       <p id="rfChild" class="alert t-info" style="grid-column:1/-1;margin:0" hidden><span class="aic">${ic('users')}</span><span>تسجيل طفل دون 13 سنة: اكتب <b>جوال ولي الأمر</b> في خانة «رقم الجوال». به يدخل ولي الأمر بوابته ويتابع حضور الطفل وتقدّمه.</span></p>
+      <fieldset id="rfMinor" class="en-kind field" style="grid-column:1/-1" hidden><legend>هل عمر المتدرب أقل من 18 سنة؟ <i>*</i></legend>
+        <label class="check"><input type="radio" name="minor" value="yes" id="rf-minor-yes"><span>نعم</span></label><label class="check"><input type="radio" name="minor" value="no" id="rf-minor-no"><span>لا</span></label>
+        <div class="errtxt" data-e="minor" style="grid-column:1/-1"></div></fieldset>
       <div id="rfGuard" style="grid-column:1/-1" hidden>${fld('guardian_phone','جوال ولي الأمر',true,`<input class="inp num" name="guardian_phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" dir="ltr" style="text-align:right" placeholder="05XXXXXXXX" autocomplete="off">`,'يدخل به ولي الأمر بوابته لمتابعة حضورك وتقدّمك، بعد تأكيده برمز تحقق وبرقم سجلك المدني.')}</div>
       ${fld('city','المدينة أو المحافظة',true,`<select class="inp" name="city"><option value="">اختر</option>${CITIES.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
       <div id="rfPol" style="grid-column:1/-1" hidden></div>
+      <label class="check" id="rfConsentL" style="grid-column:1/-1" hidden><input type="checkbox" name="guardian_consent" id="rf-guardian_consent" aria-describedby="rfE"><span>${CONSENT_TEXT}</span></label>
       <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقر بصحة البيانات أعلاه</span></label>
     </form>
     <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
@@ -250,9 +254,17 @@ export function bindRegForm(target, cohortsFn){
   const applyMode=()=>{ const m=modeOf();
     fieldOf('birth_date').hidden = m!=='kids'; if(m!=='kids'){ bd.value=''; bd.classList.remove('err'); bd.removeAttribute('aria-invalid'); $('[data-e=birth_date]',f).textContent=''; }
     ['city','education','employer'].forEach(n=>{ const x=fieldOf(n); if(x) x.hidden = m==='plan'; });
-    if(m==='plan'){ $('#rfGuard',f).hidden=false; $('#rfChild',f).hidden=true; gLabel.innerHTML='جوال ولي الأمر <small class="hint">(اختياري؛ مستقل عن جوال المتدرب)</small>'; }
-    else { gLabel.innerHTML='جوال ولي الأمر <i>*</i>'; syncGuard(); } };
-  const syncGuard=()=>{ if(modeOf()==='plan') return; const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
+    $('#rfMinor',f).hidden = m!=='plan'; if(m!=='plan') $$('[name=minor]',f).forEach(r=>{ r.checked=false; });
+    if(m==='plan'){ $('#rfGuard',f).hidden=false; $('#rfChild',f).hidden=true; planGuardLabel(); }
+    else { gLabel.innerHTML='جوال ولي الأمر <i>*</i>'; syncGuard(); }
+    syncConsent(); };
+  /* موافقة ولي الأمر (الخطوة BG): الباقة بسؤال «دون 18؟»، وبرامج الأطفال من تاريخ الميلاد ↔ checkMinorConsent/reg_minor_consent */
+  const minorYes=()=>$('[name=minor]:checked',f)?.value==='yes';
+  const planGuardLabel=()=>{ gLabel.innerHTML = minorYes() ? 'جوال ولي الأمر <i>*</i>' : 'جوال ولي الأمر <small class="hint">(اختياري؛ مستقل عن جوال المتدرب)</small>'; };
+  const consentNeeded=()=>{ const m=modeOf(); return m==='plan' ? minorYes() : m==='kids' ? minor() : false; };
+  const syncConsent=()=>{ const need=consentNeeded(), box=$('#rfConsentL',f); box.hidden=!need; if(!need) $('[name=guardian_consent]',f).checked=false; };
+  $$('[name=minor]',f).forEach(r=>r.addEventListener('change',()=>{ $('[data-e=minor]',f).textContent=''; planGuardLabel(); syncConsent(); const g=$('[name=guardian_phone]',f); if(g.dataset.touched) g.dispatchEvent(new Event('blur')); }));
+  const syncGuard=()=>{ if(modeOf()==='plan') return; queueMicrotask(()=>syncConsent()); const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
   bd.addEventListener('change',()=>{ const m=birthMsg(bd.value); $('[data-e=birth_date]',f).textContent=m; bd.classList.toggle('err',!!m); m?bd.setAttribute('aria-invalid','true'):bd.removeAttribute('aria-invalid'); syncGuard(); }); bd.addEventListener('input',syncGuard);
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
@@ -269,7 +281,7 @@ export function bindRegForm(target, cohortsFn){
       if(/[a-zA-Z]/.test(v) && /[\u0621-\u06FF]/.test(v)) return 'اكتب الاسم بلغة واحدة: العربية أو الإنجليزية.'; if(parts.length<3) return 'اكتب الاسم الثلاثي على الأقل.'; if(parts.some(x=>x.replace(/[\u064B-\u0652]/g,'').length<2)) return 'كل مقطع في الاسم حرفان على الأقل.'; return ''; },
     national_id: v => !v ? 'اكتب رقم السجل المدني.' : !/^\d+$/.test(v) ? blocked.national_id : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : !/^[12]/.test(v) ? 'يبدأ رقم السجل بـ 1 أو 2.' : !validSaudiId(v) ? 'رقم السجل غير صحيح. تحقق من الأرقام.' : '',
     phone: v => !v ? 'اكتب رقم الجوال.' : !/^\d+$/.test(v) ? blocked.phone : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
-    guardian_phone: v => modeOf()==='plan' ? (!v ? '' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '') : !minor()||child() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
+    guardian_phone: v => modeOf()==='plan' ? (!v ? (minorYes() ? 'اكتب جوال ولي الأمر.' : '') : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '') : !minor()||child() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
     email: v => !v ? '' : !v.includes('@') ? 'البريد يجب أن يحوي علامة @' : (v.match(/@/g)||[]).length>1 ? 'البريد يحوي علامة @ واحدة فقط.' : !/^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(v) ? 'صيغة البريد غير صحيحة، مثل name@gmail.com' : ''
   };
   const setState=(el,msg)=>{ const n=el.name, e=$(`[data-e=${n}]`,f); e.textContent=msg; el.classList.toggle('err',!!msg); el.classList.toggle('ok',!msg && !!el.value); msg?el.setAttribute('aria-invalid','true'):el.removeAttribute('aria-invalid'); };
@@ -288,9 +300,12 @@ export function bindRegForm(target, cohortsFn){
     $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
     Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
     const md=modeOf(); (md==='plan'?['gender']:['gender','city','education']).forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
-    if(md==='plan'){ delete F.birth_date; delete F.city; delete F.education; delete F.employer; if(!F.guardian_phone) delete F.guardian_phone; }
+    if(md==='plan'){ delete F.birth_date; delete F.city; delete F.education; delete F.employer; if(!F.guardian_phone) delete F.guardian_phone; if(!F.minor) err('minor','اختر نعم أو لا.'); }
     else if(md==='kids'){ const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
     else { delete F.birth_date; delete F.guardian_phone; }
+    if(md==='kids') F.minor = minor() ? 'yes' : 'no'; else if(md!=='plan') delete F.minor;
+    if(consentNeeded() && !F.guardian_consent){ ok=false; errs.push({id:'rf-guardian_consent',label:'موافقة ولي الأمر',msg:'يلزم إقرار موافقة ولي الأمر للمتابعة.'}); $('#rfE').textContent='يلزم إقرار موافقة ولي الأمر للمتابعة.'; }
+    if(consentNeeded() && F.guardian_consent) F.guardian_consent = true; else delete F.guardian_consent;
     let tg = tgOf(); if(tg){ tg={...tg}; delete tg._mode; }
     if(!tg){ ok=false; const el=$('#en-item',f)||$('#en-kind-program',f); errs.push({id:el?.id||'rf-full_name',label:'البرنامج أو الباقة',msg:'اختر ما تريد التسجيل فيه.'}); const e2=$('[data-e=en_item]',f); if(e2) e2.textContent='اختر ما تريد التسجيل فيه.'; }
     if($('#rf-pol',f) && !F.policies){ ok=false; errs.push({id:'rf-pol',label:'السياسات',msg:'اقرأ السياسات ووافق عليها للمتابعة.'}); $('#rfE').textContent='اقرأ السياسات ووافق عليها للمتابعة.'; }

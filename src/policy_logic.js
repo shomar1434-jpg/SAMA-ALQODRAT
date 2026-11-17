@@ -6,6 +6,7 @@ import { POLICY_TEXTS, POLICY_APPROVER, POLICY_EFFECTIVE } from './policy_texts.
 export const POLICY_KINDS = [   // بترتيب صفحة السياسات في الموقع الرسمي
   { slug:'integrity',     title:'سياسة النزاهة الأكاديمية',                 acceptance:false,  src:'academic-policy' },
   { slug:'privacy',       title:'سياسة الخصوصية وحماية البيانات',           acceptance:false,  src:'policies' },
+  { slug:'terms',         title:'الشروط والأحكام',                          acceptance:false,  src:null, seed:false },   // الخطوة BG: مسودة تُنشر من مركز السياسات
   { slug:'attendance',    title:'سياسات الحضور والانضباط في الدورات التدريبية', acceptance:false,  src:'course-policy' },
   { slug:'copyright',     title:'سياسة حقوق الملكية الفكرية وحقوق النشر',    acceptance:false, src:'copyright-policy' },
   { slug:'support',       title:'سياسة الدعم الفني',                        acceptance:false, src:'support-policy' },
@@ -59,6 +60,7 @@ export function renderPolicyBody(text){
 
 /* السياسات المعتمدة المنقولة من الموقع الرسمي: إصدار أول منشور لكل سياسة */
 export function demoPolicies(){
-  return POLICY_KINDS.map((k, i) => ({ id:'pol-' + k.slug, slug:k.slug, title:k.title, version:1, status:'published', requires_acceptance:k.acceptance,
+  return POLICY_KINDS.filter(k => k.seed !== false).map((k, i) => ({ id:'pol-' + k.slug, slug:k.slug, title:k.title, version:1, status:'published', requires_acceptance:k.acceptance,
     effective_date:POLICY_EFFECTIVE, approved_by:POLICY_APPROVER, sort:i, body:POLICY_TEXTS[k.slug], created_at:POLICY_EFFECTIVE + 'T00:00:00Z', published_at:POLICY_EFFECTIVE + 'T00:00:00Z' }));
 }
+

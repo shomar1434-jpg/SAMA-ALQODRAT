@@ -4,6 +4,8 @@ do $$
 declare v_admin uuid; v_d uuid; v_p1 uuid; v_p2 uuid; r jsonb; ok boolean; d date := riyadh_now()::date;
   v_nid text := '1000000099'; person jsonb;
 begin
+  assert (select count(*) from policies where status = 'draft' and slug in ('privacy','terms')) = 2, 'ترحيل BG: مسودتا الخصوصية والشروط';
+  delete from policies where status = 'draft' and slug = 'privacy';   -- يبدأ الاختبار بلا مسودة للخصوصية
   -- لا نشر لغير الإدارة
   insert into policies(slug, title, body, effective_date, requires_acceptance) values ('privacy', 'سياسة الخصوصية', 'نص سياسة الخصوصية المعتمد للاختبار', d, true) returning id into v_d;
   perform set_config('app.uid', '', true);

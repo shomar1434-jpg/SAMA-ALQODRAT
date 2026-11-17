@@ -25,7 +25,7 @@ const linesTxt = i => docLines(i).map(x => `${PAY_METHODS[x.method] || x.method}
 export function invoiceHtml(i, receipt){
   const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
   const rf = isRefund(i);
-  return docShell({ docNo:i.number, title:rf ? 'إشعار استرداد' : 'فاتورة', sub:`مستند داخلي لمراجعة الحسابات${rf && i.ref_invoice ? ` — مرتبط بالفاتورة ${i.ref_invoice}` : ''}${i.status === 'void' ? ' — ملغى' : ''}`,
+  return docShell({ docNo:i.number, title:rf ? 'إشعار استرداد' : 'سند استلام', sub:`مستند داخلي لمراجعة الحسابات${rf && i.ref_invoice ? ` — مرتبط بالفاتورة ${i.ref_invoice}` : ''}${i.status === 'void' ? ' — ملغى' : ''}`,
     info:[['اسم صاحب الخدمة', i.customer_name, 'wide'], ['رقم السجل المدني', i.customer_nid || '—'], ['الجوال', i.customer_phone || '—'], ['تاريخ الفاتورة', fmtGreg(i.issue_date)], ['رقم طلب الشراء', i.order_number]],
     body:`${i.status === 'void' ? `<div class="inv-void">${rf ? 'إشعار ملغى' : 'فاتورة ملغاة'} — ${esc(i.void_reason || '')}</div>` : ''}
       <table class="inv-t"><thead><tr><th>نوع الخدمة</th><th>الخدمة</th><th>تاريخ الشراء</th><th>مبلغ الخدمة (ريال)</th></tr></thead>

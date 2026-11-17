@@ -28,6 +28,21 @@ export function checkBirthGuardian(f, today, needBirth = true){
   return g;
 }
 
+/* موافقة ولي الأمر (الخطوة BG، نظام حماية البيانات الشخصية): تلزم متى لزم جوال ولي الأمر —
+   الباقات بسؤال «دون 18؟» (`minor`)، وبرامج الأطفال من تاريخ الميلاد (دون GUARDIAN_AGE). العميل القديم بلا `minor` لا يُلزم.
+   ↔ reg_minor_consent في …_guardian_consent.sql */
+export const CONSENT_TEXT = 'أقر بأنني ولي أمر المتدرب، أو أن ولي أمره اطّلع على التسجيل ووافق عليه وعلى معالجة بياناته وفق سياسة الخصوصية.';
+export function checkMinorConsent(f, today){
+  if(!f || !('minor' in f)) return false;
+  let needs = f.minor === 'yes';
+  if(f.birth_date){ const a = ageOn(f.birth_date, today); if(a != null && a < GUARDIAN_AGE) needs = true; }
+  if(!needs) return false;
+  const a = ageOn(f.birth_date, today), g = String(f.guardian_phone || (a != null && a < CHILD_AGE ? f.phone : '') || '').trim();   // الطفل: جوال التواصل هو جوال ولي أمره
+  if(!/^05\d{8}$/.test(g)) throw new Error('جوال ولي الأمر مطلوب لمن هم دون 18 سنة (10 أرقام تبدأ بـ 05)');
+  if(f.guardian_consent !== true && f.guardian_consent !== 'true') throw new Error('يلزم إقرار موافقة ولي الأمر عند تسجيل من هم دون 18 سنة');
+  return true;
+}
+
 /* ربط ولي الأمر الذاتي: ثلاثة شروط معًا — المتدرب صرّح بجوال ولي الأمر عند التسجيل، وولي الأمر أثبت ملكية الجوال
    برمز التحقق (الجلسة)، وكتب السجل المدني الصحيح. الرفض برسالة واحدة لا تكشف السبب، وحد المحاولات في الساعة. */
 export const LINK_FAIL = 'تعذّر الربط. تأكد من رقم السجل المدني، أو راجع إدارة المعهد.';

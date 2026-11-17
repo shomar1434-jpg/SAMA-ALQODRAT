@@ -24,3 +24,11 @@ export function reporter() {
   const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
   return { ok, failed: () => fail };
 }
+
+// الخطوة BG: الإجابة الافتراضية لسؤال «دون 18؟» في الباقة («لا»)، وإقرار ولي الأمر متى ظهر — لاختبارات لا تخص موافقة ولي الأمر
+export async function autoConsent(p) {
+  await p.evaluate(() => {
+    const m = document.querySelector('#rfMinor'); if (m && !m.hidden && !document.querySelector('[name=minor]:checked')) document.getElementById('rf-minor-no').checked = true;
+    const c = document.querySelector('#rfConsentL'); if (c && !c.hidden) document.getElementById('rf-guardian_consent').checked = true;
+  });
+}

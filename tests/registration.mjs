@@ -1,6 +1,6 @@
 // الخطوة B: نموذج التسجيل الموحّد (#enroll)، وتاريخ الميلاد الإلزامي، وجوال ولي الأمر لمن هم دون 19 سنة
 import { chromium } from 'playwright';
-import { serveDist, reporter } from './_server.mjs';
+import { serveDist, reporter, autoConsent } from './_server.mjs';
 const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
@@ -27,7 +27,7 @@ ok(nProg > 1 && planOpts.length > 1 && /الباقة/.test(await text('#en-lbl')
 // دون اختيار عنصر
 await p.fill('[name=full_name]', 'أنس محمد علي الفيفي'); await p.fill('[name=national_id]', '1000000487'); await p.fill('[name=phone]', '0556660001');
 await p.selectOption('[name=gender]', 'ذكر'); await p.check('[name=agree]');
-await p.click('#rfGo'); await p.waitForTimeout(300);
+await autoConsent(p); await p.click('#rfGo'); await p.waitForTimeout(300);
 ok(/اختر ما تريد التسجيل فيه/.test(await text('#rfSum')), 'يُطلب اختيار العنصر');
 
 // الباقات (البند 1): بلا مدينة ولا مؤهل ولا تاريخ ميلاد، وجوال ولي الأمر مستقل لا يُنسخ من جوال المتدرب
@@ -36,7 +36,7 @@ const hid = async n => p.$eval(`[name=${n}]`, e => !!e.closest('.field')?.hidden
 ok(await hid('birth_date') && await hid('city') && await hid('education') && !(await hid('guardian_phone')), 'نموذج الباقة: لا مدينة ولا مؤهل ولا تاريخ ميلاد، وجوال ولي الأمر ظاهر');
 await p.fill('[name=phone]', '0556660009'); await p.waitForTimeout(100);
 ok((await p.inputValue('[name=guardian_phone]')) === '', 'كتابة جوال المتدرب لا تملأ جوال ولي الأمر');
-await p.fill('[name=phone]', '0556660001'); await p.fill('[name=guardian_phone]', '٠٥٠٩٩٩٠٠٠٧'); await p.click('#rfGo'); await p.waitForSelector('.refbox');
+await p.fill('[name=phone]', '0556660001'); await p.fill('[name=guardian_phone]', '٠٥٠٩٩٩٠٠٠٧'); await autoConsent(p); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 let D = await data(); const t = D.trainees.find(x => x.national_id === '1000000487');
 ok(t && t.guardian_phone === '0509990007' && t.phone === '0556660001' && !t.birth_date && D.subscriptions.some(s => s.trainee_id === t.id), 'اشتراك محفوظ بجوالين مستقلين وبلا تاريخ ميلاد (أرقام عربية تُحوَّل)');
 ok(/بوابة ولي الأمر/.test(await text('#regCard')), 'رسالة النجاح تشرح دخول ولي الأمر');
@@ -48,7 +48,7 @@ const adultIdx = kidsIdx === 1 ? 2 : 1;
 await p.selectOption('#en-item', { index: adultIdx }); await p.waitForTimeout(150);
 ok(await hid('birth_date') && await hid('guardian_phone') && !(await hid('city')) && !(await hid('education')), 'برنامج عام: لا تاريخ ميلاد ولا جوال ولي أمر');
 await person('ماهر سعيد علي الزهراني', '1000000495', '0556660002', years(25)); await p.waitForTimeout(150);
-await p.click('#rfGo'); await p.waitForSelector('.refbox');
+await autoConsent(p); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 D = await data(); const t2 = D.trainees.find(x => x.national_id === '1000000495');
 ok(t2 && !t2.guardian_phone && D.enrollments.some(e => e.trainee_id === t2.id), 'تسجيل في برنامج تدريبي من النموذج نفسه');
 
@@ -57,13 +57,13 @@ if (kidsIdx > 0) { await p.goto(U + '#enroll'); await p.reload(); await p.waitFo
   await p.selectOption('#en-item', { index: kidsIdx }); await p.waitForTimeout(150);
   ok(!(await hid('birth_date')), 'برنامج الأطفال يطلب تاريخ الميلاد');
   await p.fill('[name=full_name]', 'ريم سعيد علي الزهراني'); await p.fill('[name=national_id]', '1000000503'); await p.fill('[name=phone]', '0556660004'); await p.selectOption('[name=gender]', 'أنثى');
-  await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); await p.click('#rfGo'); await p.waitForTimeout(300);
+  await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); await autoConsent(p); await p.click('#rfGo'); await p.waitForTimeout(300);
   ok(/تاريخ الميلاد/.test(await text('#rfSum')), 'تاريخ الميلاد إلزامي لبرامج الأطفال'); }
 else ok(true, 'لا برنامج أطفال في البيانات التجريبية');
 
 // إعادة التسجيل بجوال ولي أمر آخر: لا يُستبدل، ويصبح طلب تحديث
 await p.goto(U + '#enroll'); await p.reload(); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.selectOption('#en-item', { index: 2 });
-await person('أنس محمد علي الفيفي', '1000000487', '0556660001', ''); await p.fill('[name=guardian_phone]', '0509996666'); await p.click('#rfGo'); await p.waitForSelector('.refbox');
+await person('أنس محمد علي الفيفي', '1000000487', '0556660001', ''); await p.fill('[name=guardian_phone]', '0509996666'); await autoConsent(p); await p.click('#rfGo'); await p.waitForSelector('.refbox');
 D = await data();
 ok(D.trainees.find(x => x.national_id === '1000000487').guardian_phone === '0509990007' && D.profile_change_requests.some(r => r.trainee_id === t.id && r.status === 'pending' && r.changes.guardian_phone?.new === '0509996666'), 'جوال ولي الأمر لا يُستبدل بإعادة التسجيل، ويصبح طلب تحديث');
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
