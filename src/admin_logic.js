@@ -33,7 +33,7 @@ export function checkRole(actor, role, reason, recent){
 
 /* ---------- سجل الحركات ---------- */
 export const AUDIT_SECTIONS = {
-  admins:'المسؤولون', admin_invites:'دعوات المسؤولين', trainees:'المتدربون', subscriptions:'الاشتراكات', sub_attendance:'حضور الباقات', attendance:'حضور الدفعات',
+  assistant_responses:'ردود المساعد الذكي', admins:'المسؤولون', admin_invites:'دعوات المسؤولين', trainees:'المتدربون', subscriptions:'الاشتراكات', sub_attendance:'حضور الباقات', attendance:'حضور الدفعات',
   enrollments:'التسجيلات', cohorts:'الدفعات', programs:'البرامج', plans:'الباقات', orders:'الطلبات', invoices:'الفواتير', invoice_receipts:'إيصالات الفواتير',
   teachers:'المدربون', questions:'بنوك الأسئلة', assignments:'الواجبات', settings:'الإعدادات', policies:'السياسات', certificates:'الشهادات',
   guardian_links:'روابط أولياء الأمور', activation_codes:'رموز التفعيل', trainer_groups:'مجموعات المدربين', notifications:'الإشعارات',

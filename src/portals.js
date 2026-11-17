@@ -1,3 +1,5 @@
+import { startLiveRefresh } from './live_refresh.js';
+import { mountAssistant } from './assistant_chat.js';
 /* =====================================================================
    البوابات: المتدرب، والمدرب، وولي الأمر. لكل بوابة صفحة مستقلة ودور محدد،
    والبيانات محصورة بالدور من الخادم (portalData). الحساب من portal_logic.js.
@@ -43,11 +45,22 @@ export function bootPortal(role){
   $('#homeLink').href = publicBase() + '#home';
   window.addEventListener('hashchange', render);
   render();
+  startLiveRefresh(Store, render, { minGap: 5000 });
+  mountAssistant(Store);
   initPwa();
   mountGuide(role);
 }
 
-async function render(){
+let rendering = null, renderPending = false;
+function render(){
+  renderPending = true;
+  if(!rendering) rendering = (async () => {
+    try { while(renderPending){ renderPending=false; await renderPortal(); } }
+    finally { rendering=null; }
+  })();
+  return rendering;
+}
+async function renderPortal(){
   clearInterval(timer);
   const s = await Store.portalSession(ROLE);
   $('#logoutBtn').hidden = !s;

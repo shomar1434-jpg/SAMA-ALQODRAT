@@ -1,3 +1,5 @@
+import { startLiveRefresh } from './live_refresh.js';
+import { mountAssistant } from './assistant_chat.js';
 /* نقطة التشغيل المشتركة لكل الصفحات: تُستدعى بعد تحميل كل الوحدات */
 import { setPage } from './config.js';
 import { initStore, Store, LocalStore, cohortArchived, cohortState, progCode, enrollsOf, takenOf, activeCohortOf } from './data2.js';
@@ -22,6 +24,8 @@ export function boot(page){
   if(window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if(getTheme() === 'auto') applyTheme('auto'); });
   window.addEventListener('hashchange', route);
   route();
+  startLiveRefresh(Store, route, { minGap: page === 'admin' ? 20000 : 3000 });
+  if(page === 'public') mountAssistant(Store);
   initPwa();
   if(page === 'admin') mountGuide('admin');
 }
