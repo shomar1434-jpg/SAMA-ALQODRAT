@@ -35,7 +35,7 @@ export function weeklyDoc(r){
   return docShell({ docNo:`WK-${r.week.from.replace(/-/g, '')}`, title:'تقرير الأسبوع للمتدرب', sub:`${fmtGreg(r.week.from)} – ${fmtGreg(r.week.to)}`,
     info:[['المتدرب', r.trainee.name, 'wide'], ['القسم', r.sections.join('، ') || '—'], ['حتى تاريخ', fmtGreg(r.upto)]],
     stats:[['الحضور', A.held ? `${A.present} / ${A.held}` : '—', A.absent.length ? 'warn' : 'ok'], ['الواجبات', r.hw.length ? `${r.hwDone} / ${r.hw.length}` : '—'], ['أسئلة التدريب', String(r.practice.answered)], ['دقة التدريب', pc(r.practice.pct)], ['آخر محاكٍ', r.sims.length ? pc(r.sims.slice(-1)[0].pct) : '—']],
-    body:weeklyBody(r).replace('<div class="wk">', '<div class="wk wk-print">'), note:'تقرير تلقائي من منصة المركز للاطلاع والمتابعة؛ مؤشر المحاكي تدريبي وليس درجة قياس.' });
+    body:weeklyBody(r).replace('<div class="wk">', '<div class="wk wk-print">'), note:'تقرير تلقائي من نظام المركز للاطلاع والمتابعة؛ مؤشر المحاكي تدريبي وليس درجة قياس.' });
 }
 
 /* بطاقة البوابة (ولي الأمر) */

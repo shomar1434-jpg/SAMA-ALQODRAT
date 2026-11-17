@@ -1,0 +1,38 @@
+// الخطوة AW: الأقساط المسددة بحسب العدد (قرار المالك): الدفعة الأولى ثم الأقساط بالترتيب، وقيمتها والمتبقي
+import { chromium } from 'playwright';
+import { serveDist, reporter } from './_server.mjs';
+import { installmentsOf, instText } from '../src/order_logic.js';
+const { server, origin: U } = serveDist();
+const { ok, failed } = reporter();
+const gold = { reg_fee:690, installments:4, installment_amount:250 }, f = String;
+const o = paid => ({ kind:'plan', total:1690, paid_amount:paid });
+let x = installmentsOf(o(1190), gold);
+ok(x.firstPaid && x.paidN === 2 && x.n === 4 && x.instPaid === 500 && x.remaining === 500 && !x.partial, 'قسطان من 4 بعد الدفعة الأولى');
+ok(instText(x, f) === 'الدفعة الأولى مسددة · الأقساط المسددة 2 من 4 (500 ريال) · المتبقي 500 ريال', 'النص: العدد والقيمة والمتبقي');
+x = installmentsOf(o(1000), gold); ok(x.paidN === 1 && x.partial && x.instPaid === 310, 'قسط وجزء من التالي');
+x = installmentsOf(o(400), gold); ok(!x.firstPaid && x.paidN === 0, 'الدفعة الأولى غير مكتملة');
+x = installmentsOf({ kind:'plan', total:1490, paid_amount:1490 }, gold); ok(x.paidN === 4 && x.remaining === 0 && x.per === 200, 'بعد الخصم تُقسم الأقساط على الإجمالي الفعلي');
+ok(installmentsOf(o(690), { reg_fee:690, installments:0 }) === null && installmentsOf({ kind:'program', total:500, paid_amount:0 }, gold) === null, 'لا أقساط للباقة المدفوعة دفعة واحدة ولا للبرامج');
+
+const b = await chromium.launch();
+const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+const errs = []; p.on('pageerror', e => errs.push(e.message));
+const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat_v4')));
+const admin = async r => { await p.goto(U + 'admin/#' + r); await p.reload(); await p.waitForTimeout(500);
+  if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200); } await p.waitForSelector('#main'); };
+await admin('admin-qudurat');
+const nid = await p.evaluate(() => window.__SAMA__.makeSaudiId('1'));
+await p.click('#qAdd'); await p.waitForTimeout(300);
+await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'راكان سعيد علي القرني'); await p.fill('#sm-phone', '0557771299'); await p.selectOption('#sm-gender', 'ذكر');
+await p.selectOption('#sm-plan', { label: 'الذهبية' }); await p.click('#smS'); await p.waitForSelector('#om-recv');
+await p.fill('#opl-a0', '1190'); await p.click('#om-recv'); await p.waitForTimeout(800);
+let D = await data(); const t = D.trainees.find(x => x.national_id === nid), s = D.subscriptions.find(x => x.trainee_id === t.id), ord = D.orders.find(x => x.subscription_id === s.id);
+ok(ord.paid_amount === 1190 && ord.total === 1690, 'استلام الدفعة الأولى وقسطين');
+await admin('admin-orders'); await p.selectOption('#of-st', 'all'); await p.waitForTimeout(300);
+ok(/أقساط (2|٢) من (4|٤)/.test(await p.textContent(`tr:has([data-oo="${ord.id}"]) [data-inst]`)), 'قائمة الطلبات: عدد الأقساط المسددة');
+await p.click(`[data-oo="${ord.id}"]`); await p.waitForSelector('.modal');
+const mt = await p.textContent('.modal [data-inst]');
+ok(/الأقساط المسددة (2|٢) من (4|٤)/.test(mt) && /(500|٥٠٠) ريال/.test(mt), 'نافذة الطلب: العدد والقيمة والمتبقي');
+ok(!errs.length, 'لا أخطاء' + (errs.length ? ': ' + errs.join(' | ') : ''));
+await b.close(); server.close();
+if (failed()) process.exit(1);
