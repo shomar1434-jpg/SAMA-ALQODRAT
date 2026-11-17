@@ -95,9 +95,10 @@ ok(D.teachers.some(t => t.full_name === 'مدرب تجريبي جديد' && !(t.
 await put(D => { D.admins.find(a => a.id === 'demo-admin').role = 'staff'; });
 await go('admin');
 const nav2 = await text('.side');
-ok(!/إدارة المسؤولين/.test(nav2) && !/أرشيف الحركات/.test(nav2) && !/الإعدادات/.test(nav2) && /حضور البرامج التدريبية/.test(nav2) && /مسؤول عادي/.test(nav2), 'المسؤول العادي لا يرى الإدارة والأرشيف والإعدادات');
-for (const h of ['admin-settings', 'admin-admins', 'admin-audit']) { await go(h); ok(/لمدير النظام|للمالك/.test(await text('#main')) && !(await p.$('#adF')) && !(await p.$('#auF')), `الرابط المباشر ${h} مرفوض للمسؤول العادي`); }
+ok(!/إدارة المسؤولين/.test(nav2) && !/أرشيف الحركات/.test(nav2) && !/الإعدادات/.test(nav2) && !/بيانات مؤرشفة/.test(nav2) && /حضور البرامج التدريبية/.test(nav2) && /مسؤول عادي/.test(nav2), 'المسؤول العادي لا يرى الإدارة والأرشيف والإعدادات');
+for (const h of ['admin-settings', 'admin-admins', 'admin-audit', 'admin-archive']) { await go(h); ok(/لمدير النظام|للمالك/.test(await text('#main')) && !(await p.$('#adF')) && !(await p.$('#auF')), `الرابط المباشر ${h} مرفوض للمسؤول العادي`); }
 
+await go('admin-trainees'); ok(!(await p.$('[data-del]')), 'المسؤول العادي لا يرى زر حذف المتدرب');
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
 // الجلسات: الخروج لهذا الجهاز فقط، وجلسة الإدارة منفصلة عن البوابات في المتصفح نفسه (فحص الشيفرة؛ السحابة لا تعمل في الاختبار)
 { const src = (await import('node:fs')).readFileSync(new URL('../src/data2.js', import.meta.url), 'utf8');

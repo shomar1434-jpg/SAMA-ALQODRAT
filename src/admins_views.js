@@ -30,8 +30,8 @@ function inviteResult(r, email){
 }
 
 /* إعادة التحقق بكلمة المرور قبل منح الصلاحيات الكاملة */
-function reauth(then){
-  modal(`<h3>تأكيد هويتك</h3><p class="hint">منح «مدير نظام كامل» يحتاج إعادة إدخال كلمة مرورك.</p>
+export function reauth(then, why = 'منح «مدير نظام كامل» يحتاج إعادة إدخال كلمة مرورك.'){
+  modal(`<h3>تأكيد هويتك</h3><p class="hint">${why}</p>
     <form id="raF" class="grid" novalidate><div class="field"><label for="ra-p">كلمة المرور</label><input class="inp" id="ra-p" type="password" autocomplete="current-password"></div>
     <div class="errtxt" id="raE" role="alert"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="raC">إلغاء</button><button class="btn pri" id="raS">${ic('lock')} تأكيد</button></div></form>`);
   $('#raC').onclick = closeModal;

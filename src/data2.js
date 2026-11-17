@@ -11,6 +11,7 @@ import { PUB_STATES } from './courses.js';
 import { checkLecture, lecturesForTrainees, ytId } from './studio_logic.js';
 import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
+import { archiveList, dueForPurge, purgeTraineeData, confirmNameOk, ARCHIVE_DAYS } from './archive_logic.js';
 import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256 } from './device_logic.js';
 import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
@@ -404,7 +405,7 @@ export const LocalStore = {
     if(me?.role!=='owner') throw new Error('إعادة تعيين كلمات المرور للمالك الأساسي وحده'); if(!a) throw new Error('الحساب غير موجود');
     if(a.id===me.id) throw new Error('غيّر كلمة مرورك من «تغيير كلمة المرور»'); if(a.role==='owner') throw new Error('لا تُعاد كلمة مرور المالك الأساسي'); if(a.active===false) throw new Error('فعّل الحساب أولًا');
     this.audit('admins.password_reset', a.email); this.save(); return {ok:true, mode:'password', temp_password:'demo'+String(Math.floor(Math.random()*9e5)+1e5), email:a.email}; },
-  async adminData(){ this.autoArchive(); this.autoReport(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
+  async adminData(){ this.autoArchive(); this.autoReport(); this.autoPurgeArchive(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
   /* تقرير اليوم: محليًا يُولَّد عند أول فتح للإدارة بعد 20:30 (لا خادم مجدول في الوضع التجريبي). سحابيًا: pg_cron */
   autoReport(){ const n=riyadhNow(), D=this.data; D.daily_reports=D.daily_reports||[]; if(isPastReportTime(n) && !D.daily_reports.some(r=>r.date===n.date)){ const r=makeReport(D, n.date, 'snapshot', '', n); if(!r.existing){ r.report.auto=true; D.daily_reports.push(r.report); } } },
   async generateReport(date, kind='snapshot', note=''){ const D=this.data; D.daily_reports=D.daily_reports||[]; const r=makeReport(D, date, kind, note); if(!r.existing){ D.daily_reports.push(r.report); this.audit('daily_report.'+r.report.kind, date); this.save(); } return r; },
@@ -435,7 +436,6 @@ export const LocalStore = {
     else if(i>=0) D.attendance[i].status=status;
     else { const c=D.cohorts.find(x=>x.id===e.cohort_id); D.attendance.push({id:uid(), enrollment_id, cohort_id:e.cohort_id, program_id:e.program_id, trainee_id:e.trainee_id, att_date:date, time:(c?.start_time||'00:00')+':00', checkin_at:new Date().toISOString(), status, manual:true}); }
     this.save(); },
-  async deleteTrainee(id){ const D=this.data; if(D.attendance.some(a=>a.trainee_id===id)||(D.certificates||[]).some(c=>c.trainee_id===id)||(D.sub_attendance||[]).some(a=>a.trainee_id===id)) throw new Error('لا يمكن حذف متدرب له سجلات حضور أو شهادات. ألغِ تسجيله بدل حذفه.'); D.subscriptions=(D.subscriptions||[]).filter(s=>s.trainee_id!==id); D.trainees=D.trainees.filter(x=>x.id!==id); D.enrollments=D.enrollments.filter(e=>e.trainee_id!==id); D.attendance=D.attendance.filter(a=>a.trainee_id!==id); this.save(); },
   async saveSettings(s){ Object.assign(this.data.settings, s); this.save(); },
   async publicSite(){ const D=this.data; return { about:D.settings.about||DEFAULT_ABOUT, partners:(D.partners||[]).filter(p=>p.active!==false) }; },
   async savePartner(p){ const L=this.data.partners=this.data.partners||[]; if(p.id){ const i=L.findIndex(x=>x.id===p.id); if(i>=0) L[i]={...L[i],...p}; else L.push(p); } else L.push({...p,id:uid()}); this.save(); },
@@ -796,6 +796,13 @@ export const LocalStore = {
   /* ملف المدرب: يعدّل نبذته ورابط قناته وصورته فقط */
   async saveMyProfile(p){ const me=await this._me(), x=checkProfile(p); Object.assign(me, x); this.audit('teacher.profile', me.id); this.save(); return {ok:true}; },
   /* مجموعات المدرب المحفوظة: من متدربيه فقط */
+  /* بيانات مؤرشفة وحذف المتدرب (الخطوة BB) ↔ admin_archived_trainees / admin_delete_trainee / purge_archived_trainees */
+  _purgeLog(mode, reason, n){ (this.data.audit_logs=this.data.audit_logs||[]).push({id:uid(), at:new Date().toISOString(), actor:'demo-admin', actor_role:mode==='auto'?'system':'owner', actor_name:mode==='auto'?'':'مدير النظام', action:'trainees.purge', entity:null, detail:{mode, reason:String(reason||'').slice(0,200), ...n}}); },
+  autoPurgeArchive(){ const D=this.data, days=+D.settings?.archive_retention_days||ARCHIVE_DAYS; dueForPurge(D, riyadhNow().date, days).forEach(id=>this._purgeLog('auto','انقضت مدة الحفظ بعد انتهاء الخدمة', purgeTraineeData(D, id))); },
+  async archivedTrainees(){ await this._role('full'); const D=this.data; return archiveList(D, riyadhNow().date, +D.settings?.archive_retention_days||ARCHIVE_DAYS); },
+  async deleteTrainee(id, confirm, reason){ await this._role('full'); if(!this._recent()) throw new Error('أعد إدخال كلمة المرور لتأكيد الحذف');
+    const D=this.data, t=D.trainees.find(x=>x.id===id); if(!t) throw new Error('المتدرب غير موجود'); if(!confirmNameOk(confirm, t.full_name)) throw new Error('اكتب اسم المتدرب كما هو لتأكيد الحذف');
+    if(String(reason||'').trim().length<3) throw new Error('اكتب سبب الحذف'); this._purgeLog('manual', reason, purgeTraineeData(D, id)); this.save(); return {ok:true}; },
   /* الحسابات التجريبية (البند 13) ↔ admin_create_test_trainee / admin_purge_test_trainee */
   async createTestTrainee(f){ await this._role('full'); const D=this.data, pl=(D.plans||[]).find(p=>p.id===f.plan_id&&p.mode!=='remote'); if(!pl) throw new Error('اختر باقة حضورية');
     let nid; do { nid='1'+String(Math.floor(Math.random()*1e9)).padStart(9,'0'); } while(validSaudiId(nid)||D.trainees.some(t=>t.national_id===nid));
@@ -967,7 +974,6 @@ export const CloudStore = {
   async setEnrollmentStatus(id, status){ this._e(await this.sb.from('enrollments').update({status}).eq('id',id)); },
   async deleteEnrollment(id){ this._e(await this.sb.from('enrollments').delete().eq('id',id)); },
   async setAttendance(enrollment_id, date, status){ this._e(await this.sb.rpc('set_attendance',{p_enrollment:enrollment_id, p_date:date, p_status:status})); },
-  async deleteTrainee(id){ this._e(await this.sb.from('trainees').delete().eq('id',id)); },
   async publicSite(){ const d=this._e(await this.sb.rpc('public_site'))||{}; return { about:d.about||DEFAULT_ABOUT, partners:(d.partners||[]).map(p=>({...p, order:p.sort_order})) }; },
   async savePartner(p){ const {id,order,created_at,...row}=p; row.sort_order=order||0; this._e(id ? await this.sb.from('partners').update(row).eq('id',id) : await this.sb.from('partners').insert(row)); },
   async deletePartner(id){ this._e(await this.sb.from('partners').delete().eq('id',id)); },
@@ -1028,6 +1034,8 @@ export const CloudStore = {
   async commentSubmission(id, f){ return this._e(await this.sb.rpc('teacher_comment',{p_id:id, p:f})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
   async saveMyProfile(p){ return this._e(await this.sb.rpc('teacher_save_profile',{p:checkProfile(p)})); },
+  async archivedTrainees(){ return this._e(await this.sb.rpc('admin_archived_trainees')); },
+  async deleteTrainee(id, confirm, reason){ return this._e(await this.sb.rpc('admin_delete_trainee',{p_id:id, p_confirm:confirm, p_reason:reason})); },
   async createTestTrainee(f){ return this._e(await this.sb.rpc('admin_create_test_trainee',{p:{full_name:f.full_name||'', gender:f.gender||'ذكر', plan_id:f.plan_id, phone:f.phone||''}})); },
   async purgeTestTrainee(id){ return this._e(await this.sb.rpc('admin_purge_test_trainee',{p_id:id})); },
   async saveLecture(f){ const {id, title, minutes, starts_at, youtube, subject, cohort_id, recording}=f; const yt=ytId(youtube); if(yt===null) throw new Error('رابط يوتيوب غير صحيح');
