@@ -17,6 +17,7 @@ import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
 import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
+import { NO_WINDOW } from './device_logic.js';
 import { analysisHtml } from './analysis_views.js';
 import { weeklyCard, bindWeeklyCard } from './weekly_views.js';
 import { initPwa } from './pwa.js';
@@ -67,9 +68,10 @@ function viewLogin(){
     <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">${ROLE === 'guardian' ? 'ادخل برقم هوية ابنك المسجّل في المعهد' : 'ادخل برقم هويتك المسجّل في المعهد'}</div></div></div>
     <form id="pl" class="grid pad" novalidate>
       <div class="field"><label for="pl-phone">${ROLE === 'guardian' ? 'رقم هوية المتدرب (ابنك)' : 'رقم الهوية'}</label><input class="inp num" id="pl-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="10 أرقام" autocomplete="off"></div>
-      <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق المرسل إلى جوالك</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
+      <div class="otp-show" id="otpShow" hidden aria-live="polite"></div>
+      <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
       <div class="errtxt" id="plE" role="alert"></div>
-      <button class="btn pri" id="plB">${ic('lock')} إرسال رمز التحقق</button>
+      <button class="btn pri" id="plB">${ic('lock')} رمز التحقق</button>
       ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b> (باقات)، أو <b dir="ltr">0550000003</b> (برنامج تدريبي).'}</span></div>` : ''}
     </form></div></div>`;
   const ph = $('#pl-phone'), code = $('#pl-code');
@@ -78,10 +80,13 @@ function viewLogin(){
   $('#pl').onsubmit = async e => { e.preventDefault(); const b = $('#plB'); $('#plE').textContent = '';
     try {
       if(step === 1){ if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('رقم الهوية 10 أرقام');
-        setBusy(b, true, 'جارٍ الإرسال'); const rq = await Store.requestOtp(ph.value, ROLE); setBusy(b, false);
-        $('#plCodeL').textContent = rq?.activation ? 'رمز التفعيل (من إدارة المركز)' : 'رمز التحقق أو رمز التفعيل من إدارة المركز';
-        if(!$('#plActH')) $('#otpF').insertAdjacentHTML('beforeend', `<p class="hint" id="plActH" style="margin:6px 0 0">إن كان الرقم مسجّلًا فقد صدر رمز تحقق لهذا الجهاز <b dir="ltr">${esc(rq?.device || '')}</b>. تجده في صندوق الرسائل على جهازك المعتمد سابقًا، أو اطلبه من إدارة المركز بذكر رمز الجهاز. يُكتب مرة واحدة فيُعتمد هذا الجهاز وتبقى داخلًا.</p>`);
-        step = 2; $('#otpF').hidden = false; ph.readOnly = true; b.innerHTML = `${ic('check')} دخول`; code.focus(); liveSay('أُرسل رمز التحقق'); return; }
+        setBusy(b, true, 'جارٍ التحقق'); const rq = await Store.requestOtp(ph.value, ROLE); setBusy(b, false);
+        // الرمز يظهر على هذا الجهاز وحده عند فتح الإدارة «تفعيل» الحساب، ثم يختفي بعد الدخول
+        if(!rq?.open && !demo){ $('#otpShow').hidden = true; throw new Error(NO_WINDOW); }
+        $('#otpShow').hidden = false;
+        $('#otpShow').innerHTML = rq?.code ? `<span>رمز التحقق لهذا الجهاز</span><b class="num" dir="ltr">${esc(rq.code)}</b><small>اكتبه في الخانة أدناه. لا تشاركه مع أحد.</small>`
+          : `<span>الوضع التجريبي</span><b class="num" dir="ltr">1234</b><small>${esc(NO_WINDOW)}</small>`;
+        step = 2; $('#otpF').hidden = false; ph.readOnly = true; b.innerHTML = `${ic('check')} دخول`; code.focus(); liveSay('ظهر رمز التحقق'); return; }
       if(!/^\d{4,6}$/.test(code.value)) throw new Error('اكتب رمز التحقق');
       setBusy(b, true, 'جارٍ التحقق'); await Store.portalLogin(ph.value, code.value, ROLE); render();
     } catch(x){ setBusy(b, false); if(step === 2) b.innerHTML = `${ic('check')} دخول`; $('#plE').textContent = x.message; } };

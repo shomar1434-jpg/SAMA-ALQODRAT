@@ -20,44 +20,36 @@ ok(/رقم الهوية/.test(await text('label[for=pl-phone]')) && /برقم ه
 await p.fill('#pl-phone', '123'); await p.click('#plB'); await p.waitForTimeout(200);
 ok(/رقم الهوية 10 أرقام/.test(await text('#plE')), 'رقم هوية ناقص يُرفض');
 // هوية غير مسجّلة: الرد نفسه ولا رمز
-await ask(p, 'student', '1000000008');
+const L = async (fn, ...a) => { await p.goto(U); await p.waitForTimeout(500); return p.evaluate(async ([f, args]) => await window.__SAMA__.LocalStore[f](...args), [fn, a]); };
+let r = await L('requestOtp', '1000000008', 'student');
 D = await data();
-ok(!(await p.$('#otpF[hidden]')) && /إن كان الرقم مسجّلًا/.test(await text('#otpF')) && !(D.login_requests || []).length, 'هوية غير مسجّلة: الرد نفسه دون كشف ولا رمز');
-// هوية مسجّلة: رمز لهذا الجهاز يصل إلى صندوق الحساب وإلى طلبات الدخول عند الإدارة
-await ask(p, 'student', st.national_id);
-D = await data(); const rq = D.login_requests.find(r => r.phone === st.phone && !r.used_at);
-const dev = await text('#plActH b');
-ok(rq && /^\d{6}$/.test(rq.code) && dev.length === 4 && !(await p.content()).includes(rq.code), 'يصدر رمز لهذا الجهاز ولا يظهر في صفحة الدخول');
-ok(D.notifications.some(n => n.trainee_id === st.id && n.kind === 'login_code' && n.text.includes(rq.code) && n.text.includes(dev)), 'الرمز يصل عبر المراسلات الداخلية مع رمز الجهاز');
-// جهاز آخر لا يدخل برمز هذا الجهاز
-const ctx2 = await b.newContext(); const q = await ctx2.newPage();
-await q.goto(U + 'student/'); await q.evaluate(d => localStorage.setItem('sama_qudrat_v4', d), JSON.stringify(D)); await q.reload(); await q.waitForSelector('#pl-phone');
-await q.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); D.login_requests.forEach(r => { r.keep = true; }); localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
-await q.fill('#pl-phone', st.national_id); await q.evaluate(() => { window.__skip = true; });
-await q.click('#plB'); await q.waitForTimeout(400); await q.fill('#pl-code', rq.code); await q.click('#plB'); await q.waitForTimeout(600);
-ok(/غير صحيح أو منتهٍ/.test(await text('#plE', q)), 'رمز الجهاز الأول لا يعمل على جهاز آخر');
-await ctx2.close();
-// الإدارة ترى الطلب برمز الجهاز والرمز
+ok(r.open === false && !r.code && !(D.login_requests || []).length, 'هوية غير مسجّلة: الرد نفسه دون كشف ولا رمز');
+// هوية مسجّلة بلا تفعيل مفتوح: لا رمز، وطلب تراه الإدارة بالاسم
+r = await L('requestOtp', st.national_id, 'student');
+ok(r.open === false && !r.code, 'بلا تفعيل مفتوح: لا رمز');
 const a = await ctx.newPage(); await a.goto(U + 'admin/#admin-access'); await a.waitForTimeout(500);
 if (await a.$('[name=p]')) { await a.fill('[name=p]', '1234'); await a.click('#lf button'); await a.waitForTimeout(1200); }
 await a.waitForSelector('#acReq');
-const req = await text('#acReq', a);
-ok(req.includes(rq.code) && req.includes(dev) && req.includes(st.full_name), 'الإدارة ترى طلب الدخول باسم صاحبه ورمز جهازه ورمز التحقق');
-// الدخول بالرمز
-await p.fill('#pl-code', rq.code); await p.click('#plB'); await p.waitForSelector('#sBody');
+ok((await text('#acReq', a)).includes(st.full_name) && !/\b\d{6}\b/.test(await text('#acReq', a)), 'الإدارة ترى طلب الدخول باسم صاحبه فقط');
+await a.click('#acReq [data-rq]'); await a.waitForTimeout(600);
+// بعد التفعيل: الرمز يظهر على الجهاز وحده ويُدخل به
+await ask(p, 'student', st.national_id);
+const c1 = await text('#otpShow b');
+ok(/^\d{6}$/.test(c1), 'الرمز يظهر على جهاز صاحب الحساب');
+await p.fill('#pl-code', c1); await p.click('#plB'); await p.waitForSelector('#sBody');
 D = await data();
-ok(D.devices.some(d => d.phone === st.phone && !d.revoked_at) && D.login_requests.find(r => r.id === rq.id).used_at, 'الدخول برقم الهوية والرمز يعتمد الجهاز ويستهلك الرمز');
-ok(/رمز الدخول لجهاز جديد/.test(JSON.stringify(D.notifications.filter(n => n.trainee_id === st.id))), 'الرسالة محفوظة في صندوق المتدرب');
+ok(D.devices.some(d => d.phone === st.phone && !d.revoked_at) && !(D.notifications || []).some(n => n.kind === 'login_code'), 'الدخول برقم الهوية والرمز، ولا رموز في المراسلات');
 // ولي الأمر بهوية ابنه، والمدرب بهويته
 const kid = D.trainees.find(t => t.guardian_phone && /^[12]\d{9}$/.test(t.national_id) && D.guardian_links.some(l => l.trainee_id === t.id && l.guardian_phone === t.guardian_phone && l.status === 'verified')) || null;
-if (kid) { await p.goto(U + 'guardian/'); await p.waitForTimeout(600); await ask(p, 'guardian', kid.national_id); D = await data();
-  ok(D.login_requests.some(r => r.role === 'guardian' && r.phone === kid.guardian_phone && !r.used_at), 'ولي الأمر يطلب الدخول بهوية ابنه'); }
+if (kid) { await L('openActivation', kid.guardian_phone, 'guardian', 15); r = await L('requestOtp', kid.national_id, 'guardian');
+  ok(r.open === true && /^\d{6}$/.test(r.code), 'ولي الأمر يطلب الدخول بهوية ابنه'); }
 await a.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); D.teachers[0].national_id = '1000000016'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
-await ask(p, 'teacher', '1000000016'); D = await data();
-const tr = D.login_requests.find(r => r.role === 'teacher' && !r.used_at);
-ok(tr && tr.phone === D.teachers[0].phone, 'المدرب يطلب الدخول بهويته');
-await p.fill('#pl-code', tr.code); await p.click('#plB'); await p.waitForTimeout(900);
-ok(!!(await p.$('[data-tt]')), 'المدرب يدخل بوابته بالهوية والرمز');
+D = await data();
+await L('openActivation', D.teachers[0].phone, 'teacher', 15);
+await ask(p, 'teacher', '1000000016');
+const tc = await text('#otpShow b');
+await p.fill('#pl-code', tc); await p.click('#plB'); await p.waitForTimeout(900);
+ok(/^\d{6}$/.test(tc) && !!(await p.$('[data-tt]')), 'المدرب يدخل بوابته بالهوية والرمز الظاهر على جهازه');
 
 // تعدد المسؤولين: صفحة «إدارة المسؤولين»، والإزالة تعطيل
 await a.goto(U + 'admin/#admin-admins'); await a.waitForSelector('#adF');
