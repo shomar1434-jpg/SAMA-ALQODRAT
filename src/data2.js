@@ -8,7 +8,7 @@ import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_lo
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { PUB_STATES } from './courses.js';
-import { checkLecture, lecturesForTrainees, ytId } from './studio_logic.js';
+import { checkLecture, lecturesForTrainees, ytId, checkSlot, slotLectures, assignVideos, zoomOk, channelOk } from './studio_logic.js';
 import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
 import { archiveList, dueForPurge, purgeTraineeData, confirmNameOk, ARCHIVE_DAYS } from './archive_logic.js';
@@ -405,7 +405,7 @@ export const LocalStore = {
     if(me?.role!=='owner') throw new Error('إعادة تعيين كلمات المرور للمالك الأساسي وحده'); if(!a) throw new Error('الحساب غير موجود');
     if(a.id===me.id) throw new Error('غيّر كلمة مرورك من «تغيير كلمة المرور»'); if(a.role==='owner') throw new Error('لا تُعاد كلمة مرور المالك الأساسي'); if(a.active===false) throw new Error('فعّل الحساب أولًا');
     this.audit('admins.password_reset', a.email); this.save(); return {ok:true, mode:'password', temp_password:'demo'+String(Math.floor(Math.random()*9e5)+1e5), email:a.email}; },
-  async adminData(){ this.autoArchive(); this.autoReport(); this.autoPurgeArchive(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
+  async adminData(){ this.ensureLectures(); this.autoArchive(); this.autoReport(); this.autoPurgeArchive(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
   /* تقرير اليوم: محليًا يُولَّد عند أول فتح للإدارة بعد 20:30 (لا خادم مجدول في الوضع التجريبي). سحابيًا: pg_cron */
   autoReport(){ const n=riyadhNow(), D=this.data; D.daily_reports=D.daily_reports||[]; if(isPastReportTime(n) && !D.daily_reports.some(r=>r.date===n.date)){ const r=makeReport(D, n.date, 'snapshot', '', n); if(!r.existing){ r.report.auto=true; D.daily_reports.push(r.report); } } },
   async generateReport(date, kind='snapshot', note=''){ const D=this.data; D.daily_reports=D.daily_reports||[]; const r=makeReport(D, date, kind, note); if(!r.existing){ D.daily_reports.push(r.report); this.audit('daily_report.'+r.report.kind, date); this.save(); } return r; },
@@ -587,7 +587,34 @@ export const LocalStore = {
   async portalCheckin(traineeId, code, opts={}){ const se=await this.portalSession('student'); if(!se) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا');
     const t=this.data.trainees.find(x=>x.id===traineeId && normPhone(x.phone)===normPhone(se.phone)); if(!t) throw new Error('غير مصرح');
     return this.checkin(t.national_id, code, null, {device:opts.device||'portal', choice:opts.choice}); },
-  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; if(out) out.q_meta=qMetaOf(this.data, out); return out; },
+  async portalData(role){ const s=await this.portalSession(role); if(!s) throw new Error('انتهت الجلسة، سجّل الدخول مجددًا'); this.ensureLectures(); this.autoArchive(); this.runReminders(); this.finalizeExpiredQuizzes(); const out=JSON.parse(JSON.stringify(scopeData(this.data, role, s.phone))); out.bank_assets=this.data.settings?.bank_assets||''; if(out) out.q_meta=qMetaOf(this.data, out); return this._studioScope(out, role, s.phone); },
+  /* الخطوة BC: قاعة Zoom والجدول للمدرب، ومعرّف القناة للمتدرب وولي الأمر بلا قاعات Zoom ↔ portal_data */
+  _studioScope(out, role, phone){ const D=this.data;
+    if(role==='teacher'){ const me=(D.teachers||[]).find(t=>t.active!==false&&normPhone(t.phone)===normPhone(phone)); out.zoom_url=me?.zoom_url||''; out.slots=(D.lecture_slots||[]).filter(x=>x.teacher_id===me?.id&&x.active!==false); }
+    else { out.yt_channel=D.settings?.yt_channel_id||''; if(Array.isArray(out.teachers)) out.teachers=out.teachers.map(({zoom_url, yt_tag, ...t})=>t); }
+    return out; },
+  ensureLectures(){ const D=this.data; D.lectures=D.lectures||[]; slotLectures(D, riyadhNow().date, 8, sessionOn).forEach(l=>D.lectures.push({id:uid(), ...l, created_at:new Date().toISOString(), updated_at:new Date().toISOString()})); },
+  _assignVideos(){ const D=this.data; assignVideos(D.lectures||[], D.yt_videos||[], D.teachers||[]).forEach(({video_id, lecture_id})=>{ const l=D.lectures.find(x=>x.id===lecture_id), v=D.yt_videos.find(x=>x.video_id===video_id); l.youtube_id=video_id; v.lecture_id=lecture_id; }); },
+  async adminStudio(){ const D=this.data; this.ensureLectures(); this.save();
+    return { linked:false, local:true, channel_id:D.settings?.yt_channel_id||'', channel_title:D.settings?.yt_channel_title||'', synced_at:D.settings?.yt_synced_at||null, slots:(D.lecture_slots||[]).slice(),
+      teachers:(D.teachers||[]).filter(t=>t.active!==false).map(t=>({id:t.id, full_name:t.full_name, section:t.section, subjects:t.subjects||[], zoom_url:t.zoom_url||'', yt_tag:t.yt_tag||''})),
+      cohorts:(D.cohorts||[]).filter(c=>!c.archived_at&&c.teacher_id).map(c=>({id:c.id, teacher_id:c.teacher_id, number:c.number, program:(D.programs||[]).find(p=>p.id===c.program_id)?.name||''})),
+      videos:(D.yt_videos||[]).slice().sort((a,b)=>String(b.actual_start||b.scheduled_start||'').localeCompare(String(a.actual_start||a.scheduled_start||''))) }; },
+  async saveSlot(f){ const D=this.data; D.lecture_slots=D.lecture_slots||[]; const te=(D.teachers||[]).find(t=>t.id===f.teacher_id), x=checkSlot(f, te, D.cohorts||[]), now=Date.now();
+    let s=f.id?D.lecture_slots.find(y=>y.id===f.id):null; if(f.id&&!s) throw new Error('الموعد غير موجود');
+    if(s){ Object.assign(s, x, {active:f.active===undefined?s.active:f.active!==false, updated_at:new Date().toISOString()}); D.lectures=(D.lectures||[]).filter(l=>!(l.slot_id===s.id&&Date.parse(l.starts_at)>now&&!l.youtube_id&&l.status==='scheduled')); this.audit('lecture_slots.update', s.id, {after:x}); }
+    else { s={id:uid(), ...x, created_at:new Date().toISOString()}; D.lecture_slots.push(s); this.audit('lecture_slots.insert', s.id, {after:x}); }
+    this.ensureLectures(); this.save(); return {ok:true, id:s.id}; },
+  async setTeacherStudio(id, zoom, tag){ const t=(this.data.teachers||[]).find(x=>x.id===id); if(!t) throw new Error('المدرب غير موجود'); const z=String(zoom||'').trim(); if(!zoomOk(z)) throw new Error('رابط قاعة Zoom غير صحيح');
+    t.zoom_url=z; t.yt_tag=String(tag||'').trim().slice(0,60); this.audit('teachers.update', id, {after:{zoom_url:z, yt_tag:t.yt_tag}}); this.save(); return {ok:true}; },
+  async assignVideo(videoId, lectureId){ const D=this.data, v=(D.yt_videos||[]).find(x=>x.video_id===videoId); if(!v) throw new Error('البث غير موجود');
+    (D.lectures||[]).filter(l=>l.youtube_id===videoId).forEach(l=>{ l.youtube_id=''; }); v.lecture_id=null;
+    if(lectureId){ const l=(D.lectures||[]).find(x=>x.id===lectureId&&x.status!=='cancelled'); if(!l) throw new Error('المحاضرة غير موجودة أو ملغاة'); l.youtube_id=videoId; v.lecture_id=l.id; }
+    this.save(); return {ok:true}; },
+  async setChannel(ch){ const c=String(ch||'').trim(); if(!channelOk(c)) throw new Error('معرّف القناة يبدأ بـ UC ويتكون من 24 حرفًا'); this.data.settings.yt_channel_id=c; this.save(); return {ok:true}; },
+  async ytLink(){ throw new Error('ربط القناة متاح في النسخة المتصلة بـ Supabase فقط'); },
+  async ytUnlink(){ return {ok:true}; },
+  async ytSync(){ this._assignVideos(); this.save(); return {ok:true, skipped:true, local:true}; },
   /* صندوق الوارد (الخطوة D): تنبيهات بدء الجلسة تُنشأ عند الحاجة (في السحابة: pg_cron كل دقيقة)، ومفتاح منع التكرار */
   runReminders(){ const D=this.data; D.notifications=D.notifications||[]; const keys=new Set(D.notifications.map(x=>x.dedupe_key).filter(Boolean));
     const n=riyadhNow(), add=[...sessionReminders(D, n), ...weeklyNotes(D, n).map(x=>({id:uid(), at:new Date().toISOString(), read_at:null, ...x}))].filter(x=>!keys.has(x.dedupe_key)); if(add.length){ D.notifications.push(...add); this.save(); } return add.length; },
@@ -1040,6 +1067,15 @@ export const CloudStore = {
   async purgeTestTrainee(id){ return this._e(await this.sb.rpc('admin_purge_test_trainee',{p_id:id})); },
   async saveLecture(f){ const {id, title, minutes, starts_at, youtube, subject, cohort_id, recording}=f; const yt=ytId(youtube); if(yt===null) throw new Error('رابط يوتيوب غير صحيح');
     return this._e(await this.sb.rpc('teacher_save_lecture',{p:{id:id||null, title, minutes:+minutes, starts_at:new Date(starts_at).toISOString(), youtube_id:yt||'', subject:cohort_id?null:subject, cohort_id:cohort_id||null, recording:recording!==false}})); },
+  async adminStudio(){ return this._e(await this.sb.rpc('admin_studio_data')); },
+  async saveSlot(f){ return this._e(await this.sb.rpc('admin_save_slot',{p:{id:f.id||null, teacher_id:f.teacher_id, title:f.title, subject:f.subject||null, cohort_id:f.cohort_id||null, dow:f.dow, start_time:f.start_time, minutes:+f.minutes, recording:f.recording!==false, active:f.active!==false}})); },
+  async setTeacherStudio(id, zoom, tag){ return this._e(await this.sb.rpc('admin_set_teacher_studio',{p_teacher:id, p_zoom:String(zoom||'').trim(), p_tag:String(tag||'').trim()})); },
+  async assignVideo(videoId, lectureId){ return this._e(await this.sb.rpc('admin_assign_video',{p_video:videoId, p_lecture:lectureId||null})); },
+  async setChannel(ch){ return this._e(await this.sb.rpc('admin_set_channel',{p_channel:String(ch||'').trim()})); },
+  async _yt(body){ const {data, error}=await this.sb.functions.invoke('youtube',{body}); if(error){ let m=''; try{ m=(await error.context.json()).error||''; }catch(e){} throw new Error(m||'تعذّر الاتصال بخدمة يوتيوب'); } return data; },
+  async ytLink(){ const r=await this._yt({action:'auth_url', return_to:adminBase()}); return r.url; },
+  async ytUnlink(){ return this._yt({action:'unlink'}); },
+  async ytSync(force=false){ try{ return await this._yt({action:'sync', force}); }catch(e){ if(force) throw e; return {ok:false}; } },
   async setLectureStatus(id, status){ return this._e(await this.sb.rpc('teacher_set_lecture',{p_id:id, p_status:status})); },
   async adminLectures(){ return this._e(await this.sb.rpc('admin_lectures'))||[]; },
   async saveGroup(g){ return this._e(await this.sb.rpc('teacher_save_group',{p:{id:g.id||null, name:String(g.name||'').trim(), trainee_ids:g.trainee_ids||[]}})); },
