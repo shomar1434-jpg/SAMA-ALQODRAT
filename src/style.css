@@ -1397,3 +1397,49 @@ body.sim-on{overflow:hidden}
 .otp-show{display:grid;gap:4px;justify-items:center;text-align:center;padding:12px;border-radius:14px;background:var(--brand-tint);border:1px dashed var(--brand)}
 .otp-show b{font-size:30px;letter-spacing:6px;color:var(--brand-strong)}
 .otp-show span{font-weight:600}.otp-show small{font-size:13px;opacity:.8}
+
+/* ---------- عرض الجوال (17 نوفمبر): الشريط العلوي بسطرين، والشعارات في صف واحد بلا مربعات بيضاء ليلًا،
+   والتبويبات تتمرر بدل التراكب، وبطاقات المؤشرات عمودان، وزر الدليل أيقونة ---------- */
+@media(max-width:860px){
+  .topbar .in{flex-wrap:wrap;row-gap:6px;padding-top:8px;padding-bottom:6px}
+  .brand{order:0;flex:1 1 auto;min-width:0}
+  .brand .brand-t{display:block!important;min-width:0}
+  .brand-t b:first-child{font-size:12px}
+  .brand-t b:last-child{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand img{height:44px}
+  .nav{order:9;flex:1 0 100%!important;min-width:0;margin:0!important;overflow-x:auto;flex-wrap:nowrap;gap:4px;padding:2px 0 4px!important;
+    scrollbar-width:none;-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 24px),transparent)}
+  .nav::-webkit-scrollbar{display:none}
+  .nav a{flex:0 0 auto;padding:0 12px;min-height:40px;font-size:13.5px}
+  .nav a:last-child{margin-inline-end:20px}
+}
+@media(max-width:360px){.brand-t b:first-child{display:none}.brand img{height:40px}.brand-t b:last-child{font-size:13.5px}}
+
+/* الشعارات الرسمية: صف واحد بارتفاع بصري متناسق؛ حاويات بلا خلفية في الوضع الليلي (الشعارات شفافة أصلًا) */
+.cover-logos{flex-wrap:nowrap;gap:clamp(8px,3vw,24px)}
+.cover-logos span{padding:6px clamp(6px,2.4vw,22px);min-width:0;flex:0 1 auto}
+.cover-logos img{height:clamp(44px,11vw,84px);max-width:100%;object-fit:contain}
+.cover-logos .main img{height:clamp(52px,13vw,100px)}
+[data-theme="dark"] .cover-logos span{background:transparent;margin:0;border-radius:0;border-inline-start:1px solid var(--border)}
+[data-theme="dark"] .cover-logos span:first-child{border:0}
+[data-theme="dark"] .sf-logo,[data-theme="dark"] .sf-acc span{background:transparent;box-shadow:none;padding-inline:0}
+.sf-acc{grid-auto-flow:column;grid-auto-columns:1fr;align-items:center}
+.sf-acc img{height:clamp(44px,12vw,72px);object-fit:contain}
+@media(max-width:400px){.cover-logos span{padding-inline:4px}.cover-logos{gap:6px}}
+
+/* التبويبات على الجوال: سطر واحد يتمرر أفقيًا، ولا تتقلص النصوص فوق بعضها */
+@media(max-width:640px){
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs .tab{flex:1 0 auto;min-width:max-content;white-space:nowrap;padding:0 12px}
+  .kpis[style]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .guide-fab{padding:0;width:48px;justify-content:center;border-radius:50%}
+  .guide-fab span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+.lg-d{display:none!important}
+[data-theme="dark"] .lg-l{display:none!important}
+[data-theme="dark"] .lg-d{display:block!important}
+/* أيقونة حالة قاعدة البيانات ليست زرًا: أصغر على الشاشات الضيقة ليبقى الشريط سطرًا واحدًا */
+@media(max-width:400px){.dbst{width:30px;height:30px}.dbst .ic{width:16px;height:16px}.topbar .in{gap:5px}.brand{gap:7px}}
+@media(max-width:860px){.brand{flex:1 1 0}}
+@media(max-width:400px){.brand-t b:last-child{white-space:normal;line-height:1.2}}

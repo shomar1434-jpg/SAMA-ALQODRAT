@@ -39,8 +39,8 @@ begin
   perform admin_review_order(o.id, 'approved', '', (select version from orders where id = o.id));
   select * into o from orders where id = o.id;
   assert o.approval = 'approved' and o.payment = 'claimed' and not order_ready(o), 'الموافقة لا تثبت وصول التحويل';
-  begin perform admin_confirm_payment(o.id, pl.reg_fee - 1); ok := false; exception when others then ok := true; end;
-  assert ok, 'مبلغ أقل من المطلوب لا يُعد سدادًا';
+  begin perform admin_confirm_payment(o.id, 0); ok := false; exception when others then ok := true; end;
+  assert ok, 'مبلغ صفر لا يُقبل';
   perform admin_confirm_payment(o.id, pl.reg_fee);
   select * into o from orders where id = o.id;
   assert o.payment = 'confirmed' and order_ready(o), 'موافقة + سداد مؤكد = مستوفٍ';

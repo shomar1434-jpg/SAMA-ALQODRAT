@@ -218,7 +218,7 @@ function tabSubs(){
       <select class="inp" id="qp" aria-label="الباقة" style="width:auto"><option value="all">كل الباقات</option>${(D.plans || []).map(p => `<option value="${p.id}" ${qf.plan === p.id ? 'selected' : ''}>${esc(planName(p))}</option>`).join('')}</select>
       <select class="inp" id="qs" aria-label="القسم" style="width:auto"><option value="all">البنون والبنات</option>${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${qf.section === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <select class="inp" id="qst" aria-label="الحالة" style="width:auto">${[['live', 'القائمة'], ['all', 'الكل'], ...Object.entries(SUB_STATUS)].map(([k, v]) => `<option value="${k}" ${qf.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <button class="btn sm" id="qx">${ic('copy')} Excel</button>${rows.length ? `<button class="btn sm" id="qBS">${ic('calendar')} تاريخ البداية للمعروضين</button>` : ''}</div>
+      <button class="btn sm" id="qx">${ic('copy')} Excel</button>${rows.length ? `<button class="btn sm" id="qBS">${ic('calendar')} تواريخ الباقة للمعروضين</button>` : ''}</div>
     ${hidden ? `<p class="alert t-info" style="margin:0 0 12px"><span class="aic">${ic('search')}</span><span>${fmtNum(hidden)} ${hidden === 1 ? 'نتيجة مطابقة مخفية' : 'نتائج مطابقة مخفية'} لأن حالتها ${hiddenSt.join(' أو ')} (التصفية الآن: «${qf.status === 'live' ? 'القائمة' : SUB_STATUS[qf.status] || 'الكل'}»). <button class="btn sm" id="qAllSt">عرض كل الحالات</button></span></p>` : ''}
     ${rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الباقة</th><th>القسم</th><th>الحالة</th><th>البداية – النهاية</th><th>الحضور</th><th>المدة</th><th></th></tr></thead><tbody>
       ${rows.map(({ s, t, st }) => `<tr><td><b style="font-weight:500">${esc(t?.full_name || '—')}</b><div class="hint" dir="ltr" style="text-align:right">${esc(t?.national_id || '')}</div></td>
@@ -268,34 +268,54 @@ function tabToday(){
 }
 
 /* سجل اشتراك: الأيام المنعقدة مع الحضور، وتعديل يدوي موثّق */
-/* تاريخ بداية الباقة مرن (الخطوة AN): يُعدَّل لأي اشتراك ولو قبل تاريخ سابق، وتُحسب النهاية للباقة تلقائيًا */
-const saveStart = (s, date) => Store.saveSubscription({ id:s.id, trainee_id:s.trainee_id, plan_id:s.plan_id, section:s.section, start_date:date || null, prior_absences:s.prior_absences || 0 });
-const startEditor = (s, D) => { const pl = (D.plans || []).find(p => p.id === s.plan_id), today = riyadhNow().date;
-  return `<div class="sd-start"><div class="field" style="margin:0"><label for="sdStart">تاريخ بداية الباقة</label><input class="inp" type="date" id="sdStart" value="${s.start_date || ''}" max="${today}"></div>
-    <div class="sd-end hint" id="sdEnd">${s.start_date && pl ? `النهاية: ${fmtDate(subEnd(pl, s.start_date))}` : 'اختر يوم البداية'}</div>
-    <button class="btn sm pri" id="sdSv" type="button">${ic('check')} حفظ التاريخ</button></div>`; };
+/* تاريخ بداية الباقة ونهايتها (الخطوة AN، وقرار المالك 17 نوفمبر): يُعدَّلان لأي اشتراك؛ النهاية الفارغة تُحسب للباقة.
+   الاشتراك الجديد يبقى «بانتظار أول حضور» وتبدأ الباقة من أول تحضير بالباركود. */
+const saveDates = (s, start, end) => Store.saveSubscription({ id:s.id, trainee_id:s.trainee_id, plan_id:s.plan_id, section:s.section, start_date:start || null, end_date:(start && end) || null, prior_absences:s.prior_absences || 0 });
+const planOf = (D, s) => (D.plans || []).find(p => p.id === s.plan_id);
+const autoEnd = (pl, start) => start && pl ? subEnd(pl, start) : '';
+const startEditor = (s, D) => { const pl = planOf(D, s), auto = autoEnd(pl, s.start_date), custom = s.start_date && s.end_date && s.end_date !== auto;
+  return `<div class="sd-start"><div class="field" style="margin:0"><label for="sdStart">تاريخ بداية الباقة</label><input class="inp" type="date" id="sdStart" value="${s.start_date || ''}"></div>
+    <div class="field" style="margin:0"><label for="sdEndI">تاريخ نهاية الباقة</label><input class="inp" type="date" id="sdEndI" value="${s.start_date ? (s.end_date || auto) : ''}"></div>
+    <div class="sd-end hint" id="sdEnd">${s.start_date ? (custom ? `نهاية مخصّصة؛ المحسوبة للباقة ${fmtDate(auto)}` : 'النهاية محسوبة للباقة') : 'بانتظار أول حضور، أو اختر يوم البداية'}</div>
+    <button class="btn sm pri" id="sdSv" type="button">${ic('check')} حفظ التاريخين</button></div>`; };
 function bindStart(s, D, after){
-  const pl = (D.plans || []).find(p => p.id === s.plan_id);
-  $('#sdStart').onchange = e => { $('#sdEnd').textContent = e.target.value && pl ? `النهاية: ${fmtDate(subEnd(pl, e.target.value))}` : 'اختر يوم البداية'; };
-  $('#sdSv').onclick = async e => { const b = e.currentTarget, v = $('#sdStart').value; setBusy(b, true, 'جارٍ الحفظ');
-    try { await saveStart(s, v); await reloadAD(); toast('حُفظ تاريخ البداية'); after(); } catch(x){ setBusy(b, false); toast(x.message); } };
+  const pl = planOf(D, s);
+  $('#sdStart').onchange = e => { const a = autoEnd(pl, e.target.value); $('#sdEndI').value = a; $('#sdEnd').textContent = a ? 'النهاية محسوبة للباقة، ويمكن تعديلها' : 'اختر يوم البداية'; };
+  $('#sdEndI').onchange = e => { const a = autoEnd(pl, $('#sdStart').value); $('#sdEnd').textContent = e.target.value && e.target.value !== a ? `نهاية مخصّصة؛ المحسوبة للباقة ${fmtDate(a)}` : 'النهاية محسوبة للباقة'; };
+  $('#sdSv').onclick = async e => { const b = e.currentTarget, v = $('#sdStart').value, en = $('#sdEndI').value;
+    if(v && en && en < v){ toast('تاريخ النهاية قبل تاريخ البداية'); return; }
+    setBusy(b, true, 'جارٍ الحفظ');
+    try { await saveDates(s, v, en && en !== autoEnd(pl, v) ? en : ''); await reloadAD(); toast('حُفظ التاريخان'); after(); } catch(x){ setBusy(b, false); toast(x.message); } };
 }
-/* تعديل تاريخ البداية لكل الاشتراكات المعروضة بالتصفية الحالية */
+/* تعديل البداية أو النهاية لكل الاشتراكات المعروضة بالتصفية الحالية: معاينة أولًا ثم تطبيق */
 function bulkStartModal(rows){
-  const today = riyadhNow().date;
-  modal(`<h3>${ic('calendar')} تاريخ البداية للمعروضين</h3>
-    <p class="hint" style="margin:-4px 0 12px">يُطبَّق على ${fmtNum(rows.length)} اشتراكًا الظاهرة الآن بالتصفية الحالية (الباقة، القسم، الحالة، البحث)، وتُحسب نهاية كل اشتراك لباقته. الملغاة لا تتغير.</p>
-    <div class="field"><label for="bsD">تاريخ البداية</label><input class="inp" type="date" id="bsD" max="${today}"></div>
-    <div class="errtxt" id="bsE" role="alert"></div><p class="hint" id="bsP" aria-live="polite"></p>
-    <div style="display:flex;gap:8px;justify-content:end"><button class="btn" id="bsX">إلغاء</button><button class="btn pri" id="bsS">${ic('check')} تطبيق</button></div>`);
+  const list = rows.filter(r => r.s.status !== 'cancelled');
+  modal(`<h3>${ic('calendar')} تواريخ الباقة للمعروضين</h3>
+    <p class="hint" style="margin:-4px 0 12px">يُطبَّق على ${fmtNum(list.length)} اشتراكًا الظاهرة الآن بالتصفية الحالية (الباقة، القسم، الحالة، البحث). الملغاة لا تتغير. اعرض المعاينة قبل التطبيق.</p>
+    <div class="field"><label for="bsK">ما الذي يتغيّر؟</label><select class="inp" id="bsK"><option value="start">تاريخ البداية (والنهاية تُحسب لكل باقة)</option><option value="end">تاريخ النهاية فقط (للاشتراكات التي بدأت)</option></select></div>
+    <div class="field"><label for="bsD">التاريخ</label><input class="inp" type="date" id="bsD"></div>
+    <div class="errtxt" id="bsE" role="alert"></div><div id="bsV"></div><p class="hint" id="bsP" aria-live="polite"></p>
+    <div style="display:flex;gap:8px;justify-content:end;flex-wrap:wrap"><button class="btn" id="bsX">إلغاء</button><button class="btn" id="bsR">${ic('eye')} معاينة</button><button class="btn pri" id="bsS" disabled>${ic('check')} تطبيق</button></div>`);
   $('#bsX').onclick = closeModal;
-  $('#bsS').onclick = async e => { const v = $('#bsD').value, b = e.currentTarget; $('#bsE').textContent = '';
-    if(!v){ $('#bsE').textContent = 'اختر تاريخ البداية'; return; }
-    const list = rows.filter(r => r.s.status !== 'cancelled'); setBusy(b, true, 'جارٍ التطبيق'); let done = 0; const fails = [];
-    for(const r of list){ try { await saveStart(r.s, v); done++; } catch(x){ fails.push(`${r.t?.full_name || ''}: ${x.message}`); } $('#bsP').textContent = `تم ${fmtNum(done)} من ${fmtNum(list.length)}`; }
+  const plan = () => { const k = $('#bsK').value, v = $('#bsD').value;
+    return list.map(r => { const pl = planOf(AD, r.s), cur = { start:r.s.start_date, end:r.s.end_date };
+      if(k === 'start') return { r, cur, next:{ start:v, end:autoEnd(pl, v) } };
+      if(!r.s.start_date) return { r, cur, skip:'لم تبدأ بعد' };
+      if(v < r.s.start_date) return { r, cur, skip:'قبل تاريخ البداية' };
+      return { r, cur, next:{ start:r.s.start_date, end:v } }; }); };
+  const reset = () => { $('#bsS').disabled = true; $('#bsV').innerHTML = ''; };
+  $('#bsK').onchange = reset; $('#bsD').onchange = reset;
+  $('#bsR').onclick = () => { $('#bsE').textContent = ''; if(!$('#bsD').value){ $('#bsE').textContent = 'اختر التاريخ'; return; }
+    const pv = plan(), go = pv.filter(x => x.next && (x.next.start !== x.cur.start || x.next.end !== x.cur.end)), skip = pv.filter(x => x.skip);
+    $('#bsV').innerHTML = `<p class="hint">سيتغيّر ${fmtNum(go.length)}، ويُستثنى ${fmtNum(skip.length)}، ولا تغيير على ${fmtNum(pv.length - go.length - skip.length)}.</p>
+      <div class="tbl-wrap" style="max-height:240px;overflow:auto"><table class="tbl" id="bsT"><thead><tr><th>المشترك</th><th>الحالي</th><th>الجديد</th></tr></thead><tbody>${pv.map(x => `<tr><td>${esc(x.r.t?.full_name || '')}</td><td class="num">${x.cur.start ? `${fmtDate(x.cur.start)} ← ${fmtDate(x.cur.end)}` : 'بانتظار أول حضور'}</td><td class="num">${x.skip ? `<span class="hint">${x.skip}</span>` : `${fmtDate(x.next.start)} ← ${fmtDate(x.next.end)}`}</td></tr>`).join('')}</tbody></table></div>`;
+    $('#bsS').disabled = !go.length; };
+  $('#bsS').onclick = async e => { const b = e.currentTarget, k = $('#bsK').value, go = plan().filter(x => x.next && (x.next.start !== x.cur.start || x.next.end !== x.cur.end));
+    setBusy(b, true, 'جارٍ التطبيق'); let done = 0; const fails = [];
+    for(const x of go){ try { await saveDates(x.r.s, x.next.start, k === 'end' ? x.next.end : ''); done++; } catch(err){ fails.push(`${x.r.t?.full_name || ''}: ${err.message}`); } $('#bsP').textContent = `تم ${fmtNum(done)} من ${fmtNum(go.length)}`; }
     await reloadAD(); setBusy(b, false);
     if(fails.length){ $('#bsE').innerHTML = fails.slice(0, 8).map(esc).join('<br>'); toast(`طُبّق على ${fmtNum(done)}، وتعذّر ${fmtNum(fails.length)}`); }
-    else { closeModal(); toast(`طُبّق تاريخ البداية على ${fmtNum(done)} اشتراكًا`); } tabSubs(); };
+    else { closeModal(); toast(`حُدّثت تواريخ ${fmtNum(done)} اشتراكًا`); } tabSubs(); };
 }
 function subDetail(id){
   const D = AD, n = riyadhNow(), s = (D.subscriptions || []).find(x => x.id === id); if(!s) return;
