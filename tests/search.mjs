@@ -38,7 +38,7 @@ await p.goto(U + 'admin/#admin-access'); await p.waitForTimeout(900);
 await typeSlow('#ac-q', two);
 ok((await p.inputValue('#ac-q')) === two, 'بحث تفعيل الأجهزة يقبل المسافة');
 // نتائج تخفيها تصفية الحالة: تنبيه وزر «عرض كل الحالات»
-await p.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const s = D.subscriptions.find(x => x.start_date); s.status = 'ended'; s.start_date = '2025-11-01'; s.end_date = '2026-01-01'; s.track_from = null;
+await p.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const s = D.subscriptions.find(x => x.start_date); s.status = 'ended'; const dd = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10); s.start_date = dd(80); s.end_date = dd(20); s.track_from = null; /* داخل مدة الحفظ (90 يومًا) فلا يُحذف آليًا */
   const t = D.trainees.find(x => x.id === s.trainee_id); t.full_name = 'اسيل مصعب علي دقدقي'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
 await p.reload(); await p.waitForTimeout(700); await p.goto(U + 'admin/#admin-qudurat'); await p.waitForTimeout(900);
 await p.selectOption('#qsc', 'family'); await p.waitForTimeout(300);
