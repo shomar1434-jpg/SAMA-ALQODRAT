@@ -10,7 +10,7 @@ export const ROLE_HINT = {
 export const isFull = role => role === 'owner' || role === 'full';
 export const isOwner = role => role === 'owner';
 /* صفحات لا يراها إلا من له الدور المطلوب */
-export const PAGE_ROLE = { 'admin-settings':'full', 'admin-admins':'full', 'admin-audit':'owner' };
+export const PAGE_ROLE = { 'admin-settings':'full', 'admin-admins':'full', 'admin-archive':'full', 'admin-audit':'owner' };
 export const canSeePage = (role, page) => { const need = PAGE_ROLE[page]; return !need || (need === 'owner' ? isOwner(role) : isFull(role)); };
 
 /* قواعد إدارة المسؤولين (الواجهة؛ والخادم يطبّقها نفسها) */
