@@ -2,7 +2,7 @@
    واجهات الجانب التعليمي داخل البوابات: الواجبات، وقياس المستوى وبنك الأسئلة،
    والمراسلة، وتقييم المدرب بالنجوم.
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort, riyadhNow, addDays } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, riyadhNow, addDays, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
@@ -65,7 +65,12 @@ export function qStem(q, thumb){
   const src = q.image ? assetUrl(q.image, ASSETS) : '', pg = q.page_image ? assetUrl(q.page_image, ASSETS) : '';
   return q.image ? `<span class="qimg ${thumb ? 'th' : ''}">${src ? `<img src="${esc(src)}" alt="سؤال مصوَّر ${esc(q.code || '')}" loading="lazy">` : `<span class="hint">صورة السؤال ${esc(q.code || '')} غير متاحة (لم يُضبط مسار تخزين صور البنك)</span>`}${!thumb && pg ? `<a class="linkbtn" href="${esc(pg)}" target="_blank" rel="noopener">عرض صفحة القطعة</a>` : ''}</span>${q.text ? `<p>${esc(q.text)}</p>` : ''}` : `<p>${esc(q.text)}</p>`;
 }
-function quizHtml(a){
+/* ملاحظات المدرب بعد التسليم: العامة، ولكل سؤال برقمه */
+const fbHtml = (a, sb) => { if(!sb || (!sb.teacher_note && !sb.comments)) return ''; const idx = Object.fromEntries((a.quiz || []).map((q, i) => [q.id, i + 1]));
+  return `<div class="alert t-info fb-box" style="margin:8px 0 0"><span class="aic">${ic('chat')}</span><div style="flex:1"><b>ملاحظات المدرب</b>${sb.teacher_note ? `<p style="margin:4px 0">${esc(sb.teacher_note)}</p>` : ''}
+    ${Object.entries(sb.comments || {}).sort((x, y) => (idx[x[0]] || 999) - (idx[y[0]] || 999)).map(([id, t]) => `<p class="fb-q">${idx[id] ? `السؤال ${fmtNum(idx[id])}: ` : ''}${esc(t)}</p>`).join('')}</div></div>`; };
+function quizHtml(a){ const fb = fbHtml(a, a.submission); return fb + quizCore(a); }
+function quizCore(a){
   const sb = a.submission, done = sb?.status === 'graded' && sb.review;
   const left = attemptsLeft(a, sb);
   if(left) return `<div class="alert t-info" style="margin:8px 0 0"><span class="aic">${ic('check')}</span><div style="flex:1"><span>سُلّم الاختبار: ${esc(sb.feedback || '')} · درجتك ${fmtNum(sb.score ?? 0)} من ${fmtNum(a.max_score)}.</span>
@@ -163,7 +168,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
       return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> ${a.type && a.type !== 'homework' ? `<span class="pill ${a.type === 'exam' ? 'warn' : 'g'}">${HW_TYPES[a.type]}</span> ` : ''}${a.kind === 'quiz' ? `<span class="pill info">اختبار · ${fmtNum(a.quiz?.length || 0)} أسئلة${attemptsOf(a) > 1 ? ` · ${fmtNum(attemptsOf(a))} محاولات` : ''}</span> ` : ''}${Array.isArray(a.targets) ? `<span class="pill g">${esc(a.target_label || '')}</span> ` : ''}<span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(Array.isArray(a.targets) ? a.targets.length : students)}</span></summary>
         ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
           <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${a.kind === 'quiz' ? esc(s.feedback || '') : esc(s.answer || '')}</td>
-          <td>${a.kind === 'quiz' ? `<b class="num">${fmtNum(s.score ?? 0)} / ${fmtNum(a.max_score)}</b> <span class="hint">آلي</span>` : ['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
+          <td>${a.kind === 'quiz' ? `<b class="num">${fmtNum(s.score ?? 0)} / ${fmtNum(a.max_score)}</b> <span class="hint">آلي</span>${s.status !== 'draft' ? ` <button class="btn sm" data-fb="${s.id}">${ic('chat')} ${s.teacher_note || s.comments ? 'ملاحظاتك' : 'مراجعة وتغذية راجعة'}</button>` : ''}` : ['submitted', 'needs_revision', 'graded'].includes(s.status) ? `<button class="btn sm" data-gr="${s.id}">${ic('edit')} ${s.status === 'graded' ? fmtNum(s.score ?? 0) + '/' + fmtNum(a.max_score) : 'تصحيح'}</button>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">لا تسليمات بعد.</p>'}</details>`; }).join('') : emptyBox('لم تنشر واجبات بعد')}</div>`,
   bind(){ if(HW_PRESET) queueMicrotask(() => $('#hwAdd')?.click());
     $('#hwAdd').onclick = () => { const n = riyadhNow();
       modal(`<h3>واجب جديد</h3><form id="hf" class="grid g2" novalidate>
@@ -172,15 +177,21 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
           <label class="chk"><input type="radio" name="kind" value="text" checked> واجب كتابي</label><label class="chk"><input type="radio" name="kind" value="quiz"> اختبار من بنك أسئلتي (يُصحَّح آليًا)</label></div></fieldset>
         <div class="field"><label for="hf-ty">النوع</label><select class="inp" id="hf-ty" name="type">${Object.entries(HW_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="field"><label for="hf-tg">المستهدفون</label><select class="inp" id="hf-tg"><option value="all">كل متدربي المقرر</option><option value="plan">باقة معينة</option>${(D.groups || []).length ? '<option value="group">مجموعة محفوظة</option>' : ''}<option value="pick">أفراد بعينهم</option></select></div>
-        <div data-tgp hidden style="grid-column:1/-1"><div class="field" id="hfTgPlanF" hidden><label for="hf-tp">الباقة</label><select class="inp" id="hf-tp"></select></div><div class="field" id="hfTgGrpF" hidden><label for="hf-gp">المجموعة</label><select class="inp" id="hf-gp">${(D.groups || []).map(g => `<option value="${g.id}">${esc(g.name)} (${fmtNum(g.trainee_ids.length)})</option>`).join('')}</select></div><div class="qpick" id="hfTgList" hidden></div><p class="hint" id="hfTgN" style="margin:6px 0 0"></p></div>
+        <div data-tgp hidden style="grid-column:1/-1"><div class="field" id="hfTgPlanF" hidden><label for="hf-tp">الباقة</label><select class="inp" id="hf-tp"></select></div><div class="field" id="hfTgGrpF" hidden><label for="hf-gp">المجموعة</label><select class="inp" id="hf-gp">${(D.groups || []).map(g => `<option value="${g.id}">${esc(g.name)} (${fmtNum(g.trainee_ids.length)})</option>`).join('')}</select></div><div class="qb-row" id="hfTgTools" hidden><div class="field" style="margin:0"><label for="hfTgQ">بحث بالاسم</label><input class="inp" id="hfTgQ" type="search"></div><button type="button" class="btn sm" id="hfTgAll">تحديد الظاهرين</button><button type="button" class="btn sm" id="hfTgNone">إلغاء التحديد</button></div><div class="qpick" id="hfTgList" hidden></div><p class="hint" id="hfTgN" style="margin:6px 0 0"></p></div>
         <div class="field" data-qk hidden><label for="hf-rv">إظهار الإجابات الصحيحة للمتدرب</label><select class="inp" id="hf-rv" name="reveal">${Object.entries(REVEAL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
         <div class="field" data-qk hidden><label for="hf-at">عدد المحاولات المسموحة</label><select class="inp" id="hf-at" name="max_attempts">${Array.from({ length:MAX_ATTEMPTS }, (_, i) => `<option value="${i + 1}">${i === 0 ? 'محاولة واحدة' : i === 1 ? 'محاولتان' : fmtNum(i + 1) + ' محاولات'}</option>`).join('')}</select></div>
-        <div class="field" data-qk hidden><label for="hf-u">الوحدة أو النموذج</label><select class="inp" id="hf-u" name="unit"></select></div>
-        <div class="field" data-qk hidden><label for="hf-m">طريقة اختيار الأسئلة</label><select class="inp" id="hf-m"><option value="rand">عشوائي بعدد محدد</option><option value="pick">أنتقي الأسئلة بنفسي</option></select></div>
-        <div data-qpk hidden style="grid-column:1/-1"><div class="field"><label for="hf-k">القسم داخل الوحدة</label><select class="inp" id="hf-k"></select></div><div class="qpick" id="hfPick"></div><p class="hint" id="hfPn" style="margin:6px 0 0"></p></div>
-        <div class="field" data-qk hidden><label for="hf-n">عدد الأسئلة</label><select class="inp" id="hf-n" name="count">${[5, 10, 15, 20, 30].map(n => `<option ${n === 10 ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="qb" data-qk hidden style="grid-column:1/-1">
+          <fieldset class="field" style="border:0;padding:0;margin:0"><legend style="font-weight:500;font-size:13.5px;margin-bottom:6px">الأقسام والنماذج (اختر قسمًا أو أكثر ليكون الاختبار شاملًا)</legend><div class="qb-units" id="hfUnits"></div></fieldset>
+          <div class="qb-row"><div class="field" style="margin:0"><label for="hf-n">عدد الأسئلة</label><input class="inp num" id="hf-n" name="count" type="number" min="1" max="100" value="10" inputmode="numeric"></div>
+            <button type="button" class="btn" id="hfDraw">${ic('refresh')} سحب عشوائي من الأقسام المحددة</button></div>
+          <details class="qb-man"><summary>أو انتقِ الأسئلة بنفسك</summary>
+            <div class="qb-row"><div class="field" style="margin:0"><label for="hf-k">المهارة داخل الأقسام</label><select class="inp" id="hf-k"></select></div><div class="field" style="margin:0"><label for="hf-q">بحث</label><input class="inp" id="hf-q" type="search" placeholder="رمز السؤال أو نصه"></div></div>
+            <div class="qpick" id="hfPick"></div></details>
+          <div class="qb-sel"><div class="qb-head"><b id="hfPn">لم تُختر أسئلة بعد</b><span style="flex:1"></span><button type="button" class="btn sm" id="hfClr">${ic('x')} تفريغ</button><button type="button" class="btn sm pri" id="hfPv">${ic('eye')} معاينة</button></div><ol class="qb-list" id="hfSel"></ol></div>
+          <div class="qb-prev" id="hfPrev" hidden><div class="seg" role="tablist"><button type="button" role="tab" class="on" data-pv="t" aria-selected="true">كما يراه المدرب</button><button type="button" role="tab" data-pv="s" aria-selected="false">كما يراه المتدرب</button></div><div id="hfPrevB"></div></div>
+          <p class="hint" style="margin:0">إن لم تختر أسئلة يُسحب العدد المحدد عشوائيًا عند النشر. الحد 100 سؤال.</p></div>
         <div class="field"><label for="hf-s">المقرر</label><select class="inp" id="hf-s" name="subject">${me.subjects.map(s => `<option>${s}</option>`).join('')}</select></div>
-        <div class="field"><label for="hf-m">الدرجة العظمى</label><input class="inp num" id="hf-m" name="max_score" type="number" min="1" value="10"></div>
+        <div class="field"><label for="hf-ms">الدرجة العظمى</label><input class="inp num" id="hf-ms" name="max_score" type="number" min="1" value="10"></div>
         <div class="field"><label for="hf-p">تاريخ النشر</label><input class="inp" type="date" id="hf-p" name="publish_date" value="${n.date}"></div>
         <div class="field"><label for="hf-d">تاريخ الاستحقاق</label><input class="inp" type="date" id="hf-d" name="due_date" value="${addDays(n.date, 3)}"></div>
         <div class="field" style="grid-column:1/-1"><label for="hf-b">التعليمات</label><textarea class="inp" id="hf-b" name="body" rows="4" style="padding:10px 14px;line-height:1.8"></textarea></div>
@@ -188,34 +199,72 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
         <div class="errtxt" id="hfE" style="grid-column:1/-1"></div>
         <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="hfC">إلغاء</button><button class="btn pri" id="hfS">${ic('check')} نشر</button></div></form>`);
       $('#hfC').onclick = closeModal;
-      const pub = (D.questions || []).filter(q => q.status === 'published'), units = () => { const sub = $('#hf-s').value, us = {};
-          pub.filter(q => q.subject === sub).forEach(q => us[q.unit] = (us[q.unit] || 0) + 1);
-          $('#hf-u').innerHTML = `<option value="">كل الوحدات (${fmtNum(pub.filter(q => q.subject === sub).length)})</option>` + Object.entries(us).map(([u, n]) => `<option value="${esc(u)}">${esc(u)} (${fmtNum(n)})</option>`).join(''); };
+      const pub = (D.questions || []).filter(q => q.status === 'published');
       /* المستهدفون: قائمة ثابتة وقت الإرسال (باقة أو أفراد)، من متدربي القسم والمقرر باشتراك قائم */
       const tgPicked = new Set(), eligible = () => { const sub = $('#hf-s').value; return (D.trainees || []).map(t => ({ t, subs:(D.subscriptions || []).filter(s => s.trainee_id === t.id && (s.subjects || []).includes(sub) && ['pending', 'active'].includes(subStatus(s))) })).filter(x => x.subs.length); };
       const tgIds = () => { const m = $('#hf-tg').value; const gp = m === 'group' ? (D.groups || []).find(g => g.id === $('#hf-gp').value) : null; return m === 'all' ? null : m === 'group' ? eligible().filter(x => gp?.trainee_ids.includes(x.t.id)).map(x => x.t.id) : m === 'plan' ? eligible().filter(x => x.subs.some(s => s.plan_id === $('#hf-tp').value)).map(x => x.t.id) : eligible().filter(x => tgPicked.has(x.t.id)).map(x => x.t.id); };
-      const tgDraw = () => { const m = $('#hf-tg').value, el = eligible(); $('[data-tgp]').hidden = m === 'all'; $('#hfTgPlanF').hidden = m !== 'plan'; $('#hfTgGrpF').hidden = m !== 'group'; $('#hfTgList').hidden = m !== 'pick';
+      const tgDraw = () => { const m = $('#hf-tg').value, el = eligible(); $('[data-tgp]').hidden = m === 'all'; $('#hfTgPlanF').hidden = m !== 'plan'; $('#hfTgGrpF').hidden = m !== 'group'; $('#hfTgList').hidden = m !== 'pick'; $('#hfTgTools').hidden = m !== 'pick';
         if(m === 'plan'){ const ps = [...new Set(el.flatMap(x => x.subs.map(s => s.plan_id)))], cur = $('#hf-tp').value; $('#hf-tp').innerHTML = ps.map(id => { const p = (D.plans || []).find(y => y.id === id); return `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(p ? planName(p) : id)}</option>`; }).join(''); }
-        if(m === 'pick'){ $('#hfTgList').innerHTML = el.map(x => `<label class="qp"><input type="checkbox" value="${x.t.id}" ${tgPicked.has(x.t.id) ? 'checked' : ''}><span>${esc(x.t.full_name)}</span></label>`).join('') || '<p class="hint">لا متدربين في هذا المقرر.</p>';
+        if(m === 'pick'){ const tq = $('#hfTgQ').value; $('#hfTgList').innerHTML = el.filter(x => !tq.trim() || matchQ(tq, x.t.full_name)).map(x => `<label class="qp"><input type="checkbox" value="${x.t.id}" ${tgPicked.has(x.t.id) ? 'checked' : ''}><span>${esc(x.t.full_name)}</span></label>`).join('') || '<p class="hint">لا متدربين في هذا المقرر.</p>';
           $$('#hfTgList input').forEach(c => c.onchange = () => { c.checked ? tgPicked.add(c.value) : tgPicked.delete(c.value); tgN(); }); }
         tgN(); };
       const tgN = () => { const ids = tgIds(); $('#hfTgN').textContent = ids ? `سيُرسل إلى ${fmtNum(ids.length)} متدربًا، وتُثبَّت القائمة عند النشر.` : ''; };
+      let tgT; $('#hfTgQ').oninput = () => { clearTimeout(tgT); tgT = setTimeout(tgDraw, 200); };
+      $('#hfTgAll').onclick = () => { $$('#hfTgList input').forEach(c => tgPicked.add(c.value)); tgDraw(); }; $('#hfTgNone').onclick = () => { tgPicked.clear(); tgDraw(); };
       $('#hf-tg').onchange = tgDraw; $('#hf-tp').onchange = tgN; $('#hf-gp').onchange = tgN; $('#hf-s').addEventListener('change', tgDraw);
       if(HW_PRESET){ const P = HW_PRESET; HW_PRESET = null; $('#hf-t').value = P.title || ''; $('#hf-ty').value = 'practice'; $('#hf-tg').value = 'pick'; P.ids.forEach(id => tgPicked.add(id)); tgDraw(); }
-      const chosen = [], pickOn = () => !$('[data-qk]').hidden && $('#hf-m').value === 'pick';
-      const pool = () => pub.filter(q => q.subject === $('#hf-s').value && (!$('#hf-u').value || q.unit === $('#hf-u').value)).sort((a, b) => (a.order || 0) - (b.order || 0));
-      const drawPick = () => { const k = $('#hf-k').value, list = pool().filter(q => !k || (q.skill || '') === k).slice(0, 120);
-        $('#hfPick').innerHTML = list.length ? list.map(q => `<label class="qp"><input type="checkbox" value="${q.id}" ${chosen.includes(q.id) ? 'checked' : ''}><span>${q.code ? `<b dir="ltr">${esc(q.code)}</b>` : ''}${qStem(q, true)}</span></label>`).join('') : '<p class="hint">لا أسئلة منشورة هنا.</p>';
-        $$('#hfPick input').forEach(c => c.onchange = () => { const i = chosen.indexOf(c.value); c.checked ? i < 0 && chosen.push(c.value) : i >= 0 && chosen.splice(i, 1); count(); }); count(); };
-      const count = () => { $('#hfPn').textContent = `المختار: ${fmtNum(chosen.length)} سؤالًا (بترتيب اختيارك).`; };
-      const skills = () => { const ks = [...new Set(pool().map(q => q.skill || '').filter(Boolean))]; $('#hf-k').innerHTML = `<option value="">كل الأقسام</option>` + ks.map(k => `<option>${esc(k)}</option>`).join(''); drawPick(); };
-      const mode = () => { const p = pickOn(); $('[data-qpk]').hidden = !p; $('#hf-n').closest('.field').hidden = p || $('[data-qk]').hidden; if(p) skills(); };
-      $('#hf-m').onchange = mode; $('#hf-u').addEventListener('change', () => { if(pickOn()) skills(); }); $('#hf-k').onchange = drawPick;
-      const kind = () => { const q = $('#hf [name=kind]:checked').value === 'quiz'; $$('[data-qk]').forEach(x => x.hidden = !q); if(q) units(); mode(); };
-      $$('#hf [name=kind]').forEach(r => r.onchange = kind); $('#hf-s').addEventListener('change', () => { if(!$('[data-qk]').hidden) units(); });
+      /* بنّاء الاختبار: أقسام متعددة، سحب عشوائي بعدد مفتوح أو انتقاء يدوي، وترتيب، ومعاينة قبل النشر */
+      const chosen = [], qOf = id => pub.find(q => q.id === id), units = new Set();
+      const subPool = () => pub.filter(q => q.subject === $('#hf-s').value).sort((a, b) => (a.unit || '').localeCompare(b.unit || '', 'ar') || (a.order || 0) - (b.order || 0));
+      const pool = () => subPool().filter(q => !units.size || units.has(q.unit || ''));
+      const drawUnits = () => { const us = {}; subPool().forEach(q => us[q.unit || ''] = (us[q.unit || ''] || 0) + 1); [...units].forEach(u => { if(!(u in us)) units.delete(u); });
+        $('#hfUnits').innerHTML = Object.keys(us).length ? Object.entries(us).map(([u, n]) => `<label class="chk qb-u"><input type="checkbox" value="${esc(u)}" ${units.has(u) ? 'checked' : ''}> ${esc(u || 'بلا وحدة')} <span class="hint">(${fmtNum(n)})</span></label>`).join('') : '<p class="hint">لا توجد أسئلة منشورة في بنكك لهذا المقرر.</p>';
+        $$('#hfUnits input').forEach(c => c.onchange = () => { c.checked ? units.add(c.value) : units.delete(c.value); skills(); }); skills(); };
+      const skills = () => { const ks = [...new Set(pool().map(q => q.skill || '').filter(Boolean))], cur = $('#hf-k').value; $('#hf-k').innerHTML = `<option value="">كل المهارات</option>` + ks.map(k => `<option ${k === cur ? 'selected' : ''}>${esc(k)}</option>`).join(''); drawPick(); };
+      const drawPick = () => { const k = $('#hf-k').value, qq = $('#hf-q').value, list = pool().filter(q => (!k || (q.skill || '') === k) && (!qq.trim() || matchQ(qq, q.code, q.text, q.unit, q.skill))).slice(0, 150);
+        $('#hfPick').innerHTML = list.length ? list.map(q => `<label class="qp"><input type="checkbox" value="${q.id}" ${chosen.includes(q.id) ? 'checked' : ''}><span>${q.code ? `<b dir="ltr">${esc(q.code)}</b>` : ''}<b>${esc(q.unit || '')}${q.skill ? ' · ' + esc(q.skill) : ''}</b>${qStem(q, true)}</span></label>`).join('') : '<p class="hint">لا أسئلة مطابقة.</p>';
+        $$('#hfPick input').forEach(c => c.onchange = () => { const i = chosen.indexOf(c.value); c.checked ? i < 0 && chosen.length < 100 && chosen.push(c.value) : i >= 0 && chosen.splice(i, 1); if(c.checked && !chosen.includes(c.value)){ c.checked = false; toast('الحد 100 سؤال'); } count(); }); };
+      const short = q => esc((q.text || q.code || 'سؤال مصوَّر').slice(0, 90));
+      const count = () => { const by = {}; chosen.forEach(id => { const u = qOf(id)?.unit || ''; by[u] = (by[u] || 0) + 1; });
+        $('#hfPn').textContent = chosen.length ? `المختار: ${fmtNum(chosen.length)} سؤالًا من ${fmtNum(Object.keys(by).length)} ${Object.keys(by).length === 1 ? 'قسم' : 'أقسام'} (بهذا الترتيب)` : 'لم تُختر أسئلة بعد';
+        $('#hfSel').innerHTML = chosen.map((id, i) => { const q = qOf(id); return `<li><span class="qb-t">${q?.code ? `<b dir="ltr">${esc(q.code)}</b> ` : ''}<span class="hint">${esc(q?.unit || '')}</span> ${q ? short(q) : ''}</span>
+          <button type="button" class="btn sm ghost" data-mv="${i}:-1" aria-label="تقديم السؤال ${i + 1}" ${i ? '' : 'disabled'}>▲</button><button type="button" class="btn sm ghost" data-mv="${i}:1" aria-label="تأخير السؤال ${i + 1}" ${i < chosen.length - 1 ? '' : 'disabled'}>▼</button><button type="button" class="btn sm ghost" data-rm="${i}" aria-label="حذف السؤال ${i + 1}">${ic('x')}</button></li>`; }).join('');
+        $$('#hfSel [data-mv]').forEach(b => b.onclick = () => { const [i, d] = b.dataset.mv.split(':').map(Number), j = i + d; [chosen[i], chosen[j]] = [chosen[j], chosen[i]]; count(); if(!$('#hfPrev').hidden) preview(); });
+        $$('#hfSel [data-rm]').forEach(b => b.onclick = () => { chosen.splice(+b.dataset.rm, 1); count(); drawPick(); if(!$('#hfPrev').hidden) preview(); }); };
+      const nWanted = () => { const n = Math.floor(+$('#hf-n').value); return n >= 1 && n <= 100 ? n : 0; };
+      const draw = () => { const n = nWanted(); if(!n){ toast('عدد الأسئلة من 1 إلى 100'); return false; } const src = pool(); if(!src.length){ toast('لا توجد أسئلة منشورة في الأقسام المحددة'); return false; }
+        /* توزيع متوازن على الأقسام المحددة ثم خلط داخل كل قسم */
+        const by = {}; src.forEach(q => (by[q.unit || ''] = by[q.unit || ''] || []).push(q)); Object.values(by).forEach(l => l.sort(() => Math.random() - .5));
+        const out = [], keys = Object.keys(by); while(out.length < Math.min(n, src.length)) for(const k of keys){ const q = by[k].shift(); if(q && out.length < n) out.push(q.id); }
+        chosen.splice(0, chosen.length, ...out); count(); drawPick(); if(out.length < n) toast(`المتاح ${fmtNum(out.length)} سؤالًا فقط`); return true; };
+      let pvMode = 't';
+      const preview = () => { const qs = chosen.map(qOf).filter(Boolean);
+        $('#hfPrevB').innerHTML = qs.length ? `<ol class="qres qb-pv">${qs.map(q => `<li>${pvMode === 't' ? `<p class="hint" style="margin:0 0 4px">${q.code ? `<span dir="ltr">${esc(q.code)}</span> · ` : ''}${esc(q.unit || '')}${q.skill ? ' · ' + esc(q.skill) : ''}</p>` : ''}${qStem(q)}
+          <ul class="qb-opts">${(q.options || []).map((o, i) => `<li class="${pvMode === 't' && i === q.correct ? 'ok' : ''}">${pvMode === 't' && i === q.correct ? ic('check') : '<span class="qb-dot" aria-hidden="true"></span>'} ${esc(o)}</li>`).join('')}</ul>
+          ${pvMode === 't' && q.explanation ? `<p class="hint">${esc(q.explanation)}</p>` : ''}</li>`).join('')}</ol>${pvMode === 's' ? `<p class="hint">يرى المتدرب الأسئلة بعد ضغط «ابدأ الآن» فقط، ومدته ${fmtNum(qs.length * 2)} دقيقة، دون الإجابات الصحيحة.</p>` : ''}` : '<p class="hint">اختر أسئلة أو اسحبها عشوائيًا أولًا.</p>'; };
+      $('#hfPv').onclick = () => { if(!chosen.length && !draw()) return; $('#hfPrev').hidden = false; preview(); $('#hfPrev').scrollIntoView({ block:'nearest' }); };
+      $$('#hfPrev [data-pv]').forEach(b => b.onclick = () => { pvMode = b.dataset.pv; $$('#hfPrev [data-pv]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b); }); preview(); });
+      $('#hfDraw').onclick = () => { if(draw() && !$('#hfPrev').hidden) preview(); };
+      $('#hfClr').onclick = () => { chosen.length = 0; count(); drawPick(); $('#hfPrev').hidden = true; };
+      $('#hf-k').onchange = drawPick; let qT; $('#hf-q').oninput = () => { clearTimeout(qT); qT = setTimeout(drawPick, 200); };
+      const kind = () => { const q = $('#hf [name=kind]:checked').value === 'quiz'; $$('[data-qk]').forEach(x => x.hidden = !q); if(q) drawUnits(); };
+      $$('#hf [name=kind]').forEach(r => r.onchange = kind); $('#hf-s').addEventListener('change', () => { chosen.length = 0; count(); if(!$('[data-qk]').hidden) drawUnits(); });
       $('#hf').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), b = $('#hfS'); { const ids = tgIds(); if(ids){ if(!ids.length){ $('#hfE').textContent = 'اختر متدربًا واحدًا على الأقل'; return; } f.targets = ids; f.target_label = $('#hf-tg').value === 'plan' ? $('#hf-tp').selectedOptions[0]?.textContent || '' : $('#hf-tg').value === 'group' ? 'مجموعة: ' + ((D.groups || []).find(g => g.id === $('#hf-gp').value)?.name || '') : `${fmtNum(ids.length)} متدربًا بعينهم`; } }
-        if(f.kind === 'quiz' && $('#hf-m').value === 'pick'){ if(!chosen.length){ $('#hfE').textContent = 'انتقِ سؤالًا واحدًا على الأقل'; return; } f.question_ids = chosen.slice(); } setBusy(b, true, 'جارٍ النشر');
+        if(f.kind === 'quiz'){ if(!chosen.length && !draw()){ $('#hfE').textContent = 'اختر الأسئلة أو حدّد عددًا صحيحًا من 1 إلى 100'; return; } f.question_ids = chosen.slice(); f.count = chosen.length; delete f.unit; } setBusy(b, true, 'جارٍ النشر');
         try { await Store.saveAssignment(f); closeModal(); toast('نُشر الواجب'); reload(); } catch(x){ setBusy(b, false); $('#hfE').textContent = x.message; } }; };
+    /* مراجعة إجابات المتدرب في الاختبار: إجابته والصحيح لكل سؤال، وملاحظة لكل سؤال وملاحظة عامة (لا تغيّر الدرجة) */
+    $$('[data-fb]').forEach(b => b.onclick = () => { const s = D.submissions.find(x => x.id === b.dataset.fb), a = D.assignments.find(x => x.id === s.assignment_id), cm = s.comments || {};
+      const right = (a.quiz || []).filter(q => s.answers?.[q.id] === q.correct).length;
+      modal(`<h3>مراجعة: ${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</h3><p class="hint" style="margin:-4px 0 10px">${esc(a.title)} · صحيح ${fmtNum(right)} من ${fmtNum((a.quiz || []).length)} · الدرجة ${fmtNum(s.score ?? 0)} من ${fmtNum(a.max_score)}</p>
+        <form id="fbf" novalidate><ol class="qres">${(a.quiz || []).map(q => { const mine = s.answers?.[q.id];
+          return `<li class="${mine === q.correct ? 'ok' : 'bad'}">${qStem(q)}<p><b>إجابته:</b> ${mine == null ? 'لم يُجب' : esc(q.options[mine] ?? '')}${mine !== q.correct ? ` · <b>الصحيح:</b> ${esc(q.options[q.correct] ?? '')}` : ''}</p>
+            <label class="hint" for="fbq-${q.id}">ملاحظتك على هذا السؤال</label><textarea class="inp fb-in" id="fbq-${q.id}" data-fq="${q.id}" rows="2" maxlength="500">${esc(cm[q.id] || '')}</textarea></li>`; }).join('')}</ol>
+        <div class="field"><label for="fb-n">ملاحظة عامة للمتدرب</label><textarea class="inp" id="fb-n" rows="3" maxlength="1000" style="padding:10px 14px">${esc(s.teacher_note || '')}</textarea></div>
+        <p class="hint">يرى المتدرب ملاحظاتك في واجبه. الدرجة الآلية لا تتغير.</p><div class="errtxt" id="fbE" role="alert"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="fbC">إلغاء</button><button class="btn pri" id="fbS">${ic('send')} حفظ وإرسال الملاحظات</button></div></form>`);
+      $('#fbC').onclick = closeModal;
+      $('#fbf').onsubmit = async e => { e.preventDefault(); const bb = $('#fbS'), comments = Object.fromEntries($$('#fbf [data-fq]').map(t => [t.dataset.fq, t.value]).filter(([, v]) => v.trim())); setBusy(bb, true, 'جارٍ الحفظ');
+        try { await Store.commentSubmission(s.id, { note:$('#fb-n').value, comments }); closeModal(); toast('أُرسلت ملاحظاتك للمتدرب'); reload(); } catch(x){ setBusy(bb, false); $('#fbE').textContent = x.message; } }; });
     $$('[data-gr]').forEach(b => b.onclick = () => { const s = D.submissions.find(x => x.id === b.dataset.gr), a = D.assignments.find(x => x.id === s.assignment_id);
       modal(`<h3>تصحيح: ${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</h3><p class="hw-ans">${esc(s.answer || '')}</p><form id="gf2" class="grid g2" novalidate>
         <div class="field"><label for="g-s">الدرجة من ${fmtNum(a.max_score)}</label><input class="inp num" id="g-s" name="score" type="number" min="0" max="${a.max_score}" value="${s.score ?? ''}"></div>

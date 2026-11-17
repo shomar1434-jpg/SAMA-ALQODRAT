@@ -754,6 +754,12 @@ export const LocalStore = {
   async gradeSubmission(id, g){ const me=await this._me(), D=this.data, s=D.submissions.find(x=>x.id===id), a=s&&D.assignments.find(y=>y.id===s.assignment_id&&y.teacher_id===me.id); if(!a) throw new Error('غير مصرح');
     if(!['graded','needs_revision'].includes(g.status)) throw new Error('حالة غير صالحة'); const sc=g.score===''||g.score==null?null:+g.score; if(sc!=null&&(sc<0||sc>a.max_score)) throw new Error(`الدرجة من 0 إلى ${a.max_score}`);
     Object.assign(s,{status:g.status, score:sc, feedback:String(g.feedback||'').slice(0,1000), graded_at:new Date().toISOString()}); this.save(); return {ok:true}; },
+  /* تغذية راجعة بعد التسليم: ملاحظة عامة ولكل سؤال، لا تغيّر الدرجة ↔ teacher_comment */
+  async commentSubmission(id, f){ const me=await this._me(), D=this.data, s=D.submissions.find(x=>x.id===id), a=s&&D.assignments.find(y=>y.id===s.assignment_id&&y.teacher_id===me.id); if(!a) throw new Error('غير مصرح');
+    if(s.status==='draft') throw new Error('لم يُسلِّم المتدرب بعد'); const c={};
+    for(const [k,v] of Object.entries(f.comments||{})){ const t=String(v||'').trim(); if(!t) continue; if(a.kind!=='quiz'||!(a.quiz||[]).some(q=>q.id===k)) throw new Error('ملاحظة على سؤال خارج الاختبار'); c[k]=t.slice(0,500); }
+    if(Object.keys(c).length>100) throw new Error('الحد 100 ملاحظة');
+    s.teacher_note=String(f.note||'').trim().slice(0,1000)||null; s.comments=Object.keys(c).length?c:null; this.save(); return {ok:true}; },
   async submitAssignment({trainee_id, assignment_id, answer, answers, draft}){ await this._student(trainee_id); const D=this.data, a=D.assignments.find(x=>x.id===assignment_id);
     if(!a||!studentHasScope(D,trainee_id,a.section,a.subject)||a.publish_date>riyadhNow().date||(Array.isArray(a.targets)&&!a.targets.includes(trainee_id))) throw new Error('الواجب غير متاح لك');
     let s=D.submissions.find(x=>x.assignment_id===a.id&&x.trainee_id===trainee_id); if(s&&s.status==='graded') throw new Error('صُحّح الواجب ولا يمكن تعديله');
@@ -989,6 +995,7 @@ export const CloudStore = {
   // التعليم: نفس توقيعات LocalStore، والتحقق من النطاق في دوال SQL
   async saveAssignment(a){ return this._e(await this.sb.rpc('teacher_save_assignment',{p:a})); },
   async gradeSubmission(id, g){ return this._e(await this.sb.rpc('teacher_grade',{p_id:id, p:g})); },
+  async commentSubmission(id, f){ return this._e(await this.sb.rpc('teacher_comment',{p_id:id, p:f})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
   async saveMyProfile(p){ return this._e(await this.sb.rpc('teacher_save_profile',{p:checkProfile(p)})); },
   async saveGroup(g){ return this._e(await this.sb.rpc('teacher_save_group',{p:{id:g.id||null, name:String(g.name||'').trim(), trainee_ids:g.trainee_ids||[]}})); },

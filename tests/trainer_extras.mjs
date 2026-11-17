@@ -67,7 +67,7 @@ ok(D.trainer_groups?.length === 1 && D.trainer_groups[0].teacher_id === T.id && 
 
 // ---- اختبار بمحاولتين موجَّه للمجموعة ----
 await tab('data-tt', 'hw'); await p.click('#hwAdd'); await p.waitForTimeout(300);
-await p.fill('#hf-t', 'اختبار بمحاولتين'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200); await p.selectOption('#hf-n', '5'); await p.selectOption('#hf-at', '2');
+await p.fill('#hf-t', 'اختبار بمحاولتين'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200); await p.fill('#hf-n', '5'); await p.selectOption('#hf-at', '2');
 await p.selectOption('#hf-tg', 'group'); await p.waitForTimeout(200);
 ok(/1|١/.test(await text('#hfTgN')), 'المجموعة المحفوظة هدف للواجب');
 await p.click('#hfS'); await p.waitForTimeout(900);

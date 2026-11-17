@@ -86,7 +86,7 @@ await mtab('data-tt', 'people'); await mshot('t04_people');
 try { await m.click('[data-pc]'); await mshot('t05_trainee_card'); await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); } catch { try { const c = await m.$('#tBody .card button, #tBody [data-tc]'); if (c) { await c.click(); await mshot('t05_trainee_card'); await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); } } catch {} }
 await mtab('data-tt', 'groups'); await mshot('t06_groups');
 await mtab('data-tt', 'hw'); await mshot('t07_hw');
-try { const n = await m.$('#hwAdd'); if (n) { await n.click(); await mshot('t08_hw_editor', 900); await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); await m.waitForTimeout(300); } } catch {}
+try { const n = await m.$('#hwAdd'); if (n) { await n.click(); await m.waitForTimeout(300); try { await m.check('#hf [name=kind][value=quiz]'); for (const c of await m.$$('#hfUnits input')) await c.check(); await m.fill('#hf-n', '4'); await m.click('#hfDraw'); await m.click('#hfPv'); await m.waitForTimeout(300); } catch {} await mshot('t08_hw_editor', 1800); await m.evaluate(() => { const r = document.querySelector('#modalRoot'); if (r) r.innerHTML = ''; }); await m.waitForTimeout(300); } } catch {}
 await mtab('data-tt', 'bank'); await mshot('t09_bank');
 await mtab('data-tt', 'msg'); await mshot('t10_msg');
 await mtab('data-tt', 'rate'); await mshot('t11_rate');
