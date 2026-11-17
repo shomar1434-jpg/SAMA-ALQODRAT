@@ -459,11 +459,13 @@ export const LocalStore = {
     if(!t){ if(!validSaudiId(f.national_id||'')) throw new Error('رقم السجل المدني غير صحيح'); if(!f.full_name) throw new Error('اكتب اسم المتدرب');
       t={id:uid(), national_id:f.national_id, full_name:f.full_name, phone:f.phone||'', email:'', gender:f.gender||'ذكر', birth_date:'', city:f.city||'جازان', education:'ثانوي', employer:'', created_at:new Date().toISOString()}; D.trainees.push(t); }
     else if(!f.id){ if(f.full_name) t.full_name=f.full_name; if(f.phone) t.phone=f.phone; if(f.gender) t.gender=f.gender; }
-    const start=f.start_date||null;
-    if(f.id){ const s=D.subscriptions.find(x=>x.id===f.id); if(!s) throw new Error('الاشتراك غير موجود');
-      Object.assign(s, {plan_id:plan.id, section:f.section||s.section, subjects:f.subjects||s.subjects, start_date:start, end_date:start?subEnd(plan,start):null, status:start?'active':'pending', start_manual:!!start});
+    const start=f.start_date||null, endX=f.end_date||null;
+    /* نهاية مخصّصة لاشتراك قائم (قرار المالك) ↔ admin_save_subscription في …_sub_end_edit.sql */
+    if(endX){ if(!f.id) throw new Error('تاريخ النهاية يُعدَّل لاشتراك قائم فقط'); if(!start) throw new Error('حدّد تاريخ البداية قبل النهاية'); if(endX<start) throw new Error('تاريخ النهاية قبل تاريخ البداية'); if(endX>addDays(start,400)) throw new Error('تاريخ النهاية بعيد جدًا عن البداية'); }
+    if(f.id){ const s=D.subscriptions.find(x=>x.id===f.id); if(!s) throw new Error('الاشتراك غير موجود'); const before={start_date:s.start_date, end_date:s.end_date};
+      Object.assign(s, {plan_id:plan.id, section:f.section||s.section, subjects:f.subjects||s.subjects, start_date:start, end_date:start?(endX||subEnd(plan,start)):null, status:start?'active':'pending', start_manual:!!start});
       if(f.prior_absences!=null && f.prior_absences!==''){ const pa=Number(f.prior_absences), mx=priorSessions(D,s).length; if(!Number.isInteger(pa)||pa<0||pa>mx) throw new Error(`أيام الغياب السابقة من 0 إلى ${mx}`); s.prior_absences=pa; }
-      this.audit('subscription.update', s.id); this.save(); return s; }
+      this.audit('subscription.update', s.id, {before, after:{start_date:s.start_date, end_date:s.end_date}}); this.save(); return s; }
     if(D.subscriptions.some(s=>s.trainee_id===t.id && s.plan_id===plan.id && ['pending','active'].includes(subStatus(s)))) throw new Error(`${t.full_name} مشترك مسبقًا في ${planName(plan)}`);
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:f.section||sectionOfGender(t.gender), subjects:f.subjects||[...(plan.subjects||[])], status:start?'active':'pending', start_date:start, end_date:start?subEnd(plan,start):null, start_manual:!!start, created_at:new Date().toISOString()};
     D.subscriptions.push(s); this.audit('subscription.create', s.id);
@@ -626,7 +628,7 @@ export const LocalStore = {
     this._orderEvent(o, decision, 'admin', reason); this.audit('order.review', o.id, {decision}); this.save(); return {ok:true}; },
   async confirmOrderPayment(id, amount, confirmed=true, reason='', method='transfer'){ const D=this.data, o=(D.orders||[]).find(x=>x.id===id); if(!o) throw new Error('الطلب غير موجود'); D.invoices=D.invoices||[];
     if(confirmed && o.payment==='confirmed') throw new Error('سبق تأكيد سداد هذا الطلب.');
-    if(confirmed){ const a=Math.round(+amount*100)/100; if(!(a>0)) throw new Error('اكتب المبلغ الواصل فعليًا'); if(a<o.due_now) throw new Error(`المبلغ أقل من المطلوب الآن (${o.due_now} ريال)؛ لا يُعد السداد مستوفيًا`);
+    if(confirmed){ const a=Math.round(+amount*100)/100; if(!(a>0)) throw new Error('اكتب المبلغ الواصل فعليًا'); if(o.total>0 && a>r2(o.total-(+o.paid_amount||0))) throw new Error(`المبلغ أكبر من المتبقي (${Math.max(0,r2(o.total-(+o.paid_amount||0)))} ريال)`);
       if(!PAY_METHODS[method]) throw new Error('اختر طريقة السداد'); const prior=+o.paid_amount||0;
       o.paid_amount=Math.round((prior+a)*100)/100; o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
       const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:a, seq:D.invoice_seq, date:riyadhNow().date, prior, method:PAY_METHODS[method]}), created_at:new Date().toISOString()}; D.invoices.push(inv);
@@ -652,7 +654,7 @@ export const LocalStore = {
     if(o.approval==='rejected') throw new Error('الطلب مرفوض'); if(o.cancelled_at) throw new Error('الطلب ملغى');
     const {lines, sum}=checkLines(f.lines), today=riyadhNow().date, date=f.date||(o.payment!=='confirmed'&&o.claim?.date)||today, prior=+o.paid_amount||0, first=o.payment!=='confirmed';
     if(date>today) throw new Error('تاريخ السداد في المستقبل');
-    if(first && sum<o.due_now) throw new Error(`المبلغ أقل من المطلوب الآن (${o.due_now} ريال)؛ لا يُعد السداد مستوفيًا`);
+    /* قرار المالك: يُقبل أي مبلغ موجب؛ «المطلوب الآن» اقتراح لا حد أدنى ↔ …_pay_any_amount.sql */
     if(o.total>0 && sum>r2(o.total-prior)) throw new Error(`المبلغ أكبر من المتبقي (${Math.max(0,r2(o.total-prior))} ريال)`);
     o.paid_amount=r2(prior+sum); o.payment='confirmed'; D.invoice_seq=(D.invoice_seq||0)+1;
     const inv={id:uid(), ...buildInvoice(o, D.trainees.find(t=>t.id===o.trainee_id), {amount:sum, seq:D.invoice_seq, date:today, prior, method:linesMethod(lines), transfer_date:date, transfer_ref:linesRef(lines)||(first?o.claim?.reference||'':''), lines}), created_at:new Date().toISOString()}; D.invoices.push(inv);

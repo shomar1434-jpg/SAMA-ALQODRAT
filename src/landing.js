@@ -1,6 +1,7 @@
 import { CAT_ICON, CAT_TONE, CENTER, KIDS_PROGRAMS, KIDS_ACCREDITATION } from './catalog.js';
 import { Store } from './data2.js';
 import { LOGOS } from './logos.js';
+import { logoPair } from './logo_dark.js';
 import { DEFAULT_ABOUT, aboutSectionHtml, initPartnerMarquee, partnersSectionHtml } from './partners.js';
 import { $, $$, esc, fmtNum } from './utils.js';
 import { countUp, ic, reduceMotion } from './views2_head.js';
@@ -45,7 +46,7 @@ export function siteFooter(){
   const ph = CENTER.phones;
   return `<footer class="sfoot">
     <div class="sfoot-in">
-      <div class="sf-col sf-brand"><span class="sf-logo"><img src="${LOGOS.sama}" alt="شعار مركز سما القدرات للتدريب"></span>
+      <div class="sf-col sf-brand"><span class="sf-logo">${logoPair(LOGOS.sama, 'sama', 'شعار مركز سما القدرات للتدريب')}</span>
         <p>${CENTER.mission}.</p><span class="sf-cr">سجل تجاري ${CENTER.cr}</span></div>
       <div class="sf-col"><h4>تواصل معنا</h4>
         ${ph.map(n=>`<a class="sf-item" href="tel:${n}" dir="ltr">${ic('phone')}<span>${n}</span></a>`).join('')}
@@ -58,7 +59,7 @@ export function siteFooter(){
         <h4 style="margin-top:14px">روابط سريعة</h4>
         <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من إفادة حضور</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
       <div class="sf-col"><h4>معتمد من</h4>
-        <div class="sf-acc"><span><img src="${LOGOS.tvtc}" alt="المؤسسة العامة للتدريب التقني والمهني"></span><span><img src="${LOGOS.nelc}" alt="المركز الوطني للتعليم الإلكتروني"></span></div>
+        <div class="sf-acc"><span>${logoPair(LOGOS.tvtc, 'tvtc', 'المؤسسة العامة للتدريب التقني والمهني')}</span><span>${logoPair(LOGOS.nelc, 'nelc', 'المركز الوطني للتعليم الإلكتروني')}</span></div>
         <a class="sf-item" href="${CENTER.manar}" target="_blank" rel="noopener" style="margin-top:10px">${ic('award')}<span>منصة منار: إصدار الشهادات المعتمدة</span></a></div>
     </div>
     <div class="sfoot-bar"><span>© ${new Date().getFullYear()} ${CENTER.name}. جميع الحقوق محفوظة.</span><span dir="ltr">${ph.join(' · ')} · ${CENTER.email}</span></div>
@@ -101,7 +102,7 @@ export async function viewHome(){
   app.innerHTML = `<div class="home">
     <section class="cover">
       <div class="cover-card">
-        <div class="cover-logos" data-reveal><span><img src="${LOGOS.tvtc}" alt="المؤسسة العامة للتدريب التقني والمهني"></span><span><img src="${LOGOS.nelc}" alt="المركز الوطني للتعليم الإلكتروني"></span><span class="main"><img src="${LOGOS.sama}" alt="مركز سما القدرات للتدريب"></span></div>
+        <div class="cover-logos" data-reveal><span>${logoPair(LOGOS.tvtc, 'tvtc', 'المؤسسة العامة للتدريب التقني والمهني')}</span><span>${logoPair(LOGOS.nelc, 'nelc', 'المركز الوطني للتعليم الإلكتروني')}</span><span class="main">${logoPair(LOGOS.sama, 'sama', 'مركز سما القدرات للتدريب')}</span></div>
         <div class="cover-grid">
           <div class="cover-art" data-reveal style="--i:2">${BULB_SVG}<i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i></div>
           <div class="cover-text">

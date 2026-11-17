@@ -44,7 +44,7 @@ export function payHtml(o){
   if(!isFull()) return `<p class="hint" style="margin:0">تأكيد السداد واستلام المبالغ لمدير النظام فقط.</p>`;
   if(!first && !(rem > 0)) return `<div class="ord-acts"><span class="pill ok">${ic('check')} مسدَّد بالكامل ${sar(o.paid_amount)}</span></div>`;
   const init = first && o.claim ? [{ method:'transfer', amount:o.claim.amount, reference:o.claim.reference }] : [{ method:'cash', amount:first ? (o.due_now || '') : rem }];
-  return `<p class="hint" style="margin:0 0 6px">${first ? `المطلوب الآن ${sar(o.due_now)}${o.total > o.due_now ? ` من إجمالي ${sar(o.total)}` : ''}. ` : `المتبقي ${sar(rem)}. `}اكتب كل طريقة بمبلغها؛ تصدر فاتورة واحدة تُفصَّل فيها الطرق. التحويل البنكي لا يُسجَّل إلا بعد مطابقة كشف البنك.</p>
+  return `<p class="hint" style="margin:0 0 6px">${first ? `المقترح الآن ${sar(o.due_now)}${o.total > o.due_now ? ` من إجمالي ${sar(o.total)}` : ''}، ويُقبل أي مبلغ. ` : `المتبقي ${sar(rem)}. `}اكتب كل طريقة بمبلغها؛ تصدر فاتورة واحدة تُفصَّل فيها الطرق. التحويل البنكي لا يُسجَّل إلا بعد مطابقة كشف البنك.</p>
     ${linesHtml('opl', init)}<div class="ord-acts"><span class="hint" id="opl-left" style="flex:1"></span><button class="btn pri sm" id="om-recv">${ic('wallet')} ${first ? 'تأكيد الاستلام وإصدار الفاتورة' : 'تسجيل الدفعة وإصدار فاتورتها'}</button></div>`;
 }
 export function bindPay(o, run){
