@@ -391,6 +391,9 @@ a.choice:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
 :root{--pt:#1A746B;--pt-d:#135A53;--pt2:#59A598;--pm:#C1E1DC;--po1:#FCD147;--po2:#E17D32;--pg:#6F7072;--pt-ink:#1A746B}
 [data-theme="dark"]{--pt-ink:#6CCBBB;--pg:#A9B7B8}
 #app.pg-in>*{animation:pgin 450ms var(--ease) both}
+/* التحديث الحي يعيد العرض بهدوء: لا حركات ظهور ولا عدّادات (منعًا للومضات) */
+.live-redraw .rv,.live-redraw #app.pg-in>*,.live-redraw .livefeed .f,.live-redraw .ring .fg,.live-redraw .gg-needle,.live-redraw .cover-art .b-check,.live-redraw .skel i{animation:none!important}
+.live-redraw .bar i,.live-redraw .me-bar i,.live-redraw [data-reveal]{transition:none!important}
 @keyframes pgin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 [data-reveal]{opacity:0;transform:translateY(26px);transition:opacity 700ms var(--ease),transform 700ms var(--ease);transition-delay:calc(var(--i,0)*90ms)}
 [data-reveal].in{opacity:1;transform:none}

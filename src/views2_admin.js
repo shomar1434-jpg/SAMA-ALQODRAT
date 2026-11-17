@@ -12,7 +12,7 @@ import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules
 import { pagePartners } from './partners.js';
 import { exportCSV, pageReports, printDayModal, printSheets, traineesRows } from './print.js';
 import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin, matchQ, matchPerson, scopeSelect } from './utils.js';
-import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, statusPill, toast } from './views2_head.js';
+import { countUp, emptyBox, ic, reduceMotion, quiet, ringSvg, skeleton, statusPill, toast } from './views2_head.js';
 import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hoursTxt, kpiCard, makeQR, programUrl, route, short, titleBar } from './views2_main.js';
 import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
 import { pageSettings } from './views2_settings.js';
@@ -57,7 +57,7 @@ export async function viewAdmin(r){
       ${Store.mode==='cloud'?`<a href="#" id="chPass">${ic('key')}تغيير كلمة المرور</a>`:''}
       <a href="#" id="logout">${ic('logout')}خروج</a>
       ${Store.mode==='cloud'?`<a href="#" id="logoutAll">${ic('logout')}الخروج من كل الأجهزة</a>`:''}
-    </aside><section class="main" id="main">${skeleton()}</section></div>`;
+    </aside><section class="main" id="main">${quiet() && $('#main') ? $('#main').innerHTML : skeleton()}</section></div>`;
   $('#logout').onclick=async e=>{ e.preventDefault(); await Store.logout(); location.hash='#register'; };
   if($('#chPass')) $('#chPass').onclick=e=>{ e.preventDefault(); changePasswordModal(); };
   if($('#logoutAll')) $('#logoutAll').onclick=e=>{ e.preventDefault(); logoutAllBox(()=>{ location.hash='#register'; }); };

@@ -6,7 +6,7 @@ import { LOGOS } from './logos.js';
 import { exportCSV, fmtGreg, printDocs } from './print.js';
 import { $, $$, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, validSaudiId } from './utils.js';
 import { AD, progName, progOf, reloadAD } from './views2_admin.js';
-import { countUp, emptyBox, ic, reduceMotion, ringSvg, skeleton, toast } from './views2_head.js';
+import { countUp, emptyBox, ic, quiet, reduceMotion, ringSvg, skeleton, toast } from './views2_head.js';
 import { baseUrl, cohortLabel, copyText, kpiCard, makeQR, short, titleBar } from './views2_main.js';
 
 /* =====================================================================
@@ -88,7 +88,7 @@ export function printCertificates(certs, title){
    صفحة التحقق من إفادة الحضور (عامة)
    ===================================================================== */
 export async function viewVerify(serial){
-  const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
+  const app=$('#app'); if(!quiet()) app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
   let r=null; if(serial){ try{ r=await Store.verifyCertificate(serial); }catch(e){ r={error:e.message}; } }
   const ok = r && !r.error && !r.revoked;
   app.innerHTML = `<div class="wrap"><div class="card verify rv">

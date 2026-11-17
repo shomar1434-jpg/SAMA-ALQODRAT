@@ -8,7 +8,7 @@ import { siteFooter, viewHome } from './landing.js';
 import { closePrint } from './print.js';
 import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
 import { viewAdmin } from './views2_admin.js';
-import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
+import { countUp, emptyBox, ic, quiet, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
 import { planOpen, sessionOn, SECTIONS, subStatus } from './qudurat.js';
@@ -114,7 +114,7 @@ async function renderRoute(){
    ===================================================================== */
 export const cat = { kind:'program', cf:'all', q:'', open:false, data:null, pkg:null };
 export async function viewCatalog(){
-  const app=$('#app'); app.innerHTML = `<div class="wrap">${skeleton()}</div>`;
+  const app=$('#app'); if(!quiet()) app.innerHTML = `<div class="wrap">${skeleton()}</div>`;
   try{ cat.data = await Store.catalog(); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل البرامج', esc(e.message)+'. أعد تحميل الصفحة بعد قليل.')}</div>`; return; }
   const {programs} = cat.data; const nOpen=programs.filter(p=>cohortPublicState(p.cohort).k==='open').length, nCats=new Set(programs.map(p=>p.category)).size;
   const cats=[...new Set(programs.map(p=>p.category))].sort(catSort);
@@ -176,7 +176,7 @@ export function renderCatalogCards(){
 /* نموذج التسجيل الموحّد (#enroll، #enroll-p-<رمز البرنامج>، #enroll-q-<معرّف الباقة>):
    يختار المتدرب «برنامج تدريبي» أو «باقات القدرات والتحصيلي» ثم العنصر من قائمة ما هو مفتوح للتسجيل الآن */
 export async function viewEnroll(pre=''){
-  const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`; let cd, pd;
+  const app=$('#app'); if(!quiet()) app.innerHTML=`<div class="wrap">${skeleton()}</div>`; let cd, pd;
   try{ [cd, pd] = await Promise.all([Store.catalog(), Store.publicPlans()]); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل نموذج التسجيل', esc(e.message))}</div>`; return; }
   const isOpen=p=>cohortPublicState(p.cohort).k==='open';   // كل البرامج النشطة متاحة: المفتوحة دفعتها تسجيل مباشر، والبقية تسجيل مبدئي
   const progs=[...cd.programs].sort((a,b)=>(isOpen(b)-isOpen(a))||catSort(a.category,b.category)||a.name.localeCompare(b.name,'ar'));
@@ -415,7 +415,7 @@ export function showCheckinResult(r, onBack){
   $('#cAgain').onclick = onBack;
 }
 export async function viewProgramPage(code, tab){
-  const app=$('#app'); app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
+  const app=$('#app'); if(!quiet()) app.innerHTML=`<div class="wrap">${skeleton()}</div>`;
   let p, st={require_code:false};
   try{ [p, st] = await Promise.all([Store.publicProgram(code), Store.publicSettings()]); }catch(e){ app.innerHTML=`<div class="wrap">${emptyBox('تعذّر تحميل البرنامج', esc(e.message))}</div>`; return; }
   if(!p){ app.innerHTML=`<div class="wrap">${emptyBox('البرنامج غير موجود','تحقق من الرابط أو الباركود.')}<div style="text-align:center;margin-top:14px"><a class="btn pri" href="#register">${ic('book')} دليل البرامج</a></div></div>${siteFooter()}`; return; }

@@ -17,8 +17,9 @@ export function watchData(store, changed, { target = window, doc = document, pol
     } catch (_) { /* Reconnection and polling retry transient failures. */ }
     finally { checking = false; }
   };
-  const resume = () => { if (!doc.hidden) { changed(); check(); } };
-  const peek = () => { check(); };   // التركيز وحده يراجع رقم الإصدار ولا يعيد العرض ما لم يتغير
+  // الاتصال وعودة التبويب يراجعان رقم الإصدار فقط؛ لا إعادة عرض ما لم تتغير البيانات فعلًا (كانت سبب الومضات عند الفتح)
+  const resume = () => { if (!doc.hidden) check(); };
+  const peek = () => { check(); };
   const local = event => {
     if (event.key !== store.key) return;
     store.load();
@@ -28,7 +29,7 @@ export function watchData(store, changed, { target = window, doc = document, pol
     channel = store.sb.channel('app-data-revision').on('postgres_changes', {
       event: 'UPDATE', schema: 'public', table: 'app_data_revision', filter: 'id=eq.1'
     }, payload => accept(payload.new?.version)).subscribe(status => {
-      if (status === 'SUBSCRIBED') { changed(); check(); }
+      if (status === 'SUBSCRIBED') check();
     });
     check();
   }

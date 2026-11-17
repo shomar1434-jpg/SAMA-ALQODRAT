@@ -5,10 +5,18 @@
 //    تظهر للمالك مرة واحدة، ويُلزم صاحبها بتغييرها عند أول دخول. مفتاح الخدمة يبقى هنا على الخادم ولا يصل إلى المتصفح.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// CORS: موقع المركز وحده (وخادم التطوير المحلي)؛ ALLOWED_ORIGINS في بيئة الدالة يضيف نطاقًا آخر عند الحاجة
+const ORIGINS = ["https://shomar1434-jpg.github.io", ...String(Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map((s) => s.trim()).filter(Boolean)];
+const originOk = (o: string) => ORIGINS.includes(o) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Vary": "Origin",
+};
+const withCors = (req: Request, res: Response) => {
+  const o = req.headers.get("Origin") || "";
+  try { res.headers.set("Access-Control-Allow-Origin", originOk(o) ? o : ORIGINS[0]); } catch (_) { /* ترويسات ثابتة (تحويل) */ }
+  return res;
 };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 const ALLOWED_REDIRECT = /^https:\/\/shomar1434-jpg\.github\.io\/SAMA-ALQODRAT\/admin\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//;
@@ -19,7 +27,9 @@ function tempPassword(): string {
   return Array.from(b, (n) => A[n % A.length]).join("");
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req) => withCors(req, await handle(req)));
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "طريقة غير مدعومة" }, 405);
   const auth = req.headers.get("Authorization") || "";
@@ -63,4 +73,4 @@ Deno.serve(async (req) => {
     if (upd.error) return json({ error: "تعذّر تحديث الحساب: " + upd.error.message }, 400);
   }
   return json({ ok: true, mode: "password", temp_password: pass, email_error: inv.error.message });
-});
+}
