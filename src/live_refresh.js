@@ -22,7 +22,10 @@ export function startLiveRefresh(store, refresh, { minGap = 0 } = {}) {
     const hash = location.hash, x = window.scrollX, y = window.scrollY;
     const filters = [...document.querySelectorAll('.filters input, .filters select, input[type="search"]')]
       .filter(el => el.id).map(el => ({ id: el.id, value: el.value, type: el.tagName === 'SELECT' ? 'change' : 'input' }));
-    await refresh();
+    const root = document.documentElement;
+    root.classList.add('live-redraw');   // إعادة هادئة: بلا هيكل تحميل ولا حركات ظهور
+    try { await refresh(); }
+    finally { requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('live-redraw'))); }
     if (location.hash !== hash) return;
     for (const filter of filters) {
       const el = document.getElementById(filter.id);

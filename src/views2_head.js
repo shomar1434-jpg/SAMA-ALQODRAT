@@ -70,12 +70,14 @@ export const IC = {
 export const ic = (n, cls='') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]||''}</svg>`;
 export const EMPTY_ART = `<svg class="art" viewBox="0 0 120 96" aria-hidden="true"><rect x="18" y="20" width="84" height="62" rx="12" fill="var(--brand-tint)"/><rect x="30" y="34" width="44" height="7" rx="3.5" fill="var(--brand)" opacity=".55"/><rect x="30" y="49" width="60" height="7" rx="3.5" fill="var(--surface-track)"/><rect x="30" y="64" width="34" height="7" rx="3.5" fill="var(--surface-track)"/><circle cx="92" cy="22" r="12" fill="var(--gold-tint)"/><path d="M92 16v7l4 2" stroke="var(--gold)" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`;
 export const emptyBox = (title, text='') => `<div class="empty box">${EMPTY_ART}<strong>${title}</strong>${text?`<span>${text}</span>`:''}</div>`;
+// إعادة عرض هادئة من التحديث الحي: بلا هيكل تحميل ولا حركات ظهور (منعًا للومضات)
+export const quiet = () => document.documentElement.classList.contains('live-redraw');
 export const skeleton = () => `<div class="card skel"><i></i><i></i><i></i><i></i><i></i></div>`;
 export function ringSvg(pct, size=58, sw=6, tone){
   const r=(size-sw)/2, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
   return `<div class="ring" style="width:${size}px;height:${size}px;${tone?`--c:var(--${tone})`:''}"><svg width="${size}" height="${size}"><circle class="bg" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke-width="${sw}"/><circle class="fg" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke-width="${sw}" stroke-dasharray="${c}" stroke-dashoffset="${off}" style="--rc:${c}"/></svg><b>${fmtNum(pct)}٪</b></div>`;
 }
-export const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const reduceMotion = () => quiet() || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 export function countUp(root=document){
   $$('[data-count]', root).forEach(el=>{
     const target=+el.dataset.count, suf=el.dataset.suf||'';

@@ -7,10 +7,18 @@
 // المتغيرات: GOOGLE_CLIENT_ID وGOOGLE_CLIENT_SECRET في أسرار الدوال؛ ومفتاح الخدمة لا يغادر الخادم.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// CORS: موقع المركز وحده (وخادم التطوير المحلي)؛ ALLOWED_ORIGINS في بيئة الدالة يضيف نطاقًا آخر عند الحاجة
+const ORIGINS = ["https://shomar1434-jpg.github.io", ...String(Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map((s) => s.trim()).filter(Boolean)];
+const originOk = (o: string) => ORIGINS.includes(o) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Vary": "Origin",
+};
+const withCors = (req: Request, res: Response) => {
+  const o = req.headers.get("Origin") || "";
+  try { res.headers.set("Access-Control-Allow-Origin", originOk(o) ? o : ORIGINS[0]); } catch (_) { /* ترويسات ثابتة (تحويل) */ }
+  return res;
 };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 const ALLOWED_RETURN = /^https:\/\/shomar1434-jpg\.github\.io\/SAMA-ALQODRAT\/admin\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//;
@@ -33,7 +41,9 @@ const page = (title: string, msg: string, back?: string) => new Response(`<!doct
 <body style="font-family:system-ui;padding:32px;text-align:center"><h2>${title}</h2><p>${msg}</p>${back ? `<p><a href="${back}">العودة إلى لوحة الإدارة</a></p><script>setTimeout(()=>location.href=${JSON.stringify(back)},1500)</script>` : ""}</body></html>`,
   { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
 
-Deno.serve(async (req) => {
+Deno.serve(async (req) => withCors(req, await handle(req)));
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const u = new URL(req.url);
 
@@ -96,4 +106,4 @@ Deno.serve(async (req) => {
     } catch (e) { return json({ error: (e as Error).message }, 502); }
   }
   return json({ error: "إجراء غير معروف" }, 400);
-});
+}
