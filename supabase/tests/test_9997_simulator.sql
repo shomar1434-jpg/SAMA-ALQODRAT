@@ -29,8 +29,9 @@ begin
   assert (r->>'count')::int = 2 and (select count(*) from questions where code in ('TSQ-5','TSQ-6') and category = 'الهندسة') = 2, 'تصنيف جماعي';
   begin perform admin_set_category(v_ids, 'الفيزياء'); ok := false; exception when others then ok := true; end;
   assert ok, 'لا تصنيف من مقرر آخر';
-  c := admin_issue_activation(ph, 'student')->>'code';
+  perform admin_open_activation(ph, 'student', 15);
   perform set_config('app.uid', u1::text, true);
+  c := request_login(ph, 'student')->>'code';
   perform activate_device(ph, c, 'student');
   begin perform admin_set_category(v_ids, 'الجبر'); ok := false; exception when others then ok := true; end;
   assert ok, 'التصنيف للإدارة فقط';

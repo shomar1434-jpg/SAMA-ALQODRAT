@@ -13,8 +13,8 @@ begin
   end loop;
   insert into auth.users(id, email) values (v_admin, 'wk-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
-  c := admin_issue_activation(ph, 'student')->>'code';
-  perform set_config('app.uid', us::text, true); perform activate_device(ph, c, 'student');
+  perform admin_open_activation(ph, 'student', 15);
+  perform set_config('app.uid', us::text, true); c := request_login(ph, 'student')->>'code'; perform activate_device(ph, c, 'student');
   r := student_start_sim(jsonb_build_object('trainee_id', t1, 'subjects', jsonb_build_array('كمي')));
   a1 := (r->>'id')::uuid; q1 := (r->'snapshot'->0->>'id')::uuid;
   perform student_finish_attempt(a1, jsonb_build_object(q1::text, 0));
@@ -22,10 +22,10 @@ begin
   assert r->'q_meta' ? q1::text and r->'q_meta'->q1::text->>0 = (select category from questions where id = q1), 'q_meta بالتصنيف الحالي';
   perform set_config('app.uid', v_admin::text, true);
   perform admin_set_category(array[q1], 'الجبر');
-  c := admin_issue_activation(tph, 'teacher')->>'code';
+  perform admin_open_activation(tph, 'teacher', 15);
   perform set_config('app.uid', us::text, true);
   assert portal_data('student')->'q_meta'->q1::text->>0 = 'الجبر', 'تعديل التصنيف يظهر في التحليل دون تغيير نسخة المحاولة';
-  perform set_config('app.uid', ut::text, true); perform activate_device(tph, c, 'teacher');
+  perform set_config('app.uid', ut::text, true); c := request_login(tph, 'teacher')->>'code'; perform activate_device(tph, c, 'teacher');
   r := portal_data('teacher');
   assert exists (select 1 from jsonb_array_elements(r->'attempts') x where x->>'id' = a1::text and x->>'kind' = 'sim'), 'المدرب يرى محاكيات متدربيه';
   assert r->'q_meta' ? q1::text, 'وتصنيف أسئلتها';

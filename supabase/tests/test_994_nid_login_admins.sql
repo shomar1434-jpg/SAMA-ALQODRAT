@@ -5,13 +5,15 @@ declare u1 uuid := gen_random_uuid(); u2 uuid := gen_random_uuid(); a1 uuid := g
 begin
   select tr.* into t from trainees tr where exists (select 1 from subscriptions s where s.trainee_id = tr.id) and tr.phone ~ '^05[0-9]{8}$' and tr.national_id ~ '^[12][0-9]{9}$' and (select count(*) from trainees z where z.phone = tr.phone) = 1 order by tr.id limit 1;
   perform set_config('app.uid', u1::text, true);
-  r := request_login('1000000000', 'student'); n := (select count(*) from login_requests where uid = u1);
-  assert (r->>'ok')::boolean and n = 0, 'هوية غير مسجّلة: الرد نفسه ولا رمز';
-  r := request_login(t.national_id, 'student');
-  select code into c from login_requests where uid = u1 and phone = t.phone and used_at is null;
-  assert (r->>'ok')::boolean and c ~ '^[0-9]{6}$' and not (r ? 'code'), 'الطلب يولّد رمزًا لهذا الجهاز ولا يعيده في الرد';
-  assert exists (select 1 from notifications where trainee_id = t.id and kind = 'login_code' and text like '%' || c || '%'), 'الرمز يصل إلى صندوق الحساب';
-  -- جهاز آخر لا يستعمل رمز هذا الجهاز
+  r := request_login('1000000000', 'student');
+  assert (r->>'ok')::boolean and not (r ? 'code'), 'هوية غير مسجّلة: الرد نفسه ولا رمز';
+  -- الدخول برقم الهوية بعد فتح التفعيل
+  insert into auth.users(id, email) values (a2, 'nid-tmp-admin@test'); insert into admins(user_id, role) values (a2, 'staff');
+  perform set_config('app.uid', a2::text, true); perform admin_open_activation(t.phone, 'student', 15);
+  delete from admins where user_id = a2; delete from auth.users where id = a2;
+  perform set_config('app.uid', u1::text, true);
+  r := request_login(t.national_id, 'student'); c := r->>'code';
+  assert c ~ '^[0-9]{6}$' and not exists (select 1 from notifications where trainee_id = t.id and kind = 'login_code' and text like '%' || c || '%'), 'الرمز يعود لهذا الجهاز ولا يمر بالمراسلات';
   perform set_config('app.uid', u2::text, true);
   assert ((activate_device(t.national_id, c, 'student'))->>'ok')::boolean = false, 'الرمز لجهازه فقط';
   perform set_config('app.uid', u1::text, true);
@@ -19,7 +21,6 @@ begin
   assert (r->>'ok')::boolean and my_phone() = t.phone and 'student' = any(portal_roles()), 'الدخول برقم الهوية والرمز يفعّل الجهاز';
   perform set_config('app.uid', u2::text, true);
   assert ((activate_device(t.national_id, c, 'student'))->>'ok')::boolean = false, 'الرمز لمرة واحدة';
-  -- الإدارة ترى طلبات الدخول؛ غيرها لا
   begin perform admin_login_requests(); ok := false; exception when others then ok := true; end;
   assert ok, 'طلبات الدخول للمسؤول فقط';
   -- تعدد المسؤولين

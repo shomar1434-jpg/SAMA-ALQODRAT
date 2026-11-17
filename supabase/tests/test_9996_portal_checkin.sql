@@ -11,8 +11,9 @@ begin
   assert ok, 'دون جلسة جهاز لا تحضير';
   insert into auth.users(id, email) values (v_admin, 'pc-admin@test'); insert into admins(user_id, role) values (v_admin, 'full');
   perform set_config('app.uid', v_admin::text, true);
-  c := admin_issue_activation(ph, 'student')->>'code';
+  perform admin_open_activation(ph, 'student', 15);
   perform set_config('app.uid', u1::text, true);
+  c := request_login(ph, 'student')->>'code';
   r := activate_device(ph, c, 'student');
   assert (r->>'ok')::boolean, 'جهاز المتدرب مفعّل';
   begin perform portal_checkin(t2); ok := false; exception when others then ok := true; end;

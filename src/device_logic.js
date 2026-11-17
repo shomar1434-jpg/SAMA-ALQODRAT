@@ -23,5 +23,13 @@ export function resolveIdent(D, ident, role){
 }
 export const deviceShort = id => String(id || '').replace(/-/g, '').slice(0, 4).toUpperCase();
 export const reqLive = (r, now = Date.now()) => !r.used_at && Date.parse(r.expires_at) > now;
-export const ACT_ST = { active:'بانتظار الاستخدام', used:'استُخدم', expired:'انتهى', revoked:'أُلغي' };
-export const actMessage = (name, code, url) => `السلام عليكم ${name}،\nرمز تفعيل حسابك في منصة مركز سما القدرات: ${code}\nادخل من: ${url}\nاكتب رقم جوالك ثم الرمز مرة واحدة ويبقى جهازك معتمدًا. الرمز صالح ${ACT_TTL_DAYS} أيام ولا تشاركه مع أحد.`;
+/* الخطوة AT (قرار المالك): المسؤول يفتح «تفعيل» لمدة محددة لجهاز واحد (activation_windows ↔ admin_open_activation)،
+   والرمز يصدر لجهاز صاحب الحساب ويظهر عليه وحده (request_login يعيده للجلسة نفسها)، ولا ترى الإدارة رمزًا ولا جهازًا. */
+export const WINDOW_MINUTES = [[15, '15 دقيقة'], [60, 'ساعة'], [1440, '24 ساعة'], [4320, '3 أيام']];
+export const windowLive = (w, now = Date.now()) => !!w && !w.used_at && !w.revoked && Date.parse(w.expires_at) > now;
+export const ACT_STATE = { on:'تم التفعيل', wait:'بانتظار التفعيل', none:'لم يُفعَّل' };
+export const NO_WINDOW = 'لا يوجد تفعيل مفتوح لحسابك على جهاز جديد. اطلب من إدارة المركز «تفعيل» حسابك، ثم اضغط «رمز التحقق» مرة أخرى.';
+export const actMessage = (name, url) => `السلام عليكم ${name}،\nفُتح تفعيل حسابك في ${'مركز سما القدرات للتدريب'}.\nادخل من: ${url}\nاكتب رقم هويتك ثم اضغط «رمز التحقق»، فيظهر لك الرمز على جهازك، اكتبه ليُعتمد جهازك ويبقى داخلًا.\nلا تشارك الرمز مع أحد.`;
+/* بصمة الرمز (محليًا كما في act_hash بالخادم): SHA-256 عند توفره، وإلا بصمة بديلة للوضع التجريبي */
+export async function sha256(t){ try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+  catch(_){ let h = 2166136261; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return 'f' + (h >>> 0).toString(16); } }

@@ -1,23 +1,23 @@
 /* =====================================================================
-   الإدارة: «تفعيل الأجهزة» (#admin-access) — إصدار رموز التفعيل للمتدربين وأولياء الأمور والمدربين (فرديًا أو جماعيًا)،
-   وكشف قابل للطباعة والتصدير، وإلغاء الأجهزة المفعَّلة. الرمز يظهر مرة واحدة عند إصداره ولا يُحفظ نصًّا في الخادم.
+   الإدارة: «تفعيل الأجهزة» (#admin-access) — الخطوة AT (قرار المالك): المسؤول يضغط «تفعيل» فتُفتح مهلة لجهاز واحد،
+   ويرسل رابط البوابة عبر واتساب (بلا رمز)؛ صاحب الحساب يكتب هويته على جهازه فيظهر له الرمز وحده. تظهر للإدارة
+   الحالة فقط: لم يُفعَّل، بانتظار التفعيل، تم التفعيل — بلا رموز ولا أنواع أجهزة.
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort, matchQ } from './utils.js';
+import { $, $$, esc, fmtNum, matchQ } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { titleBar } from './views2_main.js';
-import { modal, closeModal, confirmBox } from './views2_programs.js';
+import { confirmBox } from './views2_programs.js';
 import { AD } from './views2_admin.js';
 import { setBusy } from './features.js';
-import { docShell, printDocs, exportCSV } from './print.js';
+import { docShell, printDocs } from './print.js';
 import { publicBase } from './config.js';
 import { ROLE_TXT } from './portal_logic.js';
 import { subStatus } from './qudurat.js';
-import { ACT_ST, ACT_TTL_DAYS, actStatus, actMessage } from './device_logic.js';
+import { WINDOW_MINUTES, ACT_STATE, windowLive, actMessage } from './device_logic.js';
 import { waTo } from './absence_notify.js';
-import { CENTER } from './catalog.js';
 
-let aRole = 'student', aQ = '', aOnly = 'all', issued = [], X = { devices:[], activations:[], requests:[] };
+let aRole = 'student', aQ = '', aOnly = 'all', aMin = 15, X = { devices:[], windows:[], requests:[] };
 const PATH = { student:'student/', guardian:'guardian/', teacher:'teacher/' };
 /* أصحاب الحسابات لكل دور: الجوال هو المفتاح */
 function people(role){
@@ -28,49 +28,47 @@ function people(role){
   else (AD.trainees || []).forEach(t => { if(t.guardian_phone && t.guardian_phone !== t.phone) add(t.guardian_phone, 'ولي أمر ' + t.full_name, ''); });
   return [...m.values()].map(p => ({ ...p, name:p.names.join('، ') })).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 }
-/* رمز طلب الدخول عبر واتساب: يُطابَق الطلب بصاحبه من أسماء الحسابات، ويظهر الزر عند تطابق واحد فقط */
-function reqLink(r){
-  const m = people(r.role).filter(p => r.name && p.names.some(n => n === r.name || n.endsWith(' ' + r.name) || n.endsWith(r.name)));
-  if(m.length !== 1) return '';
-  return waTo(m[0].phone, `السلام عليكم\nرمز الدخول إلى ${({ student:'بوابة المتدرب', teacher:'بوابة المدرب', guardian:'بوابة ولي الأمر' })[r.role] || 'البوابة'}: ${r.code}\nيعمل على جهازك الذي يظهر فيه رمز الجهاز ${r.device}، وصالح ربع ساعة. لا تشاركه مع أحد.\n${CENTER.name}`);
-}
-const stateOf = p => { const dev = X.devices.filter(d => d.phone === p.phone && d.role === aRole && !d.revoked_at).length, act = X.activations.filter(a => a.phone === p.phone && a.role === aRole).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  return { dev, st:dev ? 'on' : act && actStatus(act) === 'active' ? 'wait' : 'none', act }; };
+const left = iso => { const m = Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 60000)); return m >= 1440 ? `${fmtNum(Math.round(m / 1440))} يوم` : m >= 60 ? `${fmtNum(Math.round(m / 60))} ساعة` : `${fmtNum(m)} دقيقة`; };
+const stateOf = p => { const dev = X.devices.filter(d => d.phone === p.phone && d.role === aRole && !d.revoked_at).length, w = X.windows.find(x => x.phone === p.phone && x.role === aRole);
+  return { dev, st:windowLive(w) ? 'wait' : dev ? 'on' : 'none', w }; };
+const waOf = p => waTo(p.phone, actMessage(p.names?.[0] || p.name, publicBase() + PATH[aRole]));
 
 export async function pageAccess(){
-  $('#main').innerHTML = titleBar(`${ic('lock')}تفعيل الأجهزة`, 'تفعيل الأجهزة <em>ورموز الدخول</em>', `يدخل المتدرب وولي الأمر والمدرب برقم الجوال ورمز تفعيل تصدره الإدارة. يُكتب الرمز مرة واحدة فيُعتمد الجهاز ويبقى صاحبه داخلًا. الرمز صالح ${fmtNum(ACT_TTL_DAYS)} أيام ولمرة واحدة، وجهاز جديد يحتاج رمزًا جديدًا.`) + '<div id="acBody" aria-busy="true"></div>';
-  try { X = await Store.accessData(); } catch(_){ X = { devices:[], activations:[], requests:[] }; }
+  $('#main').innerHTML = titleBar(`${ic('lock')}تفعيل الأجهزة`, 'تفعيل <em>الأجهزة</em>', 'اضغط «تفعيل» أمام الاسم فيُفتح التفعيل لجهاز واحد خلال المدة المختارة، ثم أرسل له رابط بوابته بواتساب. يكتب رقم هويته على جهازه ويضغط «رمز التحقق» فيظهر الرمز عنده وحده. لا تظهر الرموز ولا الأجهزة هنا.') + '<div id="acBody" aria-busy="true"></div>';
+  try { X = await Store.accessData(); } catch(_){ X = { devices:[], windows:[], requests:[] }; }
   draw();
 }
 function draw(){
   const all = people(aRole).map(p => ({ ...p, ...stateOf(p) })), list = all.filter(p => matchQ(aQ, p.name, p.phone) && (aOnly === 'all' || p.st === aOnly)), n = k => all.filter(p => p.st === k).length;
   $('#acBody').removeAttribute('aria-busy');
   const RQ = X.requests || [];
-  $('#acBody').innerHTML = `${RQ.length ? `<div class="card pad rv" id="acReq" style="margin-bottom:14px"><h3 class="ctitle">${ic('bell')}طلبات دخول الآن (${fmtNum(RQ.length)})</h3><p class="hint" style="margin:-4px 0 10px">كتب صاحب الحساب رقم هويته على جهاز جديد فصدر له رمز تحقق. تأكد من هويته ومن رمز الجهاز الظاهر عنده، ثم أبلغه الرمز. الرمز صالح ربع ساعة ولهذا الجهاز وحده.</p>
-      <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الدور</th><th>رمز الجهاز</th><th>رمز التحقق</th><th>الوقت</th><th></th></tr></thead><tbody>${RQ.map(r => { const l = reqLink(r); return `<tr><td>${esc(r.name || '—')}</td><td>${ROLE_TXT[r.role] || ''}</td><td class="num" dir="ltr"><b>${esc(r.device)}</b></td><td class="num" dir="ltr"><b class="ac-code">${esc(r.code)}</b></td><td class="num">${esc(String(r.created_at).slice(11, 16))}</td><td>${l ? `<a class="btn sm" target="_blank" rel="noopener" href="${l}">${ic('send')} واتساب</a>` : ''}</td></tr>`; }).join('')}</tbody></table></div></div>` : ''}<div class="tabs" style="margin-bottom:12px">${Object.entries({ student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' }).map(([k, v]) => `<button class="tab" data-ar="${k}" aria-selected="${aRole === k}">${v}</button>`).join('')}</div>
-    <div class="ord-amt" style="margin:0 0 12px"><span>الحسابات <b>${fmtNum(all.length)}</b></span><span>جهاز مفعَّل <b>${fmtNum(n('on'))}</b></span><span>رمز بانتظار الاستخدام <b>${fmtNum(n('wait'))}</b></span><span>بلا رمز <b>${fmtNum(n('none'))}</b></span></div>
+  $('#acBody').innerHTML = `${RQ.length ? `<div class="card pad rv" id="acReq" style="margin-bottom:14px"><h3 class="ctitle">${ic('bell')}طلبات دخول من أجهزة جديدة (${fmtNum(RQ.length)})</h3><p class="hint" style="margin:-4px 0 10px">حاول صاحب الحساب الدخول ولا يوجد تفعيل مفتوح له. تأكد أنه هو، ثم اضغط «تفعيل» واطلب منه الضغط على «رمز التحقق» مرة أخرى.</p>
+      <div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الدور</th><th>الوقت</th><th></th></tr></thead><tbody>${RQ.map(r => `<tr><td>${esc(r.name || '—')}</td><td>${ROLE_TXT[r.role] || ''}</td><td class="num">${esc(String(r.created_at).slice(11, 16))}</td>
+        <td style="white-space:nowrap"><button class="btn sm pri" data-rq="${esc(r.phone)}|${esc(r.role)}">${ic('lock')} تفعيل 15 دقيقة</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}<div class="tabs" style="margin-bottom:12px">${Object.entries({ student:'المتدربون', guardian:'أولياء الأمور', teacher:'المدربون' }).map(([k, v]) => `<button class="tab" data-ar="${k}" aria-selected="${aRole === k}">${v}</button>`).join('')}</div>
+    <div class="ord-amt" style="margin:0 0 12px"><span>الحسابات <b>${fmtNum(all.length)}</b></span><span>${ACT_STATE.on} <b>${fmtNum(n('on'))}</b></span><span>${ACT_STATE.wait} <b>${fmtNum(n('wait'))}</b></span><span>${ACT_STATE.none} <b>${fmtNum(n('none'))}</b></span></div>
     <div class="filters"><label class="sr-only" for="ac-q">بحث</label><input class="inp" id="ac-q" type="search" placeholder="الاسم أو الجوال" value="${esc(aQ)}" style="flex:1;min-width:200px">
-      <label class="sr-only" for="ac-o">الحالة</label><select class="inp" id="ac-o">${[['all', 'الكل'], ['none', 'بلا رمز'], ['wait', 'رمز بانتظار الاستخدام'], ['on', 'جهاز مفعَّل']].map(([k, v]) => `<option value="${k}" ${aOnly === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <button class="btn pri sm" id="acBulk" ${list.some(p => p.st !== 'on') ? '' : 'disabled'}>${ic('plus')} إصدار رموز للمعروضين غير المفعَّلين</button></div>
-    ${issued.length ? `<div class="card pad rv" id="acIssued" style="margin-bottom:14px"><h3 class="ctitle">${ic('check')}رموز صدرت الآن (${fmtNum(issued.length)})</h3><p class="hint" style="margin:-4px 0 10px">تظهر الرموز هنا مرة واحدة. اطبع الكشف أو صدّره الآن، ثم سلّم كل رمز لصاحبه.</p>
-      <div class="tblwrap" style="max-height:300px;overflow:auto"><table class="tb"><thead><tr><th>الاسم</th><th>الجوال</th><th>رمز التفعيل</th><th></th></tr></thead><tbody>${issued.map(x => `<tr><td>${esc(x.name)}</td><td class="num" dir="ltr">${esc(x.phone)}</td><td class="num" dir="ltr"><b class="ac-code">${esc(x.code || '—')}</b>${x.error ? `<span class="hint">${esc(x.error)}</span>` : ''}</td>
-        <td>${x.code ? `<a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/966${x.phone.slice(1)}?text=${encodeURIComponent(actMessage(x.name, x.code, publicBase() + PATH[x.role]))}">واتساب</a>` : ''}</td></tr>`).join('')}</tbody></table></div>
-      <div style="display:flex;gap:8px;justify-content:end;margin-top:10px;flex-wrap:wrap"><button class="btn sm" id="acHide">إخفاء الرموز</button><button class="btn sm" id="acCsv">${ic('copy')} تصدير CSV</button><button class="btn pri sm" id="acPrint">${ic('form')} طباعة الكشف</button></div></div>` : ''}
-    ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الجوال</th><th>الحالة</th><th></th></tr></thead><tbody>${list.slice(0, 400).map(p => `<tr><td>${esc(p.name)}${p.extra ? `<div class="hint">${esc(p.extra)}</div>` : ''}</td><td class="num" dir="ltr">${esc(p.phone)}</td>
-        <td>${p.st === 'on' ? `<span class="pill dot ok">${fmtNum(p.dev)} جهاز مفعَّل</span>` : p.st === 'wait' ? `<span class="pill dot warn">${ACT_ST.active}</span><div class="hint">ينتهي ${fmtShort(p.act.expires_at.slice(0, 10))}</div>` : `<span class="pill dot g">${p.act ? ACT_ST[actStatus(p.act)] : 'بلا رمز'}</span>`}</td>
-        <td style="white-space:nowrap"><button class="btn sm pri" data-ai="${p.phone}">${p.st === 'none' ? 'إصدار رمز' : 'رمز جديد'}</button>${p.dev ? ` <button class="btn sm danger soft" data-av="${p.phone}">إلغاء الأجهزة</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : emptyBox('لا حسابات بهذه التصفية')}`;
+      <label class="sr-only" for="ac-o">الحالة</label><select class="inp" id="ac-o">${[['all', 'الكل'], ['none', ACT_STATE.none], ['wait', ACT_STATE.wait], ['on', ACT_STATE.on]].map(([k, v]) => `<option value="${k}" ${aOnly === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <label class="sr-only" for="ac-m">مدة التفعيل</label><select class="inp" id="ac-m" title="مدة بقاء التفعيل مفتوحًا">${WINDOW_MINUTES.map(([m, t]) => `<option value="${m}" ${aMin === m ? 'selected' : ''}>مفتوح ${t}</option>`).join('')}</select>
+      <button class="btn pri sm" id="acBulk" ${list.some(p => p.st === 'none') ? '' : 'disabled'}>${ic('lock')} تفعيل المعروضين غير المفعَّلين</button>
+      <button class="btn sm" id="acPrint" ${list.some(p => p.st === 'wait') ? '' : 'disabled'}>${ic('form')} كشف بانتظار التفعيل</button></div>
+    ${list.length ? `<div class="card rv" id="acList"><div class="tblwrap"><table class="tb"><thead><tr><th>الاسم</th><th>الجوال</th><th>الحالة</th><th></th></tr></thead><tbody>${list.slice(0, 400).map(p => `<tr><td>${esc(p.name)}${p.extra ? `<div class="hint">${esc(p.extra)}</div>` : ''}</td><td class="num" dir="ltr">${esc(p.phone)}</td>
+        <td>${p.st === 'on' ? `<span class="pill dot ok">${ACT_STATE.on}</span>` : p.st === 'wait' ? `<span class="pill dot warn">${ACT_STATE.wait}</span><div class="hint">يُغلق بعد ${left(p.w.expires_at)}${p.dev ? ' · لديه جهاز مفعَّل' : ''}</div>` : `<span class="pill dot g">${ACT_STATE.none}</span>`}</td>
+        <td style="white-space:nowrap">${p.st === 'wait' ? `<a class="btn sm" target="_blank" rel="noopener" href="${esc(waOf(p))}">${ic('send')} واتساب الرابط</a> <button class="btn sm" data-ax="${p.phone}">إيقاف</button>`
+          : `<button class="btn sm pri" data-ai="${p.phone}">${p.st === 'on' ? 'تفعيل جهاز آخر' : 'تفعيل'}</button>`}${p.dev ? ` <button class="btn sm danger soft" data-av="${p.phone}">إلغاء الأجهزة</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>` : emptyBox('لا حسابات بهذه التصفية')}`;
   $$('[data-ar]').forEach(b => b.onclick = () => { aRole = b.dataset.ar; aOnly = 'all'; draw(); });
   $('#ac-q').oninput = e => { aQ = e.target.value; clearTimeout(draw.t); draw.t = setTimeout(() => { draw(); const i = $('#ac-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
   $('#ac-o').onchange = e => { aOnly = e.target.value; draw(); };
-  const nameOf = ph => all.find(p => p.phone === ph)?.name || '', done = async rows => { issued = rows.map(r => ({ ...r, name:nameOf(r.phone) })); X = await Store.accessData(); draw(); };
-  $$('[data-ai]').forEach(b => b.onclick = async () => { setBusy(b, true, '…'); try { await done([await Store.issueActivation(b.dataset.ai, aRole)]); toast('صدر رمز التفعيل'); } catch(x){ setBusy(b, false); toast(x.message); } });
-  $$('[data-av]').forEach(b => b.onclick = () => confirmBox('إلغاء الأجهزة المفعَّلة', `يخرج ${nameOf(b.dataset.av)} من كل أجهزته ويحتاج رمزًا جديدًا للدخول.`, async () => { await Store.revokeDevices(b.dataset.av, aRole); X = await Store.accessData(); toast('أُلغيت الأجهزة'); draw(); }, 'إلغاء الأجهزة'));
-  $('#acBulk').onclick = () => { const t = list.filter(p => p.st !== 'on');
-    confirmBox('إصدار رموز جماعي', `سيصدر رمز جديد لـ ${fmtNum(t.length)} حسابًا، ويُلغى أي رمز سابق لم يُستخدم. تظهر الرموز مرة واحدة للطباعة والتصدير.`, async () => { await done(await Store.issueActivationBulk(aRole, t.map(p => p.phone))); toast(`صدر ${fmtNum(issued.filter(x => x.code).length)} رمزًا`); }, 'إصدار الرموز'); };
-  if(issued.length){ const ok = issued.filter(x => x.code);
-    $('#acHide').onclick = () => { issued = []; draw(); };
-    $('#acCsv').onclick = () => exportCSV('رموز-التفعيل', [['الاسم', 'الجوال', 'الدور', 'رمز التفعيل', 'رابط الدخول'], ...ok.map(x => [x.name, x.phone, ROLE_TXT[x.role], x.code, publicBase() + PATH[x.role]])]);
-    $('#acPrint').onclick = () => printDocs([docShell({ docNo:'ACT-' + new Date().toISOString().slice(0, 10).replace(/-/g, ''), title:'كشف رموز التفعيل', sub:`${ROLE_TXT[aRole]} · صالحة ${ACT_TTL_DAYS} أيام ولمرة واحدة`,
-      body:`<table class="inv-t"><thead><tr><th>م</th><th>الاسم</th><th>الجوال</th><th>رمز التفعيل</th><th>التوقيع بالاستلام</th></tr></thead><tbody>${ok.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td dir="ltr">${x.phone}</td><td dir="ltr" style="font-size:14px;font-weight:700;letter-spacing:2px">${x.code}</td><td></td></tr>`).join('')}</tbody></table>`,
-      note:`الدخول من ${publicBase() + PATH[aRole]} برقم الجوال ثم الرمز. الكشف سري: يُسلَّم كل رمز لصاحبه فقط ثم يُتلف.` })], 'كشف رموز التفعيل'); }
+  $('#ac-m').onchange = e => { aMin = +e.target.value; };
+  const nameOf = ph => all.find(p => p.phone === ph)?.name || '', reload = async () => { X = await Store.accessData(); draw(); };
+  $$('[data-ai]').forEach(b => b.onclick = async () => { setBusy(b, true, '…'); try { await Store.openActivation(b.dataset.ai, aRole, aMin); await reload(); toast('فُتح التفعيل. أرسل له الرابط بواتساب.'); } catch(x){ setBusy(b, false); toast(x.message); } });
+  $$('[data-rq]').forEach(b => b.onclick = async () => { const [ph, role] = b.dataset.rq.split('|'); setBusy(b, true, '…'); try { await Store.openActivation(ph, role, 15); await reload(); toast('فُتح التفعيل 15 دقيقة. اطلب منه الضغط على «رمز التحقق» مرة أخرى.'); } catch(x){ setBusy(b, false); toast(x.message); } });
+  $$('[data-ax]').forEach(b => b.onclick = async () => { setBusy(b, true, '…'); try { await Store.closeActivation(b.dataset.ax, aRole); await reload(); toast('أُوقف التفعيل'); } catch(x){ setBusy(b, false); toast(x.message); } });
+  $$('[data-av]').forEach(b => b.onclick = () => confirmBox('إلغاء الأجهزة المفعَّلة', `يخرج ${nameOf(b.dataset.av)} من كل أجهزته ويحتاج تفعيلًا جديدًا للدخول.`, async () => { await Store.revokeDevices(b.dataset.av, aRole); await reload(); toast('أُلغيت الأجهزة'); }, 'إلغاء الأجهزة'));
+  $('#acBulk').onclick = () => { const t = list.filter(p => p.st === 'none'), mt = WINDOW_MINUTES.find(([m]) => m === aMin)[1];
+    confirmBox('تفعيل جماعي', `سيُفتح التفعيل ${mt} لـ ${fmtNum(t.length)} حسابًا، لجهاز واحد لكل حساب. أرسل بعدها رابط البوابة لكل واحد من زر واتساب أو اطبع الكشف. لا تظهر أي رموز.`, async () => {
+      const r = await Store.openActivationBulk(aRole, t.map(p => p.phone), aMin); await reload(); toast(`فُتح التفعيل لـ ${fmtNum(r.filter(x => !x.error).length)} حسابًا`); }, 'فتح التفعيل'); };
+  $('#acPrint').onclick = () => { const w = list.filter(p => p.st === 'wait');
+    printDocs([docShell({ docNo:'ACT-' + new Date().toISOString().slice(0, 10).replace(/-/g, ''), title:'كشف تفعيل الحسابات', sub:`${ROLE_TXT[aRole]} · بانتظار التفعيل`,
+      body:`<table class="inv-t"><thead><tr><th>م</th><th>الاسم</th><th>الجوال</th><th>يُغلق التفعيل</th><th>التوقيع</th></tr></thead><tbody>${w.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td dir="ltr">${x.phone}</td><td>${left(x.w.expires_at)}</td><td></td></tr>`).join('')}</tbody></table>`,
+      note:`الدخول من ${publicBase() + PATH[aRole]}: يكتب صاحب الحساب رقم هويته ثم يضغط «رمز التحقق» فيظهر الرمز على جهازه وحده. لا يحتوي هذا الكشف على أي رمز.` })], 'كشف التفعيل'); };
 }

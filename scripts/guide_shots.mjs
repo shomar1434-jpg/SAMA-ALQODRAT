@@ -76,7 +76,9 @@ await m.goto(U); await m.waitForTimeout(1500);
 const T = await m.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); return D.teachers.find(t => t.section === 'boys' && t.subjects.includes('كمي')); });
 const login = async (role, phone, pre) => { await m.goto(U + role + '/'); await m.waitForTimeout(900);
   if (await m.$('#logoutBtn:not([hidden])')) { await m.click('#logoutBtn'); await m.waitForTimeout(500); }
-  await m.fill('#pl-phone', phone); if (pre) await mshot(pre); await m.click('#plB'); await m.waitForTimeout(400); await m.fill('#pl-code', '1234'); if (pre) await mshot(pre + '_code'); await m.click('#plB'); await m.waitForTimeout(1200); };
+  await m.evaluate(([ph, role]) => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); D.act_windows = (D.act_windows || []).concat([{ id: 'g-' + role, phone: ph, role, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 9e5).toISOString(), used_at: null, revoked: false }]); localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); }, [phone, role]);
+  await m.fill('#pl-phone', phone); if (pre) await mshot(pre); await m.click('#plB'); await m.waitForTimeout(500); const shown = ((await m.textContent('#otpShow b').catch(() => '')) || '').trim();
+  await m.fill('#pl-code', /^\d{6}$/.test(shown) ? shown : '1234'); if (pre) await mshot(pre + '_code'); await m.click('#plB'); await m.waitForTimeout(1200); };
 const mtab = async (attr, k) => { try { await m.click(`[${attr}="${k}"]`); await m.waitForTimeout(700); } catch (e) { console.log('TABFAIL', k); } };
 await login('teacher', T.phone, 't01_login');
 await mshot('t02_today'); await m.evaluate(() => scrollTo(0, 700)); await mshot('t03_today_sheet');
