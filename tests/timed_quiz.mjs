@@ -12,7 +12,7 @@ const login = async (role, phone) => { await p.goto(U + role + '/'); await p.wai
   if (await p.$('#logoutBtn:not([hidden])')) { await p.click('#logoutBtn'); await p.waitForTimeout(400); }
   await p.fill('#pl-phone', phone); await p.click('#plB'); await p.waitForTimeout(300); await p.fill('#pl-code', '1234'); await p.click('#plB'); await p.waitForTimeout(900); };
 const tab = async (attr, k) => { await p.click(`[${attr}="${k}"]`); await p.waitForTimeout(500); };
-const mk = async title => { await p.click('#hwAdd'); await p.waitForTimeout(300); await p.fill('#hf-t', title); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200); await p.selectOption('#hf-n', '5'); await p.click('#hfS'); await p.waitForTimeout(800); };
+const mk = async title => { await p.click('#hwAdd'); await p.waitForTimeout(300); await p.fill('#hf-t', title); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200); await p.fill('#hf-n', '5'); await p.click('#hfS'); await p.waitForTimeout(800); };
 
 await p.goto(U); await p.waitForTimeout(800);
 let D = await data();

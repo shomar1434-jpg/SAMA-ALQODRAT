@@ -57,7 +57,7 @@ ok(/بنك أسئلتي/.test(await text('#tBody')) && !(await text('#tBody')).i
 await tab('data-tt', 'hw');
 await p.click('#hwAdd'); await p.waitForTimeout(300);
 await p.fill('#hf-t', 'اختبار الأسس'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200);
-await p.selectOption('#hf-u', 'الأسس'); await p.selectOption('#hf-n', '5'); await p.click('#hfS'); await p.waitForTimeout(800);
+await p.check('#hfUnits input[value="الأسس"]'); await p.fill('#hf-n', '5'); await p.click('#hfS'); await p.waitForTimeout(800);
 D = await data();
 const qa = D.assignments.find(a => a.title === 'اختبار الأسس');
 ok(qa && qa.kind === 'quiz' && qa.quiz.length === 3 && qa.quiz.every(q => imp.some(x => x.text === q.text) || q.text.includes('10 أس')), 'واجب اختبار من وحدة البنك (3 أسئلة)');

@@ -1443,3 +1443,22 @@ body.sim-on{overflow:hidden}
 @media(max-width:400px){.dbst{width:30px;height:30px}.dbst .ic{width:16px;height:16px}.topbar .in{gap:5px}.brand{gap:7px}}
 @media(max-width:860px){.brand{flex:1 1 0}}
 @media(max-width:400px){.brand-t b:last-child{white-space:normal;line-height:1.2}}
+/* بنّاء الاختبار للمدرب (الخطوة AV): أقسام متعددة، مختار مرتب، معاينة */
+.qb{display:grid;gap:12px;border:1px solid var(--border);border-radius:14px;padding:12px}
+.qb-units{display:flex;flex-wrap:wrap;gap:6px 14px}
+.qb-u{min-height:44px}
+.qb-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.qb-row .field{flex:1 1 160px}
+.qb-man>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:500}
+.qb-man[open]>summary{margin-bottom:8px}
+.qb-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+.qb-list{margin:0;padding-inline-start:22px;display:grid;gap:4px;max-height:260px;overflow:auto}
+.qb-list li{display:flex;gap:4px;align-items:center;padding:4px 6px;border-radius:10px;background:var(--surface-sunken,var(--brand-tint))}
+.qb-list li .qb-t{flex:1;min-width:0;font-size:13.5px;overflow-wrap:anywhere}
+.qb-list li .btn{min-width:44px;min-height:44px;padding:0;justify-content:center}
+.qb-prev{border-top:1px solid var(--border);padding-top:10px}.qb-prev .seg{margin-bottom:10px}
+.qb-opts{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:4px}
+.qb-opts li{display:flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-card)}
+.qb-opts li.ok{border-color:var(--success,#16a34a);font-weight:600}
+.qb-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border-control);flex:none}
+.fb-q{margin:6px 0 0;padding:6px 10px;border-inline-start:3px solid var(--brand);background:var(--brand-tint);border-radius:8px;font-size:14px}
+.fb-in{width:100%;margin-top:6px}
