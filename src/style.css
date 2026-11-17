@@ -1478,3 +1478,14 @@ body.sim-on{overflow:hidden}
 .reg-intro{border:1px solid var(--brand);background:var(--brand-tint)}.reg-intro p{line-height:1.9;margin:0 0 10px}
 .reg-intro-l{margin:0 0 10px;padding-inline-start:22px;display:grid;gap:4px;line-height:1.8}
 .reg-intro .row-actions .btn{white-space:normal;text-align:center}
+/* استوديو البث (الخطوة AZ) */
+.lv-player{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden}
+.lv-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.lv-player:fullscreen{border-radius:0}
+.lv-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}.lv-acts .btn{min-height:44px}
+.lv-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.lv-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-card)}
+.lv-row.on{border-color:var(--brand);background:var(--brand-tint)}
+.lv-btns{display:flex;gap:6px;flex-wrap:wrap}.lv-btns .btn,.lv-row .btn{min-height:44px}
+.lv-h{margin:12px 0 6px;font-size:14px;color:var(--ink-muted)}
+.lv-how summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.lv-how ol{line-height:1.9;padding-inline-start:22px}

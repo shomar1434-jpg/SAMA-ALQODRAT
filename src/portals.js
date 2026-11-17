@@ -23,10 +23,12 @@ import { weeklyCard, bindWeeklyCard } from './weekly_views.js';
 import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
 import { planOfOrder } from './order_logic.js';
+import { teacherLive, studentLive } from './studio_views.js';
+import { lectureState } from './studio_logic.js';
 import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml, printDaySheet } from './trainer_views.js';
 
-const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','chat','المراسلة'],['rate','award','تقييم المدرب']];
-const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['bank','database','بنك الأسئلة والنتائج'],['msg','chat','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
+const S_TABS = [['dash','chart','لوحتي'],['live','tv','البث المباشر'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','chat','المراسلة'],['rate','award','تقييم المدرب']];
+const T_TABS = [['today','calendar','كشف اليوم'],['people','user','متدربيّ'],['groups','users','المجموعات'],['cohorts','users','دفعات البرامج'],['hw','form','الواجبات'],['live','tv','البث المباشر'],['bank','database','بنك الأسئلة والنتائج'],['msg','chat','الرسائل'],['rate','award','تقييماتي'],['profile','id','ملفي']];
 let sTab = 'dash', tTab = 'today', welcomed = false;
 const tabBar = (tabs, cur, attr, badges = {}) => tabs.length < 2 ? '' : `<div class="tabs ptabs" role="tablist">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" ${attr}="${k}" aria-selected="${cur === k}">${ic(i)}${l}${badges[k] ? ` <span class="badge-n">${fmtNum(badges[k])}</span>` : ''}</button>`).join('')}</div>`;
 
@@ -212,11 +214,12 @@ function viewStudent(D){
       ${wst.kind === 'now' || (!it && px) ? `<button class="btn pri hero-checkin" id="sCheckin">${ic('check')} تسجيل الحضور</button>` : ''}
       ${wst.kind === 'done' ? `<span class="hero-pill hero-done">${ic('check')} سُجّل حضورك اليوم</span>` : ''}
       ${it?.upcoming[0] ? `<div class="next-ses"><span>جلستي القادمة</span><b>${DAYS[new Date(it.upcoming[0].date + 'T12:00:00Z').getUTCDay()]} ${fmtShort(it.upcoming[0].date)}</b><span class="num">${t12(it.upcoming[0].start)}</span></div>` : ''}</section>
-    ${tabBar(pr.items.length ? S_TABS : S_TABS.slice(0, 1), sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length })}
+    ${tabBar(pr.items.length ? S_TABS : S_TABS.slice(0, 1), sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length, live:(D.lectures || []).filter(l => lectureState(l) === 'live').length })}
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
   if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
   if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name, o => planOfOrder(D, o)) + trainersCardHtml(D, pr.trainee.id)); bindOrdersCard($('#sBody'), mo, reload); }
+  else if(sTab === 'live'){ const v = studentLive(D); $('#sBody').innerHTML = v.html; v.bind(() => viewStudent(D)); }
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
   $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
@@ -288,13 +291,13 @@ function bindLinkForm(){
 /* مساعدة: واتساب المركز واتصال — في أسفل لوحات البوابات */
 const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي على مركز سما القدرات للتدريب.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
 /* تبويبات المدرب حسب ما أُسند إليه: مقررات الباقات، أو دفعات البرامج، أو كلاهما */
-const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'profile' ? true : x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
+const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'profile' ? true : x[0] === 'live' ? q || c : x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
 function viewTeacher(D, quiet){
   { const TT = tTabsOf(D); if(!TT.some(x => x[0] === tTab)) tTab = TT[0][0]; }
   if(tTab !== 'today'){ if(quiet) return; const t = teacherDashboard(D, D.me), reload = async () => viewTeacher(await Store.portalData('teacher'));
     $('#app').innerHTML = `<div class="wrap"><section class="hero portal-hero rv"><div><span class="hero-pill">${ic('book')}${TITLES.teacher}</span><h1>${esc(t.teacher.name)}</h1><p>قسم ${esc(t.teacher.section)} · ${esc(t.teacher.subjects.join('، '))}</p></div></section>
       ${tabBar(tTabsOf(D), tTab, 'data-tt', { msg:(D.messages || []).filter(m => m.from === 'student' && !m.read_at).length })}<div id="tBody"></div></div>`;
-    const v = ({ cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings, groups:teacherGroups, people:teacherPeople, profile:teacherProfile })[tTab](D, reload, k => { tTab = k; viewTeacher(D); }); $('#tBody').innerHTML = v.html; v.bind();
+    const v = ({ live:teacherLive, cohorts:teacherCohorts, hw:teacherHomework, bank:teacherBank, msg:teacherMessages, rate:teacherRatings, groups:teacherGroups, people:teacherPeople, profile:teacherProfile })[tTab](D, reload, k => { tTab = k; viewTeacher(D); }); $('#tBody').innerHTML = v.html; v.bind();
     $$('[data-tt]').forEach(b => b.onclick = () => { tTab = b.dataset.tt; viewTeacher(D); }); return; }
   const t = teacherDashboard(D, D.me), n = riyadhNow();
   const PH = { none:'لا توجد جلسة اليوم', before:'الجلسة لم تبدأ', live:'الجلسة جارية', after:'انتهت جلسة اليوم' };
