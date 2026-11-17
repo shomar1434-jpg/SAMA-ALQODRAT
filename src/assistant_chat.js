@@ -1,4 +1,6 @@
 import { matchResponse } from './assistant_logic.js';
+import { productsOf, matchProduct, centerChat } from './interest_logic.js';
+import { planName } from './qudurat.js';
 
 /* =====================================================================
    مساعد سما الذكي (الخطوة BD): زر عائم أسفل يمين الشاشة بأيقونة واحدة بثلاث حالات (تصميم المالك 17 نوفمبر):
@@ -40,12 +42,12 @@ export function mountAssistant(store) {
     if (s === 'done' && !panel.hidden) doneTimer = setTimeout(() => setState('idle'), DONE_MS);
   };
   const paintFab = () => { const s = state; state = ''; setState(s || 'idle'); };
-  const message = (who, text, actions = []) => {
+  const message = (who, text, actions = [], extras = []) => {
     const bubble = document.createElement('div');
     bubble.className = 'assistant-message ' + (who === 'me' ? 'me' : 'bot');
     const body = document.createElement('p'); body.textContent = text;
     bubble.append(body);
-    if (actions.length) {
+    if (actions.length || extras.length) {
       const acts = document.createElement('div'); acts.className = 'as-acts';
       for (const action of actions.slice(0, 4)) {
         const button = document.createElement('button');
@@ -53,12 +55,51 @@ export function mountAssistant(store) {
         button.onclick = () => send(action);
         acts.append(button);
       }
+      for (const x of extras) {
+        const el = document.createElement(x.href ? 'a' : 'button');
+        el.className = 'btn sm as-x'; el.textContent = x.label;
+        if (x.href) { el.href = x.href; el.target = '_blank'; el.rel = 'noopener'; } else { el.type = 'button'; el.onclick = () => x.onClick(el); }
+        if (x.id) el.dataset.as = x.id;
+        acts.append(el);
+      }
       bubble.append(acts);
     }
     find('assistantMessages').append(bubble);
     find('assistantMessages').scrollTop = find('assistantMessages').scrollHeight;
+    return bubble;
   };
   const load = async () => { rows = await store.assistantResponses(); loaded = true; };
+  const sid = () => { try { let v = sessionStorage.getItem('sama_as_sid'); if (!v) { v = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join(''); sessionStorage.setItem('sama_as_sid', v); } return v; } catch (_) { return 'anon-' + Date.now().toString(36); } };
+  let products = null;
+  const loadProducts = async () => {
+    if (products) return products;
+    try { const [c, p] = await Promise.all([store.catalog(), store.publicPlans()]); products = productsOf(c.programs || [], (p.plans || []).filter(x => x.mode !== 'remote'), planName); }
+    catch (_) { products = []; }
+    return products;
+  };
+  /* «أبلغوني»: الاسم وواتساب والموافقة، ويُحفظ مرتبطًا بالبرنامج أو الباقة فقط */
+  const interestForm = async product => {
+    const list = await loadProducts(); if (!list.length) return;
+    const box = document.createElement('form'); box.className = 'assistant-message bot as-form'; box.noValidate = true;
+    const opt = p => `<option value="${p.kind}:${p.id}" ${product && p.kind === product.kind && p.id === product.id ? 'selected' : ''}>${p.name.replace(/[<>&"]/g, '')}</option>`;
+    box.innerHTML = `<p>اترك اسمك ورقم واتساب، ونبلغك من واتساب المركز عند إتاحة التسجيل أو العروض.</p>
+      <label class="sr-only" for="asiP">البرنامج أو الباقة</label><select class="inp" id="asiP">${list.map(opt).join('')}</select>
+      <label class="sr-only" for="asiN">الاسم</label><input class="inp" id="asiN" placeholder="الاسم" maxlength="80" autocomplete="name">
+      <label class="sr-only" for="asiM">رقم واتساب</label><input class="inp" id="asiM" placeholder="رقم واتساب 05xxxxxxxx" inputmode="numeric" maxlength="10" dir="ltr" autocomplete="tel">
+      <label class="as-ok"><input type="checkbox" id="asiC"> <span>أوافق على استقبال رسائل مركز سما بخصوص هذا البرنامج أو الباقة، ويمكنني إيقافها متى شئت.</span></label>
+      <p class="errtxt" id="asiE" role="alert"></p><button class="btn pri sm" id="asiS">أبلغوني</button>`;
+    find('assistantMessages').append(box); find('assistantMessages').scrollTop = find('assistantMessages').scrollHeight;
+    box.querySelector('#asiN').focus();
+    box.onsubmit = async e => {
+      e.preventDefault(); const b = box.querySelector('#asiS'); b.disabled = true; box.querySelector('#asiE').textContent = '';
+      const [kind, id] = box.querySelector('#asiP').value.split(':');
+      try {
+        await store.registerInterest({ full_name: box.querySelector('#asiN').value, phone: box.querySelector('#asiM').value, kind, ref_id: id, consent: box.querySelector('#asiC').checked });
+        const name = list.find(p => p.kind === kind && p.id === id)?.name || '';
+        box.remove(); message('bot', `سجّلنا اهتمامك بـ«${name}». سيتواصل معك المركز من واتساب 0561606878 عند إتاحة التسجيل أو العروض.`); setState('done');
+      } catch (x) { b.disabled = false; box.querySelector('#asiE').textContent = x.message; }
+    };
+  };
   const send = async text => {
     const question = String(text || '').trim();
     if (!question || sending) return;
@@ -71,8 +112,14 @@ export function mountAssistant(store) {
     let reply = null, failed = false;
     try { await load(); reply = matchResponse(rows, question); } catch (_) { failed = true; }
     await new Promise(r => setTimeout(r, Math.max(0, TYPING_MIN_MS - (Date.now() - t0))));
+    const product = failed ? null : matchProduct(question, await loadProducts());
+    const notify = product || ['الباقات', 'التسجيل'].includes(reply?.category) ? [{ id: 'notify', label: product ? `أبلغوني بإتاحة «${product.name}» وعروضه` : 'أبلغوني بالإتاحة والعروض', onClick: () => interestForm(product) }] : [];
     if (failed) message('bot', 'تعذّر تحميل الرد الآن. أعد المحاولة أو تواصل مع المركز على واتساب 0561606878.');
-    else message('bot', reply?.answer || 'للاستفسار عن هذا الموضوع، تواصل مع مركز سما القدرات عبر واتساب 0561606878.', reply?.actions);
+    else message('bot', reply?.answer || 'للاستفسار عن هذا الموضوع، تواصل مع مركز سما القدرات عبر واتساب 0561606878.', reply?.actions, notify);
+    if (product) {
+      const r = await store.noteInquiry(sid(), product.kind, product.id).catch(() => null);
+      if (r?.demand) message('bot', `هناك إقبال على «${product.name}» ومجال للتسجيل فيه. تواصل مع المركز لحجز مقعدك.`, [], [{ id: 'wa', label: 'واتساب المركز', href: centerChat(`السلام عليكم، أرغب بالتسجيل في «${product.name}».`) }]);
+    }
     setState('done');
     sending = false; button.disabled = false;
   };
