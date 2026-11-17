@@ -8,6 +8,7 @@ import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_lo
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
 import { PUB_STATES } from './courses.js';
+import { checkLecture, lecturesForTrainees, ytId } from './studio_logic.js';
 import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
 import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256 } from './device_logic.js';
@@ -225,7 +226,7 @@ export function scopeData(D, role, phone){
           attendance:(D.attendance||[]).filter(a=>eids.includes(a.enrollment_id)), certificates:(D.certificates||[]).filter(x=>eids.includes(x.enrollment_id)).map(x=>({id:x.id, serial:x.serial, enrollment_id:x.enrollment_id, rate:x.rate, issued_at:x.issued_at, revoked:x.revoked})) }; })(),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)).map(attemptPublic), ratings:(D.ratings||[]).filter(r=>ids.includes(r.trainee_id)), messages:(D.messages||[]).filter(m=>ids.includes(m.trainee_id)) }; };
   if(role==='student'){ const ids=D.trainees.filter(t=>normPhone(t.phone)===ph).map(t=>t.id);
-    return {...base, ...forTrainees(ids), orders:ordersFor(ids), notifications:(D.notifications||[]).filter(x=>x.to==='student'&&ids.includes(x.trainee_id)), guardian_links:[]}; }
+    return {...base, ...forTrainees(ids), lectures:lecturesForTrainees(D, ids), orders:ordersFor(ids), notifications:(D.notifications||[]).filter(x=>x.to==='student'&&ids.includes(x.trainee_id)), guardian_links:[]}; }
   if(role==='guardian'){ const links=(D.guardian_links||[]).filter(l=>l.status==='verified'&&normPhone(l.guardian_phone)===ph), ids=links.map(l=>l.trainee_id);
     return {...base, ...forTrainees(ids), orders:ordersFor(ids), guardian_links:links.map(l=>({...l, guardian_phone:ph})), notifications:(D.notifications||[]).filter(x=>x.to==='guardian'&&ids.includes(x.trainee_id))}; }
   if(role==='teacher'){ const me=(D.teachers||[]).find(t=>t.active!==false&&normPhone(t.phone)===ph); if(!me) return null;
@@ -236,7 +237,7 @@ export function scopeData(D, role, phone){
       notifications:(D.notifications||[]).filter(x=>x.sender==='teacher:'+me.id), notifications_in:(D.notifications||[]).filter(x=>x.to==='teacher'&&x.teacher_id===me.id),
       questions:teacherBank(D, me), groups:(D.trainer_groups||[]).filter(g=>g.teacher_id===me.id).map(g=>({id:g.id, name:g.name, trainee_ids:g.trainee_ids.filter(id=>ids.includes(id)), created_at:g.created_at})),
       attempts:(D.attempts||[]).filter(a=>ids.includes(a.trainee_id)&&a.submitted_at&&(a.kind==='sim'||(a.teacher_id ? a.teacher_id===me.id : a.section===me.section&&(me.subjects||[]).includes(a.subject)))),
-      rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id),
+      rating_summary:ratingSummary(D, me.id), messages:(D.messages||[]).filter(m=>m.teacher_id===me.id), lectures:(D.lectures||[]).filter(l=>l.teacher_id===me.id).sort((a,b)=>b.starts_at.localeCompare(a.starts_at)),
       // دفعات البرامج المسندة إليه: كشفها وحضورها (أسماء المتدربين فقط)
       ...(()=>{ const cs=(D.cohorts||[]).filter(c=>c.teacher_id===me.id&&!cohortArchived(c)), cids=cs.map(c=>c.id), en=(D.enrollments||[]).filter(e=>cids.includes(e.cohort_id)&&e.status!=='ملغى'), eids=en.map(e=>e.id), tids=en.map(e=>e.trainee_id);
         return { cohorts:cs, programs:(D.programs||[]).filter(p=>cs.some(c=>c.program_id===p.id)).map(p=>({id:p.id, code:p.code, name:p.name, hours:p.hours})), enrollments:en,
@@ -795,6 +796,13 @@ export const LocalStore = {
   /* ملف المدرب: يعدّل نبذته ورابط قناته وصورته فقط */
   async saveMyProfile(p){ const me=await this._me(), x=checkProfile(p); Object.assign(me, x); this.audit('teacher.profile', me.id); this.save(); return {ok:true}; },
   /* مجموعات المدرب المحفوظة: من متدربيه فقط */
+  /* استوديو البث (الخطوة AZ) ↔ teacher_save_lecture / teacher_set_lecture / admin_lectures */
+  async saveLecture(f){ const me=await this._me(), D=this.data; D.lectures=D.lectures||[]; const mine=(D.cohorts||[]).filter(c=>c.teacher_id===me.id).map(c=>c.id), x=checkLecture(f, me, mine);
+    if(f.id){ const l=D.lectures.find(y=>y.id===f.id&&y.teacher_id===me.id&&y.status!=='cancelled'); if(!l) throw new Error('المحاضرة غير موجودة أو ملغاة'); Object.assign(l, x, {section:x.cohort_id?'all':me.section, updated_at:new Date().toISOString()}); this.audit('lectures.update', l.id); this.save(); return {ok:true, id:l.id}; }
+    const l={id:uid(), teacher_id:me.id, section:x.cohort_id?'all':me.section, ...x, status:'scheduled', created_at:new Date().toISOString()}; D.lectures.push(l); this.audit('lectures.insert', l.id); this.save(); return {ok:true, id:l.id}; },
+  async setLectureStatus(id, status){ if(!['scheduled','ended','cancelled'].includes(status)) throw new Error('حالة غير صالحة'); const D=this.data, l=(D.lectures||[]).find(y=>y.id===id); if(!l) throw new Error('غير مصرح');
+    let ok=await this.isAdmin().catch(()=>false); if(!ok){ const me=await this._me(); ok=l.teacher_id===me.id; } if(!ok) throw new Error('غير مصرح'); l.status=status; l.updated_at=new Date().toISOString(); this.audit('lectures.update', id, {after:{status}}); this.save(); return {ok:true}; },
+  async adminLectures(){ const D=this.data; return (D.lectures||[]).map(l=>({...l, teacher_name:(D.teachers||[]).find(t=>t.id===l.teacher_id)?.full_name||'', program_name:(D.programs||[]).find(p=>p.id===(D.cohorts||[]).find(c=>c.id===l.cohort_id)?.program_id)?.name||null})).sort((a,b)=>b.starts_at.localeCompare(a.starts_at)); },
   async saveGroup(g){ const me=await this._me(), D=this.data, x=checkGroup(D, me, g); D.trainer_groups=D.trainer_groups||[];
     if(g.id){ const ex=D.trainer_groups.find(y=>y.id===g.id&&y.teacher_id===me.id); if(!ex) throw new Error('غير مصرح'); Object.assign(ex, x); }
     else { if(D.trainer_groups.filter(y=>y.teacher_id===me.id).length>=GROUPS_MAX) throw new Error(`الحد ${GROUPS_MAX} مجموعة`); D.trainer_groups.push({id:uid(), teacher_id:me.id, ...x, created_at:new Date().toISOString()}); }
@@ -1005,6 +1013,10 @@ export const CloudStore = {
   async commentSubmission(id, f){ return this._e(await this.sb.rpc('teacher_comment',{p_id:id, p:f})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
   async saveMyProfile(p){ return this._e(await this.sb.rpc('teacher_save_profile',{p:checkProfile(p)})); },
+  async saveLecture(f){ const {id, title, minutes, starts_at, youtube, subject, cohort_id, recording}=f; const yt=ytId(youtube); if(yt===null) throw new Error('رابط يوتيوب غير صحيح');
+    return this._e(await this.sb.rpc('teacher_save_lecture',{p:{id:id||null, title, minutes:+minutes, starts_at:new Date(starts_at).toISOString(), youtube_id:yt||'', subject:cohort_id?null:subject, cohort_id:cohort_id||null, recording:recording!==false}})); },
+  async setLectureStatus(id, status){ return this._e(await this.sb.rpc('teacher_set_lecture',{p_id:id, p_status:status})); },
+  async adminLectures(){ return this._e(await this.sb.rpc('admin_lectures'))||[]; },
   async saveGroup(g){ return this._e(await this.sb.rpc('teacher_save_group',{p:{id:g.id||null, name:String(g.name||'').trim(), trainee_ids:g.trainee_ids||[]}})); },
   async deleteGroup(id){ return this._e(await this.sb.rpc('teacher_delete_group',{p_id:id})); },
   async startQuiz(f){ return this._e(await this.sb.rpc('student_start_quiz',{p:f})); },
