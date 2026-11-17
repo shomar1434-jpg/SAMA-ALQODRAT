@@ -7,6 +7,7 @@ import { $, $$, esc, fmtNum } from './utils.js';
 import { countUp, ic, reduceMotion } from './views2_head.js';
 import { cat, catSort, cohortPublicState } from './views2_main.js';
 import { plansSectionHtml, initPlansMarquee } from './qudurat_views.js';
+import { coursesSectionHtml, bindCourses } from './courses.js';
 
 /* =====================================================================
    الصفحات الافتتاحية — مستوحاة من صفحتي الغلاف والرؤية في دليل برامج المركز
@@ -57,10 +58,11 @@ export function siteFooter(){
         <a class="sf-item" href="${MAP_URL}" target="_blank" rel="noopener">${ic('pin')}<span>${CENTER.address}</span></a>
         <span class="sf-item">${ic('inbox')}<span>صندوق البريد ${CENTER.pobox}</span></span>
         <h4 style="margin-top:14px">روابط سريعة</h4>
-        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#verify">التحقق من إفادة حضور</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
+        <div class="sf-links"><a href="#home">الرئيسية</a><a href="#register">دليل البرامج</a><a href="#checkin">تسجيل الحضور</a><a href="#portals">بوابة المتدرب</a><a href="#policies">السياسات</a><a href="#contact">تواصل معنا</a></div></div>
       <div class="sf-col"><h4>معتمد من</h4>
         <div class="sf-acc"><span>${logoPair(LOGOS.tvtc, 'tvtc', 'المؤسسة العامة للتدريب التقني والمهني')}</span><span>${logoPair(LOGOS.nelc, 'nelc', 'المركز الوطني للتعليم الإلكتروني')}</span></div>
-        <a class="sf-item" href="${CENTER.manar}" target="_blank" rel="noopener" style="margin-top:10px">${ic('award')}<span>منصة منار: إصدار الشهادات المعتمدة</span></a></div>
+        <a class="sf-item" href="${CENTER.manar}" target="_blank" rel="noopener" style="margin-top:10px">${ic('award')}<span>منصة منار: إصدار الشهادات المعتمدة</span></a>
+        <a class="sf-item" href="#manar-guide" id="manarGuideLink">${ic('clipboard')}<span>طريقة التسجيل في منصة منار</span></a></div>
     </div>
     <div class="sfoot-bar"><span>© ${new Date().getFullYear()} ${CENTER.name}. جميع الحقوق محفوظة.</span><span dir="ltr">${ph.join(' · ')} · ${CENTER.email}</span></div>
   </footer>`;
@@ -79,6 +81,24 @@ function kidsSectionHtml(P){
 }
 
 /* صفحة «تواصل معنا»: كل قنوات المركز في مكان واحد (بدل صفحة الروابط الخارجية) */
+/* دليل «طريقة التسجيل في منصة منار» (البند 9): إرشادي داخلي؛ لا يطلب أي بيانات دخول لمنار، والروابط الرسمية في تبويب جديد */
+export const MANAR_LINKS = { registration:'https://mnar.sa/auth/registration', manual:'https://mnar.sa/trainee-manual?manual=registration', tvtc:'https://tvtc.gov.sa/ar/Eservices/Pages/PsElectronicCertificates.aspx' };
+export function viewManarGuide(){
+  const ext = (href, t) => `<a href="${href}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:600" dir="ltr">${t}</a>`;
+  const steps = [
+    `افتح الموقع الرسمي ${ext(CENTER.manar, 'mnar.sa')}، ثم اختر «إنشاء حساب»، أو افتح رابط إنشاء الحساب المباشر ${ext(MANAR_LINKS.registration, 'mnar.sa/auth/registration')}.`,
+    'في الخطوة الأولى اختر الجنسية المناسبة واضغط «التالي»؛ وإن لم تظهر جنسيتك استخدم خيار البحث المتاح.',
+    'أكمل الحقول التي تطلبها منار نفسها في الخطوات التالية، وتأكد أن الاسم والهوية أو الإقامة ورقم الجوال والبريد مطابقة لبيانات تسجيلك في المركز، ثم أكمل التحقق والموافقات التي يطلبها الموقع.',
+    'احتفظ ببيانات الدخول في مكان آمن، وسجّل الدخول عند الحاجة إلى خدمات الدورات أو الشهادات.',
+    'لعرض الشهادة عندما تصدر وتصبح متاحة في منار: افتح حسابك ← الدورات السابقة ← الشهادة ← أكمل التقييم إن طُلب ← عرض الشهادة ← تحميل الشهادة.',
+    `عند أي مشكلة في حساب منار استخدم ${ext(MANAR_LINKS.manual, 'دليل المتدرب الرسمي')} أو قنوات الدعم الرسمية، ولا ترسل كلمة المرور أو رمز التحقق إلى المركز.`];
+  $('#app').innerHTML = `<div class="wrap" style="max-width:820px"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">منصة منار</span><h2>طريقة التسجيل <em>في منصة منار</em></h2>
+    <p class="hint">منار هي المخوّلة بإصدار الشهادات المعتمدة. هذا دليل استرشادي من المركز، ولا تُدخل فيه أي بيانات.</p></div>
+    <ol class="card pad rv mnr-steps" id="manarSteps">${steps.map(t => `<li>${t}</li>`).join('')}</ol>
+    <div class="ord-acts rv" style="margin-top:14px"><a class="btn pri" href="${MANAR_LINKS.registration}" target="_blank" rel="noopener">${ic('expand')} إنشاء حساب في منار</a><a class="btn" href="${MANAR_LINKS.manual}" target="_blank" rel="noopener">${ic('book')} دليل المتدرب الرسمي</a><a class="btn" href="${MANAR_LINKS.tvtc}" target="_blank" rel="noopener">${ic('award')} الشهادات الإلكترونية (المؤسسة)</a></div>
+    <p class="alert t-info rv" style="margin-top:14px"><span class="aic">${ic('alert')}</span><span>خطوات إنشاء الحساب وشروطه وبياناته تابعة لموقع منار وقد تتغير؛ المرجع دائمًا الواجهة الرسمية الحالية. ولا تصدر الشهادة إلا بعد استيفاء شروطها ونشرها من الجهة المختصة. (روجعت الروابط في 17 نوفمبر 2026)</span></p>
+  </div>${siteFooter()}`;
+}
 export function viewContact(){
   const card = (href, icon, title, sub, ext = true) => `<a class="card pad ct-card rv" href="${href}" ${ext ? 'target="_blank" rel="noopener"' : ''}><span class="kic-lg t-info">${icon}</span><b>${title}</b><span class="hint" ${/^[0-9+@a-z. ]+$/i.test(sub) ? 'dir="ltr"' : ''}>${sub}</span></a>`;
   $('#app').innerHTML = `<div class="wrap"><div class="sec-head rv" style="margin-bottom:18px"><span class="kicker">تواصل معنا</span><h2>قنوات <em>${esc(CENTER.name)}</em></h2><p class="hint">${esc(CENTER.address)}</p></div>
@@ -109,7 +129,7 @@ export async function viewHome(){
             ${STAR_SVG('s1')}
             <h1 data-reveal style="--i:1"><span class="t1">أهلًا بكم في مركز سما القدرات للتدريب</span><span class="rule"></span></h1>
             <p data-reveal style="--i:3">${fmtNum(P.length)} برنامجًا تدريبيًا معتمدًا في ${fmtNum(cats.length)} مجالات، بإشراف ${CENTER.accreditor}. سجّل في برنامجك أو باقتك، وسجّل حضورك بباركود المركز الموحد.</p>
-            <div class="cover-cta" data-reveal style="--i:4"><a class="btn pri lg" href="#enroll" id="ctaEnroll">${ic('form')} سجّل الآن</a><a class="btn lg ghost-t" href="#register">${ic('book')} استعرض البرامج</a><a class="btn lg ghost-t" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
+            <div class="cover-cta" data-reveal style="--i:4"><a class="btn pri lg" href="#home" id="ctaEnroll" data-go-crs="now">${ic('form')} أرغب بالتسجيل</a><a class="btn lg ghost-t" href="#register">${ic('book')} استعرض البرامج</a><a class="btn lg ghost-t" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
           </div>
         </div>
         <ul class="cover-stats" data-reveal style="--i:5">
@@ -123,6 +143,8 @@ export async function viewHome(){
     </section>
 
     ${aboutSectionHtml(site.about, P)}
+
+    ${coursesSectionHtml(P, pl.plans)}
 
     <section class="about">
       <div class="sec-head" data-reveal><span class="kicker">من نحن</span><h2>بيت الخبرة الأول <em>في منطقة جازان</em></h2></div>
@@ -157,6 +179,7 @@ export async function viewHome(){
     ${siteFooter()}
   </div>`;
   $$('.dom').forEach(b=>b.onclick=()=>{ cat.kind='program'; cat.cf=b.dataset.cat; location.hash='#register'; });
+  bindCourses(app);
   revealOnScroll(app);
   initPartnerMarquee(site.partners||[]);
   initPlansMarquee(pl.plans||[]);

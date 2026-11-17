@@ -3,7 +3,7 @@ import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
 import { PAGE, adminBase, publicBase, portalBase } from './config.js';
 import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
-import { liveSay, setBusy, showErrorSummary, toLatin, viewVerify, wireFormA11y } from './features.js';
+import { liveSay, setBusy, showErrorSummary, toLatin, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
 import { closePrint } from './print.js';
 import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
@@ -13,7 +13,7 @@ import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
 import { planOpen, sessionOn, SECTIONS, subStatus } from './qudurat.js';
 import { ageOn, isMinor, isChild, MIN_AGE } from './identity_logic.js';
-import { waLink, WA_LOGO, viewContact } from './landing.js';
+import { waLink, WA_LOGO, viewContact, viewManarGuide } from './landing.js';
 import { orderPanelHtml, bindOrderPanel } from './order_panel.js';
 import { viewPolicies, viewPolicy, bindPolicyConsent } from './policy_views.js';
 
@@ -50,7 +50,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','verify','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','manar-guide','checkin','portals','policies','display','admin','admin-attendance','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 /* حالة قاعدة البيانات: أيقونة خضراء متصلة، حمراء غير متصلة (لا شبكة)، ذهبية للبيانات التجريبية */
@@ -73,12 +73,13 @@ export async function route(){
   if(PAGE==='public' && adminRoute){ location.replace(adminBase()+'#'+h); return; }
   if(PAGE==='admin' && h && !adminRoute){ location.replace(publicBase()+'#'+h); return; }
   if(PAGE==='admin' && !h) h='admin';
-  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : ['contact','verify'].includes(h)||h.startsWith('verify') ? '' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
+  const navKey = h.startsWith('admin')||h==='display'||h.startsWith('qr-') ? 'admin' : h==='checkin' ? 'checkin' : h==='me' ? 'me' : h==='portals' ? 'portals' : ['contact','manar-guide'].includes(h) ? '' : (!h||h==='home'||h==='policies'||h.startsWith('policy-')) ? 'home' : 'register';
   $$('#nav a').forEach(a=>a.classList.toggle('on', a.dataset.r===navKey));
   syncDb();
   window.scrollTo(0,0);
-  if(/^v-[A-Za-z0-9-]+$/.test(h)) return viewVerify(h.slice(2));
-  if(h==='verify') return viewVerify('');
+  /* صفحة التحقق العامة أُلغيت (البند 8): المسارات القديمة تُحال إلى الرئيسية دون عرض أي بيانات إفادة */
+  if(h==='verify' || /^v-/.test(h)){ history.replaceState(null,'','#home'); return viewHome(); }
+  if(h==='manar-guide') return viewManarGuide();
   if(h==='me'){ history.replaceState(null,'','#portals'); return viewPortals(); }   // «حضوري» انتقلت إلى بوابة المتدرب
   if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
   if(h==='enroll' || h.startsWith('enroll-')) return viewEnroll(h.slice(7));
@@ -115,7 +116,7 @@ export async function viewCatalog(){
       <p>${CENTER.vision}.</p>
       <ul class="stats"><li>${ic('book')}<b data-count="${programs.length}">0</b><span>برنامجًا معتمدًا</span></li><li>${ic('grid')}<b data-count="${nCats}">0</b><span>مجالات تدريبية</span></li><li>${ic('form')}<b data-count="${programs.length}">0</b><span>برنامجًا متاحًا للتسجيل</span></li></ul></div></section>
     <div style="height:18px"></div>
-    <div class="card pad rv"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px"><h2 class="sec-title" style="margin:0">اختر البرنامج للتسجيل في دفعته</h2><a class="btn acc sm" href="#enroll">${ic('form')} نموذج التسجيل الموحّد</a>
+    <div class="card pad rv"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px"><h2 class="sec-title" style="margin:0">اختر البرنامج للتسجيل في دفعته</h2>
       <div class="seg" style="margin:0"><button data-k="program" class="${cat.kind==='program'?'on':''}">${ic('book')}البرامج</button><button data-k="package" class="${cat.kind==='package'?'on':''}">${ic('layers')}الباقات</button></div></div>
       ${cat.kind==='program'?`<div class="cats" id="cats"><button data-c="all" class="${cat.cf==='all'?'on':''}">الكل <i>${fmtNum(programs.length)}</i></button>${cats.map(c=>`<button data-c="${esc(c)}" class="${cat.cf===c?'on':''}">${ic(CAT_ICON[c]||'book')}${esc(c)} <i>${fmtNum(programs.filter(p=>p.category===c).length)}</i></button>`).join('')}</div>
       <div class="filters" style="box-shadow:none;margin:12px 0 16px"><span class="lbl">${ic('search')}</span><input class="inp" id="rq" placeholder="ابحث باسم البرنامج أو رقم الاعتماد" value="${esc(cat.q)}" style="flex:1;min-width:200px">
@@ -212,7 +213,7 @@ export function regFormHtml(title, sub, chooser=''){
       ${fld('education','المؤهل العلمي',true,`<select class="inp" name="education"><option value="">اختر المؤهل</option>${EDU.map(x=>`<option>${x}</option>`).join('')}</select>`)}
       ${fld('employer','جهة العمل',false,`<select class="inp" name="employer"><option value="">اختر</option>${['قطاع حكومي','قطاع خاص','متدرب','باحث عن عمل','عمل حر'].map(x=>`<option>${x}</option>`).join('')}</select>`)}
       <div id="rfPol" style="grid-column:1/-1" hidden></div>
-      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقرّ بصحة البيانات، وأعلم أن الحضور يُسجَّل يوميًا بمسح باركود المركز الموحد والتحقق برقم سجلي المدني.</span></label>
+      <label class="check" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="agree" id="rf-agree" aria-describedby="rfE"><span>أقر بصحة البيانات أعلاه</span></label>
     </form>
     <div class="errtxt" id="rfE" style="margin-top:8px" aria-live="polite"></div>
     <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;

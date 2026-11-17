@@ -14,8 +14,10 @@ const person = async (name, nid, phone, birth) => { await p.fill('[name=full_nam
   await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); };
 
 await p.goto(U); await p.waitForSelector('#ctaEnroll');
-await p.click('#ctaEnroll'); await p.waitForSelector('#en-item');
-ok(/enroll/.test(p.url()) && await p.$('#en-kind-program') && await p.$('#en-kind-plan'), '«سجّل الآن» يفتح النموذج الموحّد بخياري البرنامج والباقة');
+await p.click('#ctaEnroll'); await p.waitForTimeout(400);
+ok(!/enroll/.test(p.url()) && await p.isVisible('#coursesSec [data-crp=now]'), '«أرغب بالتسجيل» ينقل إلى «دورات متاحة حاليا» دون نموذج بلا سياق');
+await p.goto(U + '#enroll'); await p.waitForSelector('#en-item');
+ok(await p.$('#en-kind-program') && await p.$('#en-kind-plan'), 'نموذج التسجيل يطلب اختيار البرنامج أو الباقة أولًا');
 const nProg = (await p.$$('#en-item option')).length;
 await p.check('#en-kind-plan', { force: true }); await p.waitForTimeout(200);
 const planOpts = await p.$$eval('#en-item option', o => o.map(x => x.textContent));
