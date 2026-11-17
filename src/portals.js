@@ -22,6 +22,7 @@ import { analysisHtml } from './analysis_views.js';
 import { weeklyCard, bindWeeklyCard } from './weekly_views.js';
 import { initPwa } from './pwa.js';
 import { ordersCardHtml, bindOrdersCard } from './order_panel.js';
+import { planOfOrder } from './order_logic.js';
 import { teacherGroups, teacherProfile, teacherPeople, daySummaryHtml, trainersCardHtml, printDaySheet } from './trainer_views.js';
 
 const S_TABS = [['dash','chart','لوحتي'],['hw','form','واجباتي'],['level','spark','قياس مستواي'],['msg','chat','المراسلة'],['rate','award','تقييم المدرب']];
@@ -215,7 +216,7 @@ function viewStudent(D){
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
   if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
-  if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name) + trainersCardHtml(D, pr.trainee.id)); bindOrdersCard($('#sBody'), mo, reload); }
+  if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name, o => planOfOrder(D, o)) + trainersCardHtml(D, pr.trainee.id)); bindOrdersCard($('#sBody'), mo, reload); }
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
   $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
@@ -285,7 +286,7 @@ function bindLinkForm(){
 
 /* ---------- المدرب ---------- */
 /* مساعدة: واتساب المركز واتصال — في أسفل لوحات البوابات */
-const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي على منصة مركز سما القدرات.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
+const helpHtml = () => `<p class="p-help">تحتاج مساعدة؟ <a href="${waLink('السلام عليكم، أحتاج مساعدة في بوابتي على مركز سما القدرات للتدريب.')}" target="_blank" rel="noopener">${WA_LOGO} واتساب المركز</a> · <a href="tel:${CENTER.phones[1]}" dir="ltr">${CENTER.phones[1]}</a></p>`;
 /* تبويبات المدرب حسب ما أُسند إليه: مقررات الباقات، أو دفعات البرامج، أو كلاهما */
 const tTabsOf = D => { const q = (D.me?.subjects || []).length > 0, c = (D.cohorts || []).length > 0; return T_TABS.filter(x => x[0] === 'profile' ? true : x[0] === 'cohorts' ? c || !q : q || !c && x[0] === 'today'); };
 function viewTeacher(D, quiet){

@@ -1,5 +1,5 @@
 [hidden]{display:none !important}
-/* ===== نظام التصميم: سِجِل — مطبّق على منصة مركز سما القدرات ===== */
+/* ===== نظام التصميم: سِجِل — مطبّق على مركز سما القدرات للتدريب ===== */
 :root{
   --surface-page:#EEF3F2; --surface-card:#FFFFFF; --surface-sunken:#F2F7F6; --surface-track:#E6EFED;
   --ink:#0F2628; --ink-muted:#3A5456; --ink-subtle:#6A8183; --border:#D9E4E2; --border-control:#6E8886;
@@ -1462,3 +1462,4 @@ body.sim-on{overflow:hidden}
 .qb-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border-control);flex:none}
 .fb-q{margin:6px 0 0;padding:6px 10px;border-inline-start:3px solid var(--brand);background:var(--brand-tint);border-radius:8px;font-size:14px}
 .fb-in{width:100%;margin-top:6px}
+.ord-inst{margin:8px 0 0;font-size:14px;font-weight:500;color:var(--ink)}

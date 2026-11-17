@@ -75,7 +75,7 @@ function openPanel(){
   if((st.items || []).some(x => x.action === 'notice' && !x.read)) Store.markRead(st.role).then(tick).catch(() => {});
 }
 function bindPanel(p){
-  if(p.querySelector('#ibDev')) p.querySelector('#ibDev').onclick = async () => { const r = await askNotify(); if(r === 'granted') deviceNotify('منصة سما القدرات', 'فُعّلت إشعارات الجهاز.', 'sama-enabled'); p.innerHTML = panelHtml(); bindPanel(p); };
+  if(p.querySelector('#ibDev')) p.querySelector('#ibDev').onclick = async () => { const r = await askNotify(); if(r === 'granted') deviceNotify('مركز سما القدرات', 'فُعّلت إشعارات الجهاز.', 'sama-enabled'); p.innerHTML = panelHtml(); bindPanel(p); };
   p.querySelector('#ibSound').onclick = () => { setSound(!soundOn()); unlockAudio(); if(soundOn()) setTimeout(chime, 50); p.innerHTML = panelHtml(); bindPanel(p); };
   p.querySelectorAll('[data-ii]').forEach(b => b.onclick = () => openItem(st.items[+b.dataset.ii]));
 }

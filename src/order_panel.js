@@ -7,18 +7,19 @@ import { ic, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { setBusy, toLatin } from './features.js';
 import { waLink, WA_LOGO } from './landing.js';
-import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, orderReady, waTransferText } from './order_logic.js';
+import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, orderReady, waTransferText, installmentsOf, instText } from './order_logic.js';
 
 export const sar = v => `${fmtNum(v)} ريال`;
 export const pills = o => `<span class="pill dot ${AP_TONE[o.approval]}">المراجعة: ${AP_TXT[o.approval]}</span> <span class="pill dot ${PAY_TONE[o.payment]}">السداد: ${PAY_TXT[o.payment]}</span>${o.provisional ? ' <span class="pill info">قبول مؤقت</span>' : ''}`;
 
 /* لوحة الطلب لصاحبه: رقم الطلب، الحالتان، بيانات التحويل، الإبلاغ بالتحويل، وواتساب برسالة مجهزة */
-export function orderPanelHtml(o, name){
-  if(!o) return '';
+export function orderPanelHtml(o, name, plan){
+  if(!o) return ''; const ins = installmentsOf(o, plan);
   const done = orderReady(o) && !o.provisional, b = o.bank;
   return `<div class="ord" data-ord="${o.id}"><div class="ord-h"><div><small>رقم الطلب</small><b class="ord-no" dir="ltr">${esc(o.number)}</b></div><button type="button" class="btn sm" data-copy="${esc(o.number)}">${ic('form')} نسخ</button></div>
     <p class="ord-t">${esc(o.title)}</p><div class="ord-st">${pills(o)}</div>
     <div class="ord-amt"><span>المطلوب الآن <b>${o.due_now > 0 ? sar(o.due_now) : 'يحدده المركز'}</b></span>${o.total > o.due_now ? `<span>إجمالي الباقة <b>${sar(o.total)}</b></span>` : ''}${o.paid_amount ? `<span>المؤكَّد وصوله <b>${sar(o.paid_amount)}</b></span>` : ''}</div>
+    ${ins ? `<p class="ord-inst" data-inst>${esc(instText(ins, fmtNum))}</p>` : ''}
     ${o.note ? `<p class="alert t-${o.approval === 'rejected' ? 'danger' : 'info'}" style="margin:10px 0 0"><span class="aic">${ic('alert')}</span><span>${o.approval === 'rejected' ? 'سبب الرفض' : 'المطلوب استكماله'}: ${esc(o.note)}</span></p>` : ''}
     ${done ? `<p class="hint" style="margin:10px 0 0">${ic('check')} اعتُمد طلبك وتأكد سدادك.</p>` : o.approval === 'rejected' ? '' : `
     ${b ? `<div class="ord-bank"><b>التحويل البنكي</b><dl><dt>البنك</dt><dd>${esc(b.bank)}</dd><dt>المستفيد</dt><dd>${esc(b.beneficiary)}</dd><dt>الآيبان</dt><dd dir="ltr">${esc(b.iban)} <button type="button" class="linkbtn" data-copy="${esc(b.iban)}">نسخ</button></dd>${b.account ? `<dt>رقم الحساب</dt><dd dir="ltr">${esc(b.account)}</dd>` : ''}</dl>
@@ -43,8 +44,8 @@ export function bindOrderPanel(root, o, key, onChange){
 }
 
 /* بطاقة «طلباتي» في البوابة: كل طلبات المتدرب */
-export function ordersCardHtml(orders, name){
+export function ordersCardHtml(orders, name, planOf = () => null){
   if(!orders?.length) return '';
-  return `<section class="card pad rv" id="myOrders" style="margin-top:14px"><h3 class="ctitle">${ic('wallet')}طلباتي والسداد</h3>${orders.map(o => orderPanelHtml(o, name)).join('')}</section>`;
+  return `<section class="card pad rv" id="myOrders" style="margin-top:14px"><h3 class="ctitle">${ic('wallet')}طلباتي والسداد</h3>${orders.map(o => orderPanelHtml(o, name, planOf(o))).join('')}</section>`;
 }
 export function bindOrdersCard(root, orders, onChange){ (orders || []).forEach(o => bindOrderPanel(root, o, {}, onChange)); }

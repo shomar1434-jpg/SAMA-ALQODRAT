@@ -244,14 +244,14 @@ footer{color:#6A8183;font-size:13px;text-align:center}
 
 const page = (k, secs, intro) => `<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="robots" content="noindex"><title>${T[k]} — منصة مركز سما القدرات للتدريب</title>
+<meta name="robots" content="noindex"><title>${T[k]} — مركز سما القدرات للتدريب</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300..700&display=swap" rel="stylesheet"><style>${css}</style></head>
 <body><header class="hero"><div class="in"><span class="badge">دليل الاستخدام</span><h1>${T[k]}</h1><p>${intro}</p>
 <div class="top"><a href="${BACK[k]}">العودة إلى المنصة</a>${Object.keys(T).filter(x => x !== k).map(x => `<a href="${x}.html">${T[x]}</a>`).join('')}</div></div></header>
 <main class="wrap"><nav class="toc" aria-label="المحتويات"><b>المحتويات</b><ol>${secs.map(([id, t]) => `<li><a href="#${id}">${t}</a></li>`).join('')}</ol></nav>
 ${secs.map(([id, t, body], i) => `<section id="${id}"><h2><span class="n">${i + 1}</span>${t}</h2>${body}</section>`).join('\n')}
-<footer>منصة مركز سما القدرات للتدريب — الصور من النسخة التجريبية ببيانات وهمية. اضغط أي صورة لتكبيرها.</footer></main></body></html>`;
+<footer>مركز سما القدرات للتدريب — الصور من النسخة التجريبية ببيانات وهمية. اضغط أي صورة لتكبيرها.</footer></main></body></html>`;
 
 writeFileSync('public/guide/admin.html', page('admin', admin, 'كل عمليات لوحة الإدارة خطوة بخطوة: التشغيل اليومي، والحضور، والمالية، والحوكمة.'));
 writeFileSync('public/guide/trainer.html', page('trainer', trainer, 'كشف اليوم، ومتابعة متدربيك، والواجبات والاختبارات، وملفك التعريفي.'));

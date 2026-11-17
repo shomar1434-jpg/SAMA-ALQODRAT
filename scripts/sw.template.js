@@ -1,4 +1,4 @@
-/* عامل الخدمة لمنصة سما القدرات — يولَّد عند البناء (vite.config.js) بقائمة ملفات dist ورقم إصدار.
+/* عامل الخدمة لمركز سما القدرات — يولَّد عند البناء (vite.config.js) بقائمة ملفات dist ورقم إصدار.
    - الصفحات: الشبكة أولًا، والنسخة المحفوظة عند انقطاع الاتصال.
    - ملفات assets (بأسماء مبصومة): المحفوظ أولًا.
    - مكتبات CDN والخطوط: المحفوظ ثم التحديث في الخلفية.
@@ -40,7 +40,7 @@ self.addEventListener('fetch', e => {
 /* إشعارات الجهاز (Web Push): تُفعَّل من الخادم في خطوة الربط؛ المعالج جاهز من الآن */
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'منصة سما القدرات', { body: d.body || '', icon: abs('pwa/icon-192.png'), badge: abs('pwa/badge-96.png'),
+  e.waitUntil(self.registration.showNotification(d.title || 'مركز سما القدرات', { body: d.body || '', icon: abs('pwa/icon-192.png'), badge: abs('pwa/badge-96.png'),
     tag: d.tag || undefined, dir: 'rtl', lang: 'ar', data: { url: d.url || '' } }));
 });
 self.addEventListener('notificationclick', e => {

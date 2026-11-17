@@ -33,3 +33,15 @@ export function checkTransfer(f, today){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(f.date || '')) || f.date > today) throw new Error('اختر تاريخ التحويل');
   return { amount, date:f.date, reference:String(f.reference || '').trim().slice(0, 60) };
 }
+
+/* الأقساط المسددة (قرار المالك 17 نوفمبر): الدفعة الأولى (رسوم التسجيل) ثم أقساط الباقة بالترتيب، والمدفوع يغطيها بالترتيب.
+   يُحسب من إجمالي الطلب (بعد أي خصم)، والقسط الأخير يستوعب فرق التقريب. للعرض فقط. */
+const rr = v => Math.round((+v || 0) * 100) / 100;
+export const planOfOrder = (D, o) => { const s = o?.subscription_id && (D.subscriptions || []).find(x => x.id === o.subscription_id); return s ? (D.plans || []).find(p => p.id === s.plan_id) || null : null; };
+export function installmentsOf(o, plan){
+  const n = +plan?.installments || 0, total = +o?.total || 0; if(!n || total <= 0 || o.kind !== 'plan') return null;
+  const first = Math.min(+plan.reg_fee || 0, total), rest = rr(total - first), per = rr(rest / n), paid = Math.min(+o.paid_amount || 0, total);
+  const after = rr(Math.max(0, paid - first)), paidN = Math.min(n, Math.floor((after + 0.005) / (per || 1)));
+  return { first, firstPaid:paid >= first - 0.005, n, per, paidN, instPaid:Math.min(after, rest), partial:rr(after - paidN * per) > 0 && paidN < n, remaining:orderRemaining(o) };
+}
+export const instText = (x, fmt) => !x ? '' : `${x.firstPaid ? 'الدفعة الأولى مسددة' : 'الدفعة الأولى غير مكتملة'} · الأقساط المسددة ${fmt(x.paidN)} من ${fmt(x.n)} (${fmt(x.instPaid)} ريال)${x.partial ? ' وجزء من التالي' : ''} · المتبقي ${fmt(x.remaining)} ريال`;

@@ -9,7 +9,7 @@ import { titleBar } from './views2_main.js';
 import { modal, closeModal } from './views2_programs.js';
 import { AD, reloadAD } from './views2_admin.js';
 import { setBusy } from './features.js';
-import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, EV_TXT, PAY_METHODS, orderReady, orderRemaining } from './order_logic.js';
+import { AP_TXT, AP_TONE, PAY_TXT, PAY_TONE, EV_TXT, PAY_METHODS, orderReady, orderRemaining, installmentsOf, instText, planOfOrder } from './order_logic.js';
 import { sar, pills } from './order_panel.js';
 import { waTo } from './absence_notify.js';
 import { CENTER } from './catalog.js';
@@ -30,7 +30,7 @@ export function pageOrders(){
     ${list.length ? `<div class="card rv"><div class="tblwrap"><table class="tb"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>المتدرب</th><th>البند</th><th>المطلوب الآن</th><th>المتبقي</th><th>المراجعة</th><th>السداد</th><th></th></tr></thead><tbody>${list.map(o => { const t = tr(o.trainee_id);
         return `<tr><td class="num" dir="ltr"><b>${esc(o.number)}</b></td><td>${fmtShort(o.created_at.slice(0, 10))}</td><td>${esc(t?.full_name || '—')}<div class="hint num" dir="ltr">${esc(t?.phone || '')}</div></td><td style="max-width:240px">${esc(o.title)}</td>
           <td class="num">${o.due_now > 0 ? fmtNum(o.due_now) : '—'}${o.total > o.due_now ? `<div class="hint">من ${fmtNum(o.total)}</div>` : ''}</td>
-          <td class="num">${fmtNum(orderRemaining(o))}</td>
+          <td class="num">${fmtNum(orderRemaining(o))}${(x => x ? `<div class="hint" data-inst>أقساط ${fmtNum(x.paidN)} من ${fmtNum(x.n)}</div>` : '')(installmentsOf(o, planOfOrder(D, o)))}</td>
           <td><span class="pill dot ${AP_TONE[o.approval]}">${AP_TXT[o.approval]}</span>${o.provisional ? '<div class="hint">قبول مؤقت</div>' : ''}${o.cancelled_at ? '<div><span class="pill bad">ملغى</span></div>' : ''}</td>
           <td><span class="pill dot ${PAY_TONE[o.payment]}">${PAY_TXT[o.payment]}</span>${o.claim && o.payment !== 'confirmed' ? `<div class="hint num">${fmtNum(o.claim.amount)} · ${fmtShort(o.claim.date)}</div>` : ''}</td>
           <td><button class="btn sm pri" data-oo="${o.id}">فتح</button></td></tr>`; }).join('')}</tbody></table></div></div>` : emptyBox(all.length ? 'لا طلبات بهذه التصفية' : 'لا توجد طلبات بعد', all.length ? '' : 'يُنشأ طلب برقم فريد مع كل تسجيل جديد في برنامج أو باقة.')}
@@ -67,6 +67,7 @@ function orderModal(o){
       <dt>البند</dt><dd>${esc(o.title)}</dd><dt>المطلوب الآن</dt><dd>${o.due_now > 0 ? sar(o.due_now) : 'غير محدد السعر'}${o.total > o.due_now ? ` من إجمالي ${sar(o.total)}` : ''}</dd>
       <dt>التحويل المُبلَّغ</dt><dd>${o.claim ? `${sar(o.claim.amount)} بتاريخ ${fmtShort(o.claim.date)}${o.claim.reference ? ` · مرجع <span dir="ltr">${esc(o.claim.reference)}</span>` : ''}` : 'لم يُبلَّغ بتحويل'}</dd>
       ${o.paid_amount ? `<dt>المدفوع</dt><dd>${sar(o.paid_amount)}${o.opening ? ` (منها ${sar(o.opening.paid)} مرحَّلة من قبل النظام)` : ''} · المتبقي <b>${sar(orderRemaining(o))}</b></dd>` : ''}
+      ${(x => x ? `<dt>الأقساط</dt><dd data-inst>${esc(instText(x, fmtNum))}</dd>` : '')(installmentsOf(o, planOfOrder(AD, o)))}
       ${o.discount_note ? `<dt>سبب الخصم</dt><dd>${esc(o.discount_note)}</dd>` : ''}
       ${o.opening?.payments?.length ? `<dt>دفعات سابقة</dt><dd>${o.opening.payments.map(p => `${esc(p.label)} ${fmtNum(p.amount)} (${PAY_METHODS[p.method] || ''})`).join(' · ')}</dd>` : ''}</dl>
     ${dup ? `<p class="alert t-info" style="margin:10px 0 0"><span class="aic">${ic('alert')}</span><span>للمتدرب ${fmtNum(dup)} طلبًا آخر. تأكد أن التحويل نفسه لا يُعتمد لطلبين.</span></p>` : ''}

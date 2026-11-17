@@ -33,5 +33,5 @@ export function statementDoc(t, S){
     info:[['المتدرب', t.full_name, 'w2'], ['رقم الهوية', t.national_id], ['الجوال', t.phone || '']],
     stats:[['الرسوم (ريال)', D2(S.charges)], ['المدفوع (ريال)', D2(S.paid)], ['المسترد (ريال)', D2(S.refunded)], ['الرصيد (ريال)', D2(S.balance)]],
     body:`<table class="inv-t"><thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>المستند</th><th>عليه</th><th>له</th><th>الرصيد</th></tr></thead><tbody>${S.rows.map(r => `<tr><td>${fmtGreg(r.date)}</td><td>${KIND[r.kind]}</td><td>${esc(r.text)}<br><small dir="ltr">${esc(r.order)}</small></td><td dir="ltr">${esc(r.doc)}</td><td class="n">${r.debit ? D2(r.debit) : ''}</td><td class="n">${r.credit ? D2(r.credit) : ''}</td><td class="n"><b>${D2(r.balance)}</b></td></tr>`).join('')}</tbody></table>`,
-    note:`${balTxt(S.balance)}. مستند داخلي من منصة المركز وليس فاتورة ضريبية؛ الدفعات السابقة مرحَّلة من كشوف المركز قبل المنصة.` });
+    note:`${balTxt(S.balance)}. مستند داخلي من نظام المركز وليس فاتورة ضريبية؛ الدفعات السابقة مرحَّلة من كشوف المركز قبل المنصة.` });
 }

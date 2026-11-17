@@ -123,7 +123,7 @@ export function catalogHtml(){
       <table class="ptab"><thead><tr><th style="width:28px">م</th><th>البرنامج</th><th style="width:70px">رقم الاعتماد</th><th style="width:48px">الساعات</th><th style="width:52px">الأيام</th><th style="width:74px">الرسوم</th><th style="width:150px">الدفعة الحالية</th></tr></thead>
       <tbody>${ps.map((p,i)=>{ const c=activeCohortOf(AD,p.id,today); return `<tr><td>${fmtNum(i+1)}</td><td class="nm">${esc(p.name)}</td><td dir="ltr">${esc(p.accreditation_no||'—')}</td><td>${p.hours==null?'—':fmtNum(p.hours)}</td><td>${p.duration_days==null?'—':fmtNum(p.duration_days)}</td><td>${Number(p.price)>0?fmtMoney(p.price):'عند التواصل'}</td>
         <td>${c?`${cohortLabel(c)} · ${fmtShort(c.start_date)}${c.reg_open?' · التسجيل مفتوح':''}`:'—'}</td></tr>`; }).join('')}</tbody></table>`; }).join(''),
-    note:'البرامج معتمدة من المؤسسة العامة للتدريب التقني والمهني. للتسجيل امسح باركود البرنامج أو زر دليل البرامج في منصة المركز.' });
+    note:'البرامج معتمدة من المؤسسة العامة للتدريب التقني والمهني. للتسجيل امسح باركود البرنامج أو زر دليل البرامج في نظام المركز.' });
 }
 
 /* ---------- المعاينة والطباعة ---------- */
