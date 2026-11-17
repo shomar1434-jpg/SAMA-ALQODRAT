@@ -5,13 +5,14 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat_v4')));
 const text = async s => ((await p.textContent(s).catch(() => '')) || '').trim();
 const years = n => { const d = new Date(Date.now() + 3 * 3600e3); d.setUTCFullYear(d.getUTCFullYear() - n); return d.toISOString().slice(0, 10); };
 const person = async (name, nid, phone) => { await p.fill('[name=full_name]', name); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', phone);
-  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(25)); await p.dispatchEvent('[name=birth_date]', 'change');
-  await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]'); };
+  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', years(25), { timeout: 400 }).catch(() => {}); await p.dispatchEvent('[name=birth_date]', 'change');
+  await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.check('[name=agree]'); };
 const admin = async r => { await p.goto(U + 'admin/#' + r); await p.reload(); await p.waitForTimeout(500);
   if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#lf button'); await p.waitForTimeout(1200); } await p.waitForSelector('#main'); };
 

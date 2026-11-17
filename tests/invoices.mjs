@@ -5,6 +5,7 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat_v4')));
 const text = async s => ((await p.textContent(s).catch(() => '')) || '').trim();
@@ -15,7 +16,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR
 
 await p.goto(U + '#enroll'); await p.waitForSelector('#en-item'); await p.check('#en-kind-plan', { force: true }); await p.waitForTimeout(200); await p.selectOption('#en-item', { index: 1 });
 await p.fill('[name=full_name]', 'راشد سعد علي المالكي'); await p.fill('[name=national_id]', '1000000529'); await p.fill('[name=phone]', '0556662001'); await p.selectOption('[name=gender]', 'ذكر');
-await p.fill('[name=birth_date]', years(25)); await p.dispatchEvent('[name=birth_date]', 'change'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
+await p.fill('[name=birth_date]', years(25), { timeout: 400 }).catch(() => {}); await p.dispatchEvent('[name=birth_date]', 'change'); await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.check('[name=agree]');
 await p.click('#rfGo'); await p.waitForSelector('.ord');
 await p.fill('.ord-f [name=reference]', 'TRX-4411'); await p.click('.ord-f button'); await p.waitForTimeout(400);
 let D = await data(); const o = D.orders.find(x => x.claim?.reference === 'TRX-4411');

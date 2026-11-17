@@ -6,6 +6,7 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1366, height: 900 } });
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const go = async (h, w = 900) => { await p.evaluate(() => { location.hash = '#zz'; }); await p.waitForTimeout(150); await p.evaluate(x => { location.hash = '#' + x; }, h); await p.waitForTimeout(w); };
 const S = (fn, arg) => p.evaluate(fn, arg);
@@ -29,7 +30,7 @@ const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 const subscribe = async () => {
   await go('plan-' + ids.silver);
   await p.fill('[name=full_name]', 'سلمان أحمد علي الشهري'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0551112233');
-  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 });
+  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01', { timeout: 400 }).catch(() => {}); await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {});
   await p.check('[name=agree]'); if (await p.$('#rf-pol')) await p.check('#rf-pol'); await p.click('#rfGo'); await p.waitForTimeout(700);
 };
 await subscribe(); ok(await p.$('.refbox') && /البنون/.test(await text('#regCard')), 'الاشتراك في الفضية يحدد قسم البنين ومواعيده');

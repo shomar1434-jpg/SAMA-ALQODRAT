@@ -14,7 +14,11 @@ export function ageOn(birth, today){
 export const isChild = (birth, today) => { const a = ageOn(birth, today); return a != null && a < CHILD_AGE; };
 export const isMinor = (birth, today) => { const a = ageOn(birth, today); return a != null && a < GUARDIAN_AGE; };
 /* يتحقق من تاريخ الميلاد وجوال ولي الأمر، ويعيد جوال ولي الأمر المعتمد ('' للبالغ) */
-export function checkBirthGuardian(f, today){
+/* تاريخ الميلاد يُطلب في برامج الأطفال فقط (البند 1 من «طلبات نهائية»، رقم الاعتماد KIDS_ACC)؛ وبدونه يُقبل جوال ولي الأمر اختياريًا كما كُتب دون نسخه من جوال المتدرب ↔ reg_guardian */
+export const KIDS_ACC = '25194';
+export const isKidsProgram = p => String(p?.accreditation_no || '') === KIDS_ACC;
+export function checkBirthGuardian(f, today, needBirth = true){
+  if(!f.birth_date && !needBirth){ const g = String(f.guardian_phone || '').trim(); if(g && !/^05\d{8}$/.test(g)) throw new Error('جوال ولي الأمر غير صحيح (10 أرقام تبدأ بـ 05)'); return g; }
   const a = ageOn(f.birth_date, today);
   if(a == null) throw new Error('تاريخ الميلاد مطلوب');
   if(f.birth_date > today || a < MIN_AGE || a > 100) throw new Error('تاريخ الميلاد غير صحيح');

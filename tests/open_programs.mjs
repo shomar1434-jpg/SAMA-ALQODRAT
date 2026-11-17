@@ -5,6 +5,7 @@ const { server, origin: U } = serveDist();
 const { ok, failed } = reporter();
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat_v4')));
 const put = fn => p.evaluate(src => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); (0, eval)(src)(D); localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); }, fn.toString()).then(() => p.reload());
@@ -20,8 +21,8 @@ ok(opts.length - 1 === nActive && opts.slice(1).every(x => /تسجيل مبدئ�
 await p.selectOption('#en-item', { index: 1 });
 ok(/سجّل مبدئيًا/.test(await text('#en-info')), 'شرح التسجيل المبدئي تحت القائمة');
 await p.fill('[name=full_name]', 'ماجد سالم علي الحربي'); await p.fill('[name=national_id]', '1000000495'); await p.fill('[name=phone]', '0556660021');
-await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-03-01'); await p.dispatchEvent('[name=birth_date]', 'change');
-await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 }); await p.check('[name=agree]');
+await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-03-01', { timeout: 400 }).catch(() => {}); await p.dispatchEvent('[name=birth_date]', 'change');
+await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.check('[name=agree]');
 await p.click('#rfGo'); await p.waitForSelector('.refbox');
 ok(/اكتمل تسجيلك المبدئي/.test(await text('#regCard')) && /^SR-/.test(await text('.refbox')), 'رسالة التسجيل المبدئي برقم الطلب');
 D = await data(); const t = D.trainees.find(x => x.national_id === '1000000495'); const rq = D.program_requests.find(r => r.trainee_id === t?.id);

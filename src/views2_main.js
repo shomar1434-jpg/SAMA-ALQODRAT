@@ -12,7 +12,7 @@ import { countUp, emptyBox, ic, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
 import { viewPlanPage } from './qudurat_views.js';
 import { planOpen, sessionOn, SECTIONS, subStatus } from './qudurat.js';
-import { ageOn, isMinor, isChild, MIN_AGE } from './identity_logic.js';
+import { ageOn, isMinor, isChild, MIN_AGE, isKidsProgram } from './identity_logic.js';
 import { waLink, WA_LOGO, viewContact, viewManarGuide } from './landing.js';
 import { orderPanelHtml, bindOrderPanel } from './order_panel.js';
 import { viewPolicies, viewPolicy, bindPolicyConsent } from './policy_views.js';
@@ -189,16 +189,24 @@ export async function viewEnroll(pre=''){
       : kind==='program' && !isOpen(x) ? `لا توجد دفعة مفتوحة الآن: سجّل مبدئيًا ويتواصل معك المركز عند فتح الدفعة، ولا يُطلب منك سداد قبل ذلك · ${priceTxt(x.price)} · <a href="#${x.code}" style="color:var(--brand)">صفحة البرنامج</a>`
       : kind==='program' ? `${fmtShort(x.cohort.start_date)} – ${fmtShort(x.cohort.end_date)} · ${t12(x.cohort.start_time)} · ${priceTxt(x.price)} · <a href="#${x.code}" style="color:var(--brand)">صفحة البرنامج</a>`
       : `يبدأ اشتراكك من أول يوم تحضر فيه · <a href="#plan-${x.id}" style="color:var(--brand)">صفحة الباقة</a>`; };
-  $$('[name=en_kind]').forEach(r=>r.onchange=()=>{ kind=r.value; item=''; sel.innerHTML=opts(); $('#en-lbl').innerHTML=`${kind==='program'?'البرنامج التدريبي':'الباقة'} <i>*</i>`; info(); });
-  sel.onchange=()=>{ item=sel.value; $('[data-e=en_item]').textContent=''; info(); }; info();
-  bindRegForm(()=> !item ? null : kind==='program' ? {program_id:item} : {plan_id:item}, ()=>{ const p=progs.find(x=>x.id===item); return p&&isOpen(p)?[p.cohort]:[]; });
+  $$('[name=en_kind]').forEach(r=>r.onchange=()=>{ kind=r.value; item=''; sel.innerHTML=opts(); $('#en-lbl').innerHTML=`${kind==='program'?'البرنامج التدريبي':'الباقة'} <i>*</i>`; info(); $('#rf').applyMode?.(); });
+  sel.onchange=()=>{ item=sel.value; $('[data-e=en_item]').textContent=''; info(); $('#rf').applyMode?.(); }; info();
+  bindRegForm(()=> !item ? null : kind==='program' ? {program_id:item, _mode:isKidsProgram(progs.find(x=>x.id===item))?'kids':'program'} : {plan_id:item}, ()=>{ const p=progs.find(x=>x.id===item); return p&&isOpen(p)?[p.cohort]:[]; });
 }
 
 /* =====================================================================
    2) صفحة البرنامج: نموذج تسجيل الدفعة + تحقق الحضور (هدف الباركود)
    ===================================================================== */
+/* شاشة التعليمات الإلزامية قبل أي نموذج تسجيل (البند 17): لا تجمع بيانات، و«قرأت التعليمات وأرغب بالمتابعة» يُظهر النموذج نفسه دون فقد الخدمة المختارة.
+   في الوضع التجريبي فقط يتخطاها مفتاح الاختبارات sama_skip_reg_intro */
+export const regIntroHtml = () => `<div class="card pad rv reg-intro" id="regIntro" role="region" aria-labelledby="regIntroT"><h2 class="sec-title" id="regIntroT">${ic('alert')} تنبيه مهم قبل التسجيل</h2>
+  <p>عزيزي المتدرب / عزيزتي المتدربة، يرجى التأكد من صحة بياناتك عند التسجيل في مركز سما القدرات للتدريب، لأن البيانات المسجلة تُستخدم في إجراءات البرامج والشهادات لدى الجهات المختصة، وفي إشعارات المركز ومراسلاته عبر رقم الجوال والبريد الإلكتروني المسجلين.</p>
+  <ul class="reg-intro-l"><li><b>الاسم الرباعي</b> كما في الهوية.</li><li><b>رقم الهوية / السجل المدني</b>.</li><li><b>رقم الجوال</b> و<b>البريد الإلكتروني</b> الصحيحان.</li><li><b>تاريخ الميلاد</b> إن كان مطلوبًا لبرنامجك.</li><li><b>جوال ولي الأمر</b> في خانته المستقلة إن طُلب، ولا يُنسخ من جوال المتدرب.</li><li>راجع جميع البيانات الأخرى قبل الإرسال.</li></ul>
+  <p class="hint">يتحمل صاحب التسجيل مسؤولية دقة البيانات المقدمة، ويمكنه التواصل مع المركز لتصحيحها وفق الإجراءات المعتمدة. البيانات الوهمية مسموحة في بيئة الاختبار فقط.</p>
+  <div class="row-actions"><span></span><button type="button" class="btn pri lg" id="regAck">${ic('check')} قرأت التعليمات وأرغب بالمتابعة</button></div></div>`;
+const skipIntro = () => { try { return Store.mode!=='cloud' && localStorage.getItem('sama_skip_reg_intro')==='1'; } catch(_){ return false; } };
 export function regFormHtml(title, sub, chooser=''){
-  return `<div class="card pad rv" id="regCard"><h2 class="sec-title">${title}</h2><p class="hint" style="margin:0 0 18px">${sub?esc(sub)+'. ':''}الحقول المعلّمة بـ <span style="color:var(--danger-ink)">*</span> مطلوبة. رقم السجل المدني هو ما يُحضَّر به المتدرب يوميًا في هذه الدفعة.</p>
+  return `${skipIntro()?'':regIntroHtml()}<div class="card pad rv" id="regCard" ${skipIntro()?'':'hidden'}><h2 class="sec-title">${title}</h2><p class="hint" style="margin:0 0 18px">${sub?esc(sub)+'. ':''}الحقول المعلّمة بـ <span style="color:var(--danger-ink)">*</span> مطلوبة. رقم السجل المدني هو ما يُحضَّر به المتدرب يوميًا في هذه الدفعة.</p>
     <div class="errsum" id="rfSum" tabindex="-1" role="alert" hidden></div>
     <form id="rf" class="grid g2" novalidate>${chooser}
       ${fld('full_name','الاسم الرباعي',true,`<input class="inp" name="full_name" type="text" maxlength="80" placeholder="محمد علي أحمد الحكمي" autocomplete="name" spellcheck="false">`,'حروف فقط، عربية أو إنجليزية، ثلاثة مقاطع على الأقل.')}
@@ -219,11 +227,23 @@ export function regFormHtml(title, sub, chooser=''){
     <div class="row-actions"><span></span><button class="btn acc lg" id="rfGo">${ic('check')} تأكيد التسجيل</button></div></div>`;
 }
 export function bindRegForm(target, cohortsFn){
+  if($('#regAck')) $('#regAck').onclick=()=>{ $('#regIntro').remove(); const c=$('#regCard'); c.hidden=false; c.scrollIntoView({behavior:'smooth', block:'start'}); $('input,select',c)?.focus({preventScroll:true}); };
   const f=$('#rf'); wireFormA11y(f,'rf'); bindPolicyConsent($('#rfPol',f));
   const bd=$('[name=birth_date]',f), minor=()=>isMinor(bd.value, riyadhNow().date);
   const birthMsg=v=>{ const a=ageOn(v, riyadhNow().date); return !v ? 'اختر تاريخ الميلاد.' : a==null||v>riyadhNow().date||a<MIN_AGE||a>100 ? 'تاريخ الميلاد غير صحيح.' : ''; };
   const child=()=>isChild(bd.value, riyadhNow().date);
-  const syncGuard=()=>{ const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
+  /* الحقول بحسب الخدمة (البند 1): الباقات بلا مدينة ولا مؤهل ولا تاريخ ميلاد، وجوال ولي الأمر مستقل اختياري؛
+     وتاريخ الميلاد لبرامج الأطفال فقط؛ ولا يُنسخ جوال المتدرب إلى ولي الأمر */
+  const tgOf=()=> typeof target==='function' ? target() : target;
+  const modeOf=()=>{ const t=tgOf(); return t?._mode || (t?.plan_id ? 'plan' : 'program'); };
+  const fieldOf=n=>$(`[name=${n}]`,f)?.closest('.field');
+  const gLabel=$('label',fieldOf('guardian_phone'));
+  const applyMode=()=>{ const m=modeOf();
+    fieldOf('birth_date').hidden = m!=='kids'; if(m!=='kids'){ bd.value=''; bd.classList.remove('err'); bd.removeAttribute('aria-invalid'); $('[data-e=birth_date]',f).textContent=''; }
+    ['city','education','employer'].forEach(n=>{ const x=fieldOf(n); if(x) x.hidden = m==='plan'; });
+    if(m==='plan'){ $('#rfGuard',f).hidden=false; $('#rfChild',f).hidden=true; gLabel.innerHTML='جوال ولي الأمر <small class="hint">(اختياري؛ مستقل عن جوال المتدرب)</small>'; }
+    else { gLabel.innerHTML='جوال ولي الأمر <i>*</i>'; syncGuard(); } };
+  const syncGuard=()=>{ if(modeOf()==='plan') return; const m=minor()&&!child(); $('#rfGuard',f).hidden=!m; $('#rfChild',f).hidden=!child(); if(!m){ const g=$('[name=guardian_phone]',f); g.value=''; g.classList.remove('err','ok'); g.removeAttribute('aria-invalid'); $('[data-e=guardian_phone]',f).textContent=''; } };
   bd.addEventListener('change',()=>{ const m=birthMsg(bd.value); $('[data-e=birth_date]',f).textContent=m; bd.classList.toggle('err',!!m); m?bd.setAttribute('aria-invalid','true'):bd.removeAttribute('aria-invalid'); syncGuard(); }); bd.addEventListener('input',syncGuard);
   /* التحقق من نوع المحتوى في كل خانة: تصفية فورية أثناء الكتابة + تحقق عند مغادرة الخانة + تحقق شامل عند الإرسال */
   const NAME_RX=/[^\u0621-\u063A\u0641-\u064A\u064B-\u0652\u0670\u0671\u067E\u0686\u06A4\u06AF\u06CCa-zA-Z\s]/g;
@@ -240,7 +260,7 @@ export function bindRegForm(target, cohortsFn){
       if(/[a-zA-Z]/.test(v) && /[\u0621-\u06FF]/.test(v)) return 'اكتب الاسم بلغة واحدة: العربية أو الإنجليزية.'; if(parts.length<3) return 'اكتب الاسم الثلاثي على الأقل.'; if(parts.some(x=>x.replace(/[\u064B-\u0652]/g,'').length<2)) return 'كل مقطع في الاسم حرفان على الأقل.'; return ''; },
     national_id: v => !v ? 'اكتب رقم السجل المدني.' : !/^\d+$/.test(v) ? blocked.national_id : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : !/^[12]/.test(v) ? 'يبدأ رقم السجل بـ 1 أو 2.' : !validSaudiId(v) ? 'رقم السجل غير صحيح. تحقق من الأرقام.' : '',
     phone: v => !v ? 'اكتب رقم الجوال.' : !/^\d+$/.test(v) ? blocked.phone : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
-    guardian_phone: v => !minor()||child() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
+    guardian_phone: v => modeOf()==='plan' ? (!v ? '' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '') : !minor()||child() ? '' : !v ? 'اكتب جوال ولي الأمر.' : !/^05/.test(v) ? 'يبدأ رقم الجوال بـ 05.' : v.length!==10 ? `الرقم ${fmtNum(v.length)} من 10 أرقام.` : '',
     email: v => !v ? '' : !v.includes('@') ? 'البريد يجب أن يحوي علامة @' : (v.match(/@/g)||[]).length>1 ? 'البريد يحوي علامة @ واحدة فقط.' : !/^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(v) ? 'صيغة البريد غير صحيحة، مثل name@gmail.com' : ''
   };
   const setState=(el,msg)=>{ const n=el.name, e=$(`[data-e=${n}]`,f); e.textContent=msg; el.classList.toggle('err',!!msg); el.classList.toggle('ok',!msg && !!el.value); msg?el.setAttribute('aria-invalid','true'):el.removeAttribute('aria-invalid'); };
@@ -252,14 +272,17 @@ export function bindRegForm(target, cohortsFn){
     el.addEventListener('paste',()=>setTimeout(()=>el.dispatchEvent(new Event('input')),0));
     el.addEventListener('blur',()=>{ if(n==='full_name') el.value=el.value.trim(); if(!el.value && !el.dataset.touched) return; el.dataset.touched='1'; setState(el,checks[n](el.value)); }); });
   $$('select.inp',f).forEach(i=>i.addEventListener('change',()=>{ i.classList.remove('err'); i.removeAttribute('aria-invalid'); $(`[data-e=${i.name}]`,f).textContent=''; }));
+  applyMode(); f.applyMode=applyMode;
   $('#rfGo').onclick = async e=>{
     const b=e.currentTarget, F=Object.fromEntries(new FormData(f)); let ok=true; const errs=[];
     const err=(n,m)=>{ ok=false; const el=$(`[name=${n}]`,f); $(`[data-e=${n}]`,f).textContent=m; el.classList.add('err'); el.setAttribute('aria-invalid','true'); errs.push({id:el.id,label:$(`label[for="${el.id}"]`,f)?.textContent.replace('*','').trim()||n,msg:m}); };
     $$('.errtxt',f).forEach(x=>x.textContent=''); $$('.inp',f).forEach(x=>{ x.classList.remove('err'); x.removeAttribute('aria-invalid'); }); $('#rfE').textContent='';
     Object.keys(checks).forEach(n=>{ F[n]=filters[n](F[n]||'').trim(); $(`[name=${n}]`,f).dataset.touched='1'; const m=checks[n](F[n]); if(m) err(n,m); else if(F[n]) $(`[name=${n}]`,f).classList.add('ok'); });
-    ['gender','city','education'].forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
-    { const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
-    const tg = typeof target==='function' ? target() : target;
+    const md=modeOf(); (md==='plan'?['gender']:['gender','city','education']).forEach(k=>{ if(!F[k]) err(k,'اختر قيمة لهذا الحقل.'); });
+    if(md==='plan'){ delete F.birth_date; delete F.city; delete F.education; delete F.employer; if(!F.guardian_phone) delete F.guardian_phone; }
+    else if(md==='kids'){ const m=birthMsg(F.birth_date||''); if(m) err('birth_date',m); if(!minor()||child()) delete F.guardian_phone; if(child()) F.guardian_phone=F.phone; }
+    else { delete F.birth_date; delete F.guardian_phone; }
+    let tg = tgOf(); if(tg){ tg={...tg}; delete tg._mode; }
     if(!tg){ ok=false; const el=$('#en-item',f)||$('#en-kind-program',f); errs.push({id:el?.id||'rf-full_name',label:'البرنامج أو الباقة',msg:'اختر ما تريد التسجيل فيه.'}); const e2=$('[data-e=en_item]',f); if(e2) e2.textContent='اختر ما تريد التسجيل فيه.'; }
     if($('#rf-pol',f) && !F.policies){ ok=false; errs.push({id:'rf-pol',label:'السياسات',msg:'اقرأ السياسات ووافق عليها للمتابعة.'}); $('#rfE').textContent='اقرأ السياسات ووافق عليها للمتابعة.'; }
     if(!F.agree){ ok=false; errs.push({id:'rf-agree',label:'الإقرار',msg:'أكّد صحة البيانات للمتابعة.'}); $('#rfE').textContent='أكّد صحة البيانات للمتابعة.'; }
@@ -408,8 +431,8 @@ export async function viewProgramPage(code, tab){
   $$('.tabs .tab').forEach(b=>b.onclick=()=>{ cleanup(); viewProgramPage(code, b.dataset.t); });
   const body=$('#pBody');
   if(tab==='att'){ body.innerHTML=attendanceBoxHtml(st); bindAttendance(st, code, ()=>viewProgramPage(code,'att')); return; }
-  if(ps.k==='open'){ body.innerHTML=regFormHtml(`التسجيل في ${cohortLabel(c)}`, `تبدأ ${fmtDate(c.start_date)}`); bindRegForm({program_id:p.id}, ()=>[c]); }
-  else { body.innerHTML = regFormHtml('التسجيل المبدئي في البرنامج', ps.k==='running'?`${cohortLabel(c)} منعقدة الآن؛ سجّل مبدئيًا للدفعة القادمة ويتواصل معك المركز عند فتحها`:'لا توجد دفعة مفتوحة الآن؛ سجّل مبدئيًا ويتواصل معك المركز عند فتح الدفعة، ولا يُطلب منك سداد قبل ذلك'); bindRegForm({program_id:p.id}, ()=>[]); }
+  if(ps.k==='open'){ body.innerHTML=regFormHtml(`التسجيل في ${cohortLabel(c)}`, `تبدأ ${fmtDate(c.start_date)}`); bindRegForm({program_id:p.id, _mode:isKidsProgram(p)?'kids':'program'}, ()=>[c]); }
+  else { body.innerHTML = regFormHtml('التسجيل المبدئي في البرنامج', ps.k==='running'?`${cohortLabel(c)} منعقدة الآن؛ سجّل مبدئيًا للدفعة القادمة ويتواصل معك المركز عند فتحها`:'لا توجد دفعة مفتوحة الآن؛ سجّل مبدئيًا ويتواصل معك المركز عند فتح الدفعة، ولا يُطلب منك سداد قبل ذلك'); bindRegForm({program_id:p.id, _mode:isKidsProgram(p)?'kids':'program'}, ()=>[]); }
 }
 export async function viewGeneralCheckin(){
   const app=$('#app'); let st={require_code:false}; try{ st=await Store.publicSettings(); }catch(e){}

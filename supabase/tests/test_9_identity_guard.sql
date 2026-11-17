@@ -52,8 +52,7 @@ declare d date := riyadh_now()::date; ok boolean; v_t uuid; minor date := (riyad
           'plan_id',(select id from plans where tier='basic' and mode='in_person'),
           'accepted_policies',(select coalesce(jsonb_agg(id), '[]') from current_policies(riyadh_now()::date) where requires_acceptance));
 begin
-  begin perform register_subscription(base); ok := false; exception when others then ok := sqlerrm like '%تاريخ الميلاد مطلوب%'; end;
-  assert ok, 'تاريخ الميلاد إلزامي';
+  assert reg_guardian(base) is null, 'الباقة لا تطلب تاريخ الميلاد (البند 1 من «طلبات نهائية»)';
   begin perform register_subscription(base || jsonb_build_object('birth_date', minor)); ok := false; exception when others then ok := sqlerrm like '%جوال ولي الأمر مطلوب%'; end;
   assert ok, 'جوال ولي الأمر إلزامي دون 19';
   assert age_on((d - interval '19 years')::date, d) = 19 and age_on((d - interval '19 years' + interval '1 day')::date, d) = 18, 'حد العمر 19';

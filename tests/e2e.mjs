@@ -7,6 +7,7 @@ const { ok, failed } = reporter();
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1366, height: 900 }, acceptDownloads: true });
 const p = await ctx.newPage();
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const go = async (h, w = 900) => { await p.evaluate(() => { location.hash = '#zz'; }); await p.waitForTimeout(150); await p.evaluate(x => { location.hash = '#' + x; }, h); await p.waitForTimeout(w); };
 const S = (fn, arg) => p.evaluate(fn, arg);
@@ -21,7 +22,7 @@ const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 const fillReg = async () => {
   await go(openCode, 800); await p.waitForSelector('.tab[data-t=reg]', { timeout:10000 }); await p.click('.tab[data-t=reg]'); await p.waitForSelector('[name=full_name]', { timeout:10000 });
   await p.fill('[name=full_name]', 'يحيى محمد علي الحكمي'); await p.fill('[name=national_id]', nid); await p.fill('[name=phone]', '0551234567');
-  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01'); await p.selectOption('[name=city]', { index: 1 }); await p.selectOption('[name=education]', { index: 1 });
+  await p.selectOption('[name=gender]', 'ذكر'); await p.fill('[name=birth_date]', '1995-01-01', { timeout: 400 }).catch(() => {}); await p.selectOption('[name=city]', { index: 1 }, { timeout: 400 }).catch(() => {}); await p.selectOption('[name=education]', { index: 1 }, { timeout: 400 }).catch(() => {});
   await p.check('[name=agree]'); if (await p.$('#rf-pol')) await p.check('#rf-pol'); await p.click('#rfGo'); await p.waitForTimeout(700);
 };
 await fillReg(); ok(await p.$('.refbox'), 'تسجيل متدرب جديد في دفعة مفتوحة');
@@ -99,6 +100,7 @@ const r4 = await ck(info.nid); ok(!/تم تسجيل حضورك/.test(r4), 'لا 
 
 // الشريط والجوال
 const m = await ctx.newPage(); await m.setViewportSize({ width: 390, height: 844 }); m.on('pageerror', e => errs.push('m:' + e.message));
+await m.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 await m.goto(U + '#' + openCode); await m.waitForTimeout(1200); ok(await m.$('.tab[data-t=reg]'), 'صفحة البرنامج على الجوال');
 
 ok(errs.length === 0, 'لا أخطاء في الصفحة' + (errs.length ? ': ' + errs.join(' | ') : ''));

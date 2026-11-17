@@ -27,8 +27,15 @@ await p.goto(U + '#verify'); await p.waitForTimeout(900);
 ok(!p.url().includes('#verify') && await p.$('#coursesSec'), 'مسار التحقق القديم يُحال إلى الرئيسية');
 await p.goto(U + '#v-SAMA-TEST-1'); await p.waitForTimeout(900);
 ok(!p.url().includes('#v-') && !(await text('#app')).includes('SAMA-TEST-1'), 'مسار إفادة قديم لا يعرض شيئًا');
-await p.goto(U + '#enroll'); await p.waitForSelector('#en-item');
+// شاشة التعليمات قبل أي نموذج تسجيل (البند 17)، ثم النموذج بالخدمة المختارة نفسها
+const plan0 = (await data()).plans.find(x => x.mode !== 'remote' && x.status !== 'coming_soon');
+await p.goto(U + '#enroll-q-' + plan0.id); await p.waitForSelector('#regIntro');
+ok(await p.isHidden('#regCard') && /تنبيه مهم قبل التسجيل/.test(await text('#regIntro')) && /إن كان مطلوبًا لبرنامجك/.test(await text('#regIntro')) && !(await p.$('#regIntro input')), 'التعليمات أولًا بلا أي حقل، وتاريخ الميلاد «إن كان مطلوبًا»');
+await p.click('#regAck'); await p.waitForSelector('#en-item');
+ok(!(await p.$('#regIntro')) && (await p.inputValue('#en-item')) === plan0.id, '«قرأت التعليمات وأرغب بالمتابعة» يفتح النموذج بالباقة المختارة');
 ok(/أقر بصحة البيانات أعلاه/.test(await text('label.check')), 'نص الإقرار المختصر');
+await p.goto(U + '#home'); await p.waitForSelector('#coursesSec'); await p.click('[data-crp=now] .crs-card a.btn'); await p.waitForTimeout(600);
+ok(await p.isVisible('#regIntro'), 'التعليمات تظهر أيضًا من بطاقة «أرغب بالتسجيل فيها»');
 await p.goto(U + '#register'); await p.waitForTimeout(800);
 ok(!/نموذج التسجيل الموحّد/.test(await text('#app')), 'لا زر للنموذج الموحّد في دليل البرامج');
 

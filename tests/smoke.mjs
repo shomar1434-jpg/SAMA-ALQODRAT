@@ -6,6 +6,7 @@ const { server, origin: ORIGIN } = serveDist();
 const U = ORIGIN;
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1366, height: 900 } });
+await p.addInitScript(() => { try { localStorage.setItem('sama_skip_reg_intro', '1'); } catch {} });   // شاشة التعليمات تُختبر في home_courses
 const errs = []; p.on('pageerror', e => errs.push(e.message));
 const go = async (h, w = 900) => { await p.evaluate(x => { location.hash = '#' + x; }, h); await p.waitForTimeout(w); };
 let fail = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
