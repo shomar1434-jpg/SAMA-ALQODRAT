@@ -66,7 +66,7 @@ D = await data(); o2 = D.orders.find(x => x.id === o.id);
 ok(o2.paid_amount === 345 && o2.refunded === 1345, 'الاسترداد الجزئي');
 
 // صفحة الفواتير: الإشعارات والصافي وإغلاق الصندوق
-await admin('admin-invoices');
+await admin('admin-invoices'); await p.click('[data-it=list]'); await p.waitForTimeout(300);
 ok(/المسترد/.test(await text('#main')) && /الصافي/.test(await text('#main')), 'إجماليات المحصَّل والمسترد والصافي');
 await p.selectOption('#if-s', 'refund'); await p.waitForTimeout(300);
 ok((await p.$$('[data-io]')).length === 2, 'تصفية إشعارات الاسترداد');

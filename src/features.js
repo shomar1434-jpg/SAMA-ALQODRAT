@@ -58,7 +58,6 @@ export function certificateHtml(cert){
   const t=AD.trainees.find(x=>x.id===cert.trainee_id), p=progOf(cert.program_id), c=AD.cohorts.find(x=>x.id===cert.cohort_id), e=AD.enrollments.find(x=>x.id===cert.enrollment_id);
   const days=sessionDays(c).filter(d=>d>=e.created_at.slice(0,10)), att=days.map(d=>AD.attendance.some(a=>a.enrollment_id===e.id&&a.att_date===d));
   const fem=t.gender==='أنثى', ord=['','الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة','الثامنة','التاسعة','العاشرة'][c.number]||fmtNum(c.number);
-  const url=baseUrl(AD.settings)+'#v-'+cert.serial;
   return `<div class="pdoc land cert"><div class="cz-frame"><div class="cz-card">
     <svg class="cz-field" viewBox="0 0 279 192" preserveAspectRatio="none" aria-hidden="true">${certFieldSvg()}</svg><div class="cz-hair"></div><div class="cz-hair2"></div>
     <div class="cz-logos"><span><img src="${LOGOS.tvtc}" alt=""></span><span><img src="${LOGOS.nelc}" alt=""></span><span class="m"><img src="${LOGOS.sama}" alt=""></span></div>
@@ -74,7 +73,7 @@ export function certificateHtml(cert){
     <div class="cz-foot">
       <div class="cz-seal"><svg viewBox="0 0 100 100">${certSealSvg(att, days.length)}</svg></div>
       <div class="cz-sign"><i></i><span>مدير المركز</span><small>التوقيع والختم</small></div>
-      <div class="cz-qr"><div><small>للتحقق من الإفادة</small><b>${esc(cert.serial)}</b><small>صدرت ${fmtGreg(cert.issued_at.slice(0,10))}</small></div><div class="cz-q" data-qr="${esc(url)}"></div></div>
+      <div class="cz-qr"><div><small>رقم الإفادة</small><b>${esc(cert.serial)}</b><small>صدرت ${fmtGreg(cert.issued_at.slice(0,10))}</small></div></div>
     </div>
     <div class="cz-note">${CENTER.name} · ${CENTER.address} · ${CENTER.phones.join(' · ')}</div>
   </div></div></div>`;
@@ -207,7 +206,7 @@ export function traineeDetailHtml(r){
         <div class="hint" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>المحتسب ${fmtNum(+x.score.toFixed(2))} من ${fmtNum(x.total)} محاضرة</span><span>حد الشهادة ${fmtNum(x.required)} (${fmtNum(thr)}٪) · يلزمه ${fmtNum(x.needed)}</span></div>`:''}
       <div class="me-alert ${tone}" style="margin-top:10px">${ic('tv')}<p><span class="hint" style="display:block">الرسالة الظاهرة للمتدرب:</span>${esc(x.message)}</p></div>
       ${x.next?`<div class="me-next">${ic('calendar')}المحاضرة القادمة: ${fmtDate(x.next)} الساعة ${t12(x.start_time)}</div>`:''}
-      ${x.cert?`<a class="btn sm" href="#v-${esc(x.cert)}" style="margin-top:8px">${ic('award')} إفادة الحضور ${esc(x.cert)}</a>`:''}</div>`; }).join('') : emptyBox('لا توجد تسجيلات',''));
+      ${x.cert?`<p class="hint" style="margin-top:8px">${ic('award')} إفادة الحضور <b dir="ltr">${esc(x.cert)}</b></p>`:''}</div>`; }).join('') : emptyBox('لا توجد تسجيلات',''));
 }
 
 /* =====================================================================
@@ -259,7 +258,7 @@ export function certSectionHtml(c){
     <div style="flex:1;min-width:220px"><h3 class="ctitle">إفادات الحضور</h3><div class="hint">${arch?`صدرت ${fmtNum(certs.filter(x=>!x.revoked).length)} إفادة لمن بلغت نسبة حضوره ${fmtNum(thr)}٪ فأكثر من أيام الدفعة كاملة.`:`تُصدر تلقائيًا عند أرشفة الدفعة لمن يبلغ ${fmtNum(thr)}٪ من أيامها. يستحقها حاليًا ${fmtNum(elig)} متدربًا.`}</div></div>
     ${arch?`<button class="btn sm" id="ciss">${ic('refresh')} إصدار المستحقة</button><button class="btn pri sm" id="cprt" ${certs.some(x=>!x.revoked)?'':'disabled'}>${ic('form')} طباعة الشهادات</button>`:''}</div>
     ${certs.length?`<div style="overflow:auto;margin-top:12px"><table class="tb"><thead><tr><th>الرقم التسلسلي</th><th>المتدرب</th><th>نسبة الحضور</th><th>الحالة</th><th></th></tr></thead><tbody>${certs.map(x=>{ const t=AD.trainees.find(y=>y.id===x.trainee_id); return `<tr><td dir="ltr" style="text-align:right" class="num">${esc(x.serial)}</td><td>${esc(t?.full_name||'')}</td><td>${fmtNum(x.rate)}٪</td><td><span class="pill dot ${x.revoked?'bad':'ok'}">${x.revoked?'ملغاة':'صالحة'}</span></td>
-      <td style="white-space:nowrap"><button class="btn sm" data-c1="${x.id}" ${x.revoked?'disabled':''}>${ic('form')} طباعة</button> <a class="btn sm" href="#v-${esc(x.serial)}">${ic('search')} التحقق</a> <button class="btn sm ${x.revoked?'':'danger soft'}" data-rv="${x.id}">${x.revoked?'إعادة تفعيل':'إلغاء'}</button></td></tr>`; }).join('')}</tbody></table></div>`:''}
+      <td style="white-space:nowrap"><button class="btn sm" data-c1="${x.id}" ${x.revoked?'disabled':''}>${ic('form')} طباعة</button> <button class="btn sm ${x.revoked?'':'danger soft'}" data-rv="${x.id}">${x.revoked?'إعادة تفعيل':'إلغاء'}</button></td></tr>`; }).join('')}</tbody></table></div>`:''}
   </div>`;
 }
 export function bindCertSection(c, back){

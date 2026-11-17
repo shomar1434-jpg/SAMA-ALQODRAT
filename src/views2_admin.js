@@ -26,6 +26,7 @@ import { pageInvoices } from './invoice_views.js';
 import { pageData } from './import_views.js';
 import { pageAccess } from './access_views.js';
 import { requestsHtml, bindRequests } from './request_views.js';
+import { PUB_STATES, PUB_TONE, pubState } from './courses.js';
 
 /* =====================================================================
    5) لوحة الإدارة
@@ -39,9 +40,9 @@ export const allCats = () => [...new Set([...CATEGORIES, ...AD.programs.map(p=>p
 export async function viewAdmin(r){
   const app=$('#app');
   const me=await Store.adminMe(); setMe(me); /* القائمة الجانبية مجمّعة في أقسام، ولكل صفحة أيقونة تخصها */
-  const GROUPS=[['التشغيل اليومي',[['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','الحضور اليومي'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-daily','clipboard','تقرير اليوم']]],
+  const GROUPS=[['التشغيل اليومي',[['display','qr','باركود محاضرات اليوم'],['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','حضور البرامج التدريبية'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-daily','clipboard','تقرير اليوم']]],
     ['المتدربون والتعليم',[['admin-trainees','id','المتدربون'],['admin-data','search','مراجعة البيانات'],['admin-users','user','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-access','key','تفعيل الأجهزة'],['admin-notify','bell','الإشعارات والرسائل']]],
-    ['المالية',[['admin-orders','wallet','طلبات الشراء'],['admin-invoices','receipt','الفواتير']]],
+    ['المالية',[['admin-orders','wallet','طلبات الشراء'],['admin-invoices','receipt','الفوترة والمدفوعات']]],
     ['المحتوى والتقارير',[['admin-programs','book','البرامج والباقات'],['admin-reports','printer','التقارير والطباعة'],['admin-policies','shield','مركز السياسات'],['admin-partners','handshake','النبذة والشركاء']]],
     ['الضبط والحوكمة',[['admin-rules','pie','آلية الاحتساب'],['admin-admins','lock','إدارة المسؤولين'],['admin-audit','history','أرشيف الحركات'],['admin-settings','settings','الإعدادات']]]]
     .map(([g,ps])=>[g,ps.filter(([h])=>canSeePage(me?.role, h))]).filter(([,ps])=>ps.length);
@@ -49,7 +50,6 @@ export async function viewAdmin(r){
       <div class="ws"><img src="${LOGO}" alt=""><b>مركز سما القدرات<br><span style="color:var(--hero-muted);font-weight:400;font-size:12.5px">لوحة الإدارة${me?.role?` · ${ADMIN_ROLES[me.role]}`:''}</span></b></div>
       ${GROUPS.map(([g,ps])=>`<div class="sec">${g}</div>${ps.map(([h,i,t])=>`<a href="#${h}" class="${r===h?'on':''}">${ic(i)}${t}</a>`).join('')}`).join('')}
       <div class="sec">أدوات</div>
-      <a href="#display">${ic('qr')}باركود محاضرات اليوم</a>
       <a href="#register">${ic('book')}دليل البرامج</a>
       ${Store.mode==='cloud'?`<a href="#" id="chPass">${ic('key')}تغيير كلمة المرور</a>`:''}
       <a href="#" id="logout">${ic('logout')}خروج</a>
@@ -224,7 +224,7 @@ export function pageAttendance(){
   const rosterOf = c => enrollsOf(AD,c.id).filter(e=>e.created_at.slice(0,10)<=attDate);
   const totalExp = sess.reduce((s,c)=>s+rosterOf(c).length,0);
   const late = dayAtt.filter(a=>a.status==='متأخر').length;
-  m.innerHTML = titleBar(`${ic('calendar')}${fmtDate(attDate)}`, `حضور اليوم، <em>${fmtNum(dayAtt.length)} من ${fmtNum(totalExp)}</em>`, 'لكل دفعة منعقدة كشفها: الحاضرون أولًا بترتيب وقت الدخول، ثم الغائبون. يمكنك التحضير اليدوي وطباعة الكشوف كنماذج إثبات.', `${sess.length&&!future?`<button class="btn pri sm" id="prAll">${ic('form')} طباعة كشوف اليوم</button>`:''}<a class="btn sm" href="#display">${ic('qr')} باركود محاضرات اليوم</a>`)+
+  m.innerHTML = titleBar(`${ic('calendar')}حضور البرامج التدريبية · ${fmtDate(attDate)}`, `حضور اليوم، <em>${fmtNum(dayAtt.length)} من ${fmtNum(totalExp)}</em>`, 'لكل دفعة منعقدة كشفها: الحاضرون أولًا بترتيب وقت الدخول، ثم الغائبون. يمكنك التحضير اليدوي وطباعة الكشوف كنماذج إثبات.', `${sess.length&&!future?`<button class="btn pri sm" id="prAll">${ic('form')} طباعة كشوف اليوم</button>`:''}<a class="btn sm" href="#display">${ic('qr')} باركود محاضرات اليوم</a>`)+
     `<div class="filters rv" style="--i:1"><button class="btn sm" id="pd">${ic('prev')} السابق</button><input type="date" class="inp" id="ad" value="${attDate}"><button class="btn sm" id="nd">التالي ${ic('next')}</button>
       <button class="btn sm" id="td">اليوم</button><span style="flex:1"></span><input class="inp" id="aq" placeholder="بحث بالاسم أو السجل المدني" value="${esc(attQ)}" style="min-width:230px"></div>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
@@ -269,9 +269,10 @@ export function pageCohorts(){
   const mt=c=>matchQ(cohQ,progName(c.program_id),c.trainer,c.hall);
   m.innerHTML = titleBar(`${ic('users')}الدفعات والكشوف`, `${fmtNum(act.length)} دفعة نشطة، <em>و${fmtNum(arc.length)} في الأرشيف</em>`, 'لكل برنامج دفعة نشطة واحدة بكشف تسجيلها، وهو ما يعتمد عليه التحضير اليومي. تُؤرشف الدفعة تلقائيًا بعد انتهاء مدتها. والتحضير اليومي بباركود المركز الموحد في «باركود محاضرات اليوم»، ولكل برنامج باركود تسجيل خاص به.',
       `<a class="btn pri sm" href="#admin-programs">${ic('plus')} فتح دفعة لبرنامج</a>`)+
-    requestsHtml(AD)+`<div class="filters rv" style="--i:1"><div class="seg" style="margin:0"><button data-ct="active" class="${cohTab==='active'?'on':''}">${ic('activity')}النشطة <span class="pill g">${fmtNum(act.length)}</span></button><button data-ct="archived" class="${cohTab==='archived'?'on':''}">${ic('database')}الأرشيف <span class="pill g">${fmtNum(arc.length)}</span></button></div>
+    requestsHtml(AD)+`<div class="filters rv" style="--i:1"><div class="seg" style="margin:0"><button data-ct="active" class="${cohTab==='active'?'on':''}">${ic('activity')}النشطة <span class="pill g">${fmtNum(act.length)}</span></button><button data-ct="archived" class="${cohTab==='archived'?'on':''}">${ic('database')}الأرشيف <span class="pill g">${fmtNum(arc.length)}</span></button><button data-ct="pub" class="${cohTab==='pub'?'on':''}">${ic('monitor')}العرض في الرئيسية</button></div>
       <span style="flex:1"></span><input class="inp" id="cq" placeholder="بحث باسم البرنامج" value="${esc(cohQ)}" style="min-width:220px"></div>
     <div id="cohList"></div>`;
+  if(cohTab==='pub'){ pubTab(); $$('[data-ct]').forEach(b=>b.onclick=()=>{ cohTab=b.dataset.ct; pageCohorts(); }); $('#cq').oninput=e=>{ cohQ=e.target.value; clearTimeout(window._cq); window._cq=setTimeout(()=>{ pageCohorts(); const el=$('#cq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); }; return; }
   const list=(cohTab==='active'?act:arc).filter(mt);
   $('#cohList').innerHTML = cohTab==='active'
     ? (list.length ? `<div class="grid g2">${list.map((c,i)=>{ const p=progOf(c.program_id), st=cohortState(c,today), tk=takenOf(AD,c.id), pc=Math.min(100,Math.round(tk/c.seats*100));
@@ -291,6 +292,19 @@ export function pageCohorts(){
   $$('[data-ct]').forEach(b=>b.onclick=()=>{ cohTab=b.dataset.ct; pageCohorts(); });
   $('#cq').oninput=e=>{ cohQ=e.target.value; clearTimeout(window._cq); window._cq=setTimeout(()=>{ pageCohorts(); const el=$('#cq'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); },300); };
   bindCohortActions(pageCohorts);
+}
+/* حالة عرض البرامج في الرئيسية (البند 14): تلقائي، غير منشور، قريبًا، مفتوح (يشترط دفعة مفتوحة)، مغلق، مؤرشف */
+function pubTab(){ const today=riyadhNow().date;
+  const rows=AD.programs.filter(p=>p.active!==false && matchQ(cohQ,p.name,p.category)).map(p=>{ const c=activeCohortOf(AD,p.id,today); return {p, pub:{...p, cohort:c?{...c, taken:takenOf(AD,c.id)}:null}}; })
+    .sort((a,b)=>(pubState(b.pub)==='open_for_registration')-(pubState(a.pub)==='open_for_registration')||a.p.name.localeCompare(b.p.name,'ar'));
+  const eff=x=>{ const k=pubState(x.pub); return k ? `<span class="pill dot ${PUB_TONE[k]}">${k==='open_for_registration'?'في «دورات متاحة حاليا»':k==='coming_soon'?'في «دورات متاحة قريبا»':PUB_STATES[k]}</span>` : '<span class="pill g">لا يظهر في الرئيسية</span>'; };
+  $('#cohList').innerHTML = `<p class="hint rv">تحدد هنا ظهور كل برنامج في قسمي «دورات متاحة حاليا» و«دورات متاحة قريبا». المفتوح للتسجيل يشترط دفعة نشطة مفتوحة التسجيل، وينتقل البرنامج إليه تلقائيًا عند فتحها. «قريبًا» إعلان مع تسجيل اهتمام فقط، وغير المنشور والمغلق والمؤرشف لا يقبل التسجيل. كل تغيير يُسجَّل في أرشيف الحركات.</p>
+    <div class="tbw rv"><table class="tb" id="pubT"><thead><tr><th>البرنامج</th><th>الدفعة</th><th>حالة العرض</th><th>الموعد المتوقع</th><th>الظهور الآن</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr data-pr="${x.p.id}"><td><b style="font-weight:500">${esc(x.p.name)}</b><div class="hint">${esc(x.p.category||'')}</div></td>
+      <td>${x.pub.cohort?`${cohortLabel(x.pub.cohort)}<div class="hint">${x.pub.cohort.reg_open?'التسجيل مفتوح':'التسجيل مغلق'}</div>`:'<span class="hint">لا دفعة نشطة</span>'}</td>
+      <td><select class="inp" data-ps aria-label="حالة عرض ${esc(x.p.name)}"><option value="">تلقائي</option>${Object.entries(PUB_STATES).map(([k,v])=>`<option value="${k}" ${x.p.publish_state===k?'selected':''}>${v}</option>`).join('')}</select></td>
+      <td><input class="inp" type="date" data-pe value="${x.p.expected_start||''}" aria-label="الموعد المتوقع"></td><td>${eff(x)}</td><td><button class="btn sm pri" data-psv>${ic('check')} حفظ</button></td></tr>`).join('')}</tbody></table></div>`;
+  $$('#pubT [data-psv]').forEach(b=>b.onclick=async()=>{ const tr=b.closest('tr'); setBusy(b,true,'جارٍ الحفظ');
+    try{ await Store.setPublish(tr.dataset.pr, $('[data-ps]',tr).value, $('[data-pe]',tr).value); await reloadAD(); toast('حُفظت حالة العرض'); pageCohorts(); }catch(x){ setBusy(b,false); toast(x.message); } });
 }
 export function cohortSummary(c){ const today=riyadhNow().date, es=enrollsOf(AD,c.id), ds=sessionDays(c,today), at=AD.attendance.filter(a=>a.cohort_id===c.id);
   const exp=expectedOf(c,c.start_date,c.end_date), rate=exp?Math.round(at.length/exp*100):0;

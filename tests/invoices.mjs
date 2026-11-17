@@ -27,7 +27,7 @@ ok(D.invoices.length === 1 && /^INV-\d{4}-\d{6}$/.test(inv.number) && inv.order_
 ok(inv.customer_name === 'راشد سعد علي المالكي' && inv.kind === 'plan' && inv.service === o.title && inv.purchase_date === o.created_at.slice(0, 10), 'اسم صاحب الخدمة ونوع الخدمة وتاريخ شرائها');
 ok(inv.total === o.total && inv.paid === o.due_now && inv.remaining === o.total - o.due_now && inv.transfer_ref === 'TRX-4411' && inv.method === 'تحويل بنكي', 'مبلغ الباقة والمدفوع والمتبقي ورقم التحويل');
 
-await admin('admin-invoices');
+await admin('admin-invoices'); await p.click('[data-it=list]'); await p.waitForTimeout(300);
 const main = await text('#main');
 ok(main.includes(inv.number) && /راشد سعد/.test(main) && /TRX-4411/.test(main) && /المحصَّل/.test(main), 'صفحة الفواتير تعرض الفاتورة والإجماليات');
 await p.fill('#if-q', 'لا يوجد'); await p.waitForTimeout(600);

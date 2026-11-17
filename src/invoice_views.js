@@ -14,10 +14,11 @@ import { INV_ST, INV_TONE, KIND_TXT, RECEIPT_MAX, invoiceFilter, invoiceTotals }
 import { PAY_METHODS } from './order_logic.js';
 import { docLines, isRefund, DOC_TXT } from './billing_logic.js';
 import { cashCloseHtml, bindCashClose, isOwner } from './billing_views.js';
+import { summaryHtml, bindSummary } from './payments_summary.js';
 
 const sar = v => `${fmtNum(v)} ريال`, D2 = v => (Math.round(v * 100) / 100).toLocaleString('en', { minimumFractionDigits:2 });
 let iF = null;
-const filt = () => iF || (iF = { from:riyadhNow().date.slice(0, 8) + '01', to:riyadhNow().date, st:'issued', q:'', tab:'list', day:riyadhNow().date });
+const filt = () => iF || (iF = { from:riyadhNow().date.slice(0, 8) + '01', to:riyadhNow().date, st:'issued', q:'', tab:'sum', day:riyadhNow().date });
 const linesTxt = i => docLines(i).map(x => `${PAY_METHODS[x.method] || x.method} ${fmtNum(x.amount)}${x.reference ? ` (${esc(x.reference)})` : ''}`).join(' + ');
 
 /* الفاتورة للطباعة (A4، RTL): نسخة ثابتة من بيانات العميل والخدمة والتحويل */
@@ -48,7 +49,8 @@ const csvRows = list => [['رقم الفاتورة', 'تاريخ الفاتور�
 export function pageInvoices(){
   const f = filt(), all = (AD.invoices || []).slice().sort((a, b) => b.number.localeCompare(a.number)), list = invoiceFilter(all, { ...f, q:f.q.trim() }), t = invoiceTotals(list);
   const head = titleBar(`${ic('form')}الفواتير`, 'الفواتير <em>ومراجعة الحسابات</em>', 'تصدر فاتورة برقم تسلسلي عند استلام المبلغ من صفحة طلبات الشراء، بطريقة أو أكثر، وتحفظ بيانات صاحب الخدمة والخدمة والسداد كما كانت وقت الإصدار. الاسترداد بأمر المالك يصدر له «إشعار استرداد» مرتبط بالفاتورة. المستندات لا تُحذف ولا تُعدَّل؛ تُلغى بسبب مكتوب.') +
-    `<div class="tabs" role="tablist" style="margin:0 0 14px">${[['list', 'form', 'الفواتير والاسترداد'], ['cash', 'wallet', 'إغلاق الصندوق']].map(([k, i, l]) => `<button class="tab" role="tab" data-it="${k}" aria-selected="${f.tab === k}">${ic(i)}${l}</button>`).join('')}</div>`;
+    `<div class="tabs" role="tablist" style="margin:0 0 14px">${[['sum', 'chart', 'ملخص جميع المدفوعات'], ['list', 'form', 'الفواتير والاسترداد'], ['cash', 'wallet', 'إغلاق الصندوق']].map(([k, i, l]) => `<button class="tab" role="tab" data-it="${k}" aria-selected="${f.tab === k}">${ic(i)}${l}</button>`).join('')}</div>`;
+  if(f.tab === 'sum'){ $('#main').innerHTML = head + summaryHtml(AD); $$('[data-it]').forEach(b => b.onclick = () => { iF.tab = b.dataset.it; pageInvoices(); }); bindSummary(AD, pageInvoices); return; }
   if(f.tab === 'cash'){ $('#main').innerHTML = head + cashCloseHtml(f.day); $$('[data-it]').forEach(b => b.onclick = () => { iF.tab = b.dataset.it; pageInvoices(); }); bindCashClose(f.day, d => { iF.day = d || riyadhNow().date; pageInvoices(); }); return; }
   $('#main').innerHTML = head +
     `<div class="grid g4" style="margin-bottom:14px">${[['فواتير سارية', fmtNum(t.count), 'ok'], ['المحصَّل', sar(t.paid), 'ok'], ['المسترد', `${sar(t.refunded)}${t.refunds ? ` (${fmtNum(t.refunds)})` : ''}`, 'bad'], ['الصافي', sar(t.net), 'info']].map(([k, v, c]) => `<div class="card pad ostat"><span class="hint"><span class="pill dot ${c}" aria-hidden="true" style="padding:0 0 0 6px"></span>${k}</span><b class="num">${v}</b></div>`).join('')}</div>

@@ -7,6 +7,7 @@ import { defaultPlans, planTotal, customPlans, defaultTemplates, demoQudurat, pl
 import { rolesOfPhone, normPhone, makeNotification, ROLE_TXT } from './portal_logic.js';
 import { makeReport, isPastReportTime } from './report_logic.js';
 import { buildInvoice, validReceipt } from './invoice_logic.js';
+import { PUB_STATES } from './courses.js';
 import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
 import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256 } from './device_logic.js';
@@ -317,11 +318,16 @@ export const LocalStore = {
   _pub(p){ const D=this.data, c=activeCohortOf(D,p.id); return {...p, code:progCode(p), cohort: c?{...c, taken:takenOf(D,c.id)}:null}; },
   async catalog(){ const D=this.data; return { programs:D.programs.filter(p=>p.active).map(p=>this._pub(p)), packages:D.packages.filter(k=>k.active) }; },
   async publicProgram(code){ const p=this.data.programs.find(x=>progCode(x)===code); return p ? this._pub(p) : null; },
+  /* حالة العرض في الرئيسية (البند 14) ↔ admin_set_publish */
+  async setPublish(id, state, expected){ const D=this.data, p=D.programs.find(x=>x.id===id); if(!p) throw new Error('البرنامج غير موجود'); const v=state||null;
+    if(v && !PUB_STATES[v]) throw new Error('حالة غير صالحة'); if(v==='open_for_registration' && !openCohortOf(D, id, riyadhNow().date)) throw new Error('افتح دفعة للبرنامج وفعّل استقبال التسجيل أولًا');
+    const before={publish_state:p.publish_state||null, expected_start:p.expected_start||null}; p.publish_state=v; p.expected_start=expected||null; this.audit('programs.update', id, {before, after:{publish_state:v, expected_start:p.expected_start}}); this.save(); return {ok:true}; },
   async publicSettings(){ const s=this.data.settings; return {require_code:s.require_code, late_minutes:s.late_minutes, early_minutes:s.early_minutes, checkin_url:s.checkin_url}; },
   async register(f){
     const D=this.data, today=riyadhNow().date;
     if(!validSaudiId(f.national_id)) throw new Error('رقم السجل المدني غير صحيح');
     const pids = f.package_id ? (D.packages.find(k=>k.id===f.package_id)?.program_ids||[]) : [f.program_id];
+    if(!f.package_id && ['draft','closed','archived'].includes(D.programs.find(x=>x.id===f.program_id)?.publish_state)) throw new Error('التسجيل في هذا البرنامج غير متاح حاليًا');   // ↔ register_trainee (…_publish_state.sql)
     if(!f.package_id && !openCohortOf(D, f.program_id, today)) return this._programRequest(f);   // لا دفعة مفتوحة: تسجيل مبدئي (↔ register_program_request)
     const targets = pids.map(pid=>({p:D.programs.find(x=>x.id===pid), c:activeCohortOf(D,pid,today)}));
     for(const {p,c} of targets){
@@ -886,6 +892,7 @@ export const CloudStore = {
       throw new Error(/foreign key/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
   async catalog(){ const d=this._e(await this.sb.rpc('public_catalog')); return {programs:d.programs||[], packages:d.packages||[]}; },
   async publicProgram(code){ return this._e(await this.sb.rpc('public_program',{p_code:code})); },
+  async setPublish(id, state, expected){ return this._e(await this.sb.rpc('admin_set_publish',{p_program:id, p_state:state||null, p_expected:expected||null})); },
   async publicSettings(){ return this._e(await this.sb.rpc('public_settings')) || {}; },
   async register(f){ return this._e(await this.sb.rpc('register_trainee',{p:f})); },
   async placeRequests(ids){ return this._e(await this.sb.rpc('admin_place_requests',{p_ids:ids})); },

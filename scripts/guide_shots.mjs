@@ -54,7 +54,7 @@ await step('order modal', async () => { await admin('admin-orders'); await p.sel
   await p.selectOption('#om-pl', { index: 1 }); await p.fill('#om-pr', 'ترقية بطلب ولي الأمر');
   await p.locator('#om-pl').scrollIntoViewIfNeeded(); await shot('a13_order_plan_change');
   await p.locator('#om-cancel').scrollIntoViewIfNeeded(); await shot('a14_order_cancel'); await closeM(); });
-await step('invoices', async () => { await admin('admin-invoices'); await shot('a15_invoices');
+await step('invoices', async () => { await admin('admin-invoices'); await shot('a15b_pay_summary'); await p.click('[data-it=list]').catch(() => {}); await p.waitForTimeout(400); await shot('a15_invoices');
   const io = await p.$('[data-io]'); if (io) { await io.click(); await p.waitForSelector('.modal'); await shot('a16_invoice_modal'); await closeM(); }
   await p.click('[data-it=cash]'); await shot('a17_cash_close'); });
 await step('statement', async () => { await admin('admin-trainees'); await p.fill('#tq', 'ماجد سعيد'); await W(800);

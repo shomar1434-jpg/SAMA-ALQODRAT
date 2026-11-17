@@ -1463,3 +1463,13 @@ body.sim-on{overflow:hidden}
 .fb-q{margin:6px 0 0;padding:6px 10px;border-inline-start:3px solid var(--brand);background:var(--brand-tint);border-radius:8px;font-size:14px}
 .fb-in{width:100%;margin-top:6px}
 .ord-inst{margin:8px 0 0;font-size:14px;font-weight:500;color:var(--ink)}
+/* الدورات المتاحة حاليا وقريبا (الخطوة AX) */
+.courses{padding:56px clamp(16px,4vw,48px)}
+.crs-tabs{justify-content:center;margin:0 0 18px}
+.crs-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
+.crs-card{background:var(--surface-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow-sm)}
+.crs-card h3{font-size:17px;font-weight:600;margin:4px 0;line-height:1.5}.crs-card p{margin:0;display:flex;gap:6px;align-items:center}
+.crs-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.crs-act{margin-top:auto;padding-top:8px}.crs-act .btn{min-height:44px}
+.crs-empty{text-align:center;color:var(--ink-muted);padding:28px 10px;border:1px dashed var(--border);border-radius:var(--radius-lg)}
+.mnr-steps{padding-inline-start:36px;display:grid;gap:12px;line-height:1.9}
