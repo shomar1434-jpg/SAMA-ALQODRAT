@@ -1489,3 +1489,4 @@ body.sim-on{overflow:hidden}
 .lv-btns{display:flex;gap:6px;flex-wrap:wrap}.lv-btns .btn,.lv-row .btn{min-height:44px}
 .lv-h{margin:12px 0 6px;font-size:14px;color:var(--ink-muted)}
 .lv-how summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.lv-how ol{line-height:1.9;padding-inline-start:22px}
+.lv-grp{border-top:1px solid var(--border);padding:4px 0}.lv-grp>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;list-style:none}.lv-grp>summary::-webkit-details-marker{display:none}.lv-room .btn{min-height:44px}
