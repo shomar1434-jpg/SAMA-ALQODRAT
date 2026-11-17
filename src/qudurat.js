@@ -164,7 +164,8 @@ export function demoQudurat(D, person, rnd){
    المتوقع في يوم جلسة = الاشتراكات القائمة فيه (بدأت قبله أو فيه، ولم تنتهِ، ومتابَعة منه)، والحضور يوم واحد لكل تاريخ.
    الجلسة الجارية اليوم تُحتسب بعد بدايتها فقط، والقادمة لا تُحتسب. */
 export function quduratAnalytics(D, from, to, n = riyadhNow()){
-  const subs = (D.subscriptions || []).filter(s => s.status !== 'cancelled' && s.start_date);
+  const testIds = new Set((D.trainees || []).filter(t => t.is_test).map(t => t.id));   // الحسابات التجريبية خارج الإحصاءات
+  const subs = (D.subscriptions || []).filter(s => s.status !== 'cancelled' && s.start_date && !testIds.has(s.trainee_id));
   const att = (D.sub_attendance || []).filter(a => a.att_date >= from && a.att_date <= to);
   const last = to < n.date ? to : n.date;
   const live = (s, d) => s.start_date <= d && (!s.end_date || s.end_date >= d) && (!s.track_from || s.track_from <= d);
@@ -176,8 +177,8 @@ export function quduratAnalytics(D, from, to, n = riyadhNow()){
       return { date:s.date, expected:exp.length, present:a.length, late:a.filter(x => x.status === 'متأخر').length };
     });
     const e = days.reduce((t, x) => t + x.expected, 0), p = days.reduce((t, x) => t + x.present, 0), l = days.reduce((t, x) => t + x.late, 0);
-    const active = (D.subscriptions || []).filter(s => s.section === sec && subStatus(s, n.date) === 'active').length;
-    const pending = (D.subscriptions || []).filter(s => s.section === sec && subStatus(s, n.date) === 'pending').length;
+    const active = (D.subscriptions || []).filter(s => s.section === sec && !testIds.has(s.trainee_id) && subStatus(s, n.date) === 'active').length;
+    const pending = (D.subscriptions || []).filter(s => s.section === sec && !testIds.has(s.trainee_id) && subStatus(s, n.date) === 'pending').length;
     const todayS = sessionOn(D, sec, n.date);
     const byPlan = {};
     for (const s of mine) { const k = s.plan_id || '—'; byPlan[k] = byPlan[k] || { expected:0, present:0 };

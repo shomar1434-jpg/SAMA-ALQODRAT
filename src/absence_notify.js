@@ -34,7 +34,7 @@ export function absentees(D, kind, key, date){
     rows = c ? enrollsOf(D, c.id).filter(e => e.created_at.slice(0, 10) <= date && !D.attendance.some(a => a.enrollment_id === e.id && a.att_date === date))
       .map(e => ({ id:e.id, t:D.trainees.find(x => x.id === e.trainee_id), note:'' })) : [];
   }
-  return { what, time, rows: rows.filter(r => r.t).map(r => { const g = intlPhone(r.t.guardian_phone);
+  return { what, time, rows: rows.filter(r => r.t && !r.t.is_test).map(r => { const g = intlPhone(r.t.guardian_phone);
     return { ...r, to:g ? 'guardian' : 'trainee', phone:g ? r.t.guardian_phone : r.t.phone, link:waTo(g ? r.t.guardian_phone : r.t.phone, absenceText(r.t, !!g, what, date, time)) }; })
     .sort((a, b) => a.t.full_name.localeCompare(b.t.full_name, 'ar')) };
 }

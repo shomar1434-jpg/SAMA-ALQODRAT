@@ -796,6 +796,21 @@ export const LocalStore = {
   /* ملف المدرب: يعدّل نبذته ورابط قناته وصورته فقط */
   async saveMyProfile(p){ const me=await this._me(), x=checkProfile(p); Object.assign(me, x); this.audit('teacher.profile', me.id); this.save(); return {ok:true}; },
   /* مجموعات المدرب المحفوظة: من متدربيه فقط */
+  /* الحسابات التجريبية (البند 13) ↔ admin_create_test_trainee / admin_purge_test_trainee */
+  async createTestTrainee(f){ await this._role('full'); const D=this.data, pl=(D.plans||[]).find(p=>p.id===f.plan_id&&p.mode!=='remote'); if(!pl) throw new Error('اختر باقة حضورية');
+    let nid; do { nid='1'+String(Math.floor(Math.random()*1e9)).padStart(9,'0'); } while(validSaudiId(nid)||D.trainees.some(t=>t.national_id===nid));
+    let ph=String(f.phone||'').trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)); const used=x=>D.trainees.some(t=>t.phone===x||t.guardian_phone===x)||(D.teachers||[]).some(t=>t.phone===x);
+    if(!ph){ do { ph='05000'+String(Math.floor(Math.random()*1e5)).padStart(5,'0'); } while(used(ph)); }
+    else if(!/^05\d{8}$/.test(ph)) throw new Error('رقم الجوال غير صحيح'); else if(D.trainees.some(t=>(t.phone===ph||t.guardian_phone===ph)&&!t.is_test)||(D.teachers||[]).some(t=>t.phone===ph)) throw new Error('هذا الجوال لحساب حقيقي؛ اختر جوالًا اصطناعيًا');
+    let name=String(f.full_name||'').trim(); if(name.length<5) name='متدرب تجريبي '+Date.now().toString().slice(-4); if(!name.includes('تجريبي')) name+=' (تجريبي)';
+    const g=f.gender==='أنثى'?'أنثى':'ذكر', today=riyadhNow().date, t={id:uid(), national_id:nid, full_name:name, phone:ph, gender:g, email:'', birth_date:'', city:'', education:'', employer:'', is_test:true, created_at:new Date().toISOString()};
+    D.trainees.push(t); D.subscriptions.push({id:uid(), ref:'SQ-T'+String(Math.floor(Math.random()*1e6)).padStart(6,'0'), trainee_id:t.id, plan_id:pl.id, section:g==='أنثى'?'girls':'boys', subjects:[...(pl.subjects||[])], status:'active', start_date:today, end_date:subEnd(pl,today), start_manual:true, created_at:new Date().toISOString()});
+    this.audit('trainees.insert', t.id, {after:{is_test:true}}); this.save(); return {ok:true, id:t.id, national_id:nid, phone:ph, full_name:name}; },
+  async purgeTestTrainee(id){ await this._role('full'); const D=this.data, t=D.trainees.find(x=>x.id===id); if(!t||!t.is_test) throw new Error('تُزال الحسابات التجريبية وحدها');
+    if((D.orders||[]).some(o=>o.trainee_id===id)||(D.invoices||[]).some(i=>i.trainee_id===id)||(D.enrollments||[]).some(e=>e.trainee_id===id)) throw new Error('للحساب سجلات مالية أو تسجيل في دفعة؛ لا يُزال');
+    const sids=(D.subscriptions||[]).filter(s=>s.trainee_id===id).map(s=>s.id);
+    D.sub_attendance=(D.sub_attendance||[]).filter(a=>!sids.includes(a.subscription_id)); ['submissions','attempts','messages','ratings','notifications','guardian_links','profile_change_requests','program_requests'].forEach(k=>{ if(D[k]) D[k]=D[k].filter(x=>x.trainee_id!==id); });
+    D.subscriptions=D.subscriptions.filter(s=>s.trainee_id!==id); D.trainees=D.trainees.filter(x=>x.id!==id); this.audit('trainees.delete', id, {before:{is_test:true}}); this.save(); return {ok:true}; },
   /* استوديو البث (الخطوة AZ) ↔ teacher_save_lecture / teacher_set_lecture / admin_lectures */
   async saveLecture(f){ const me=await this._me(), D=this.data; D.lectures=D.lectures||[]; const mine=(D.cohorts||[]).filter(c=>c.teacher_id===me.id).map(c=>c.id), x=checkLecture(f, me, mine);
     if(f.id){ const l=D.lectures.find(y=>y.id===f.id&&y.teacher_id===me.id&&y.status!=='cancelled'); if(!l) throw new Error('المحاضرة غير موجودة أو ملغاة'); Object.assign(l, x, {section:x.cohort_id?'all':me.section, updated_at:new Date().toISOString()}); this.audit('lectures.update', l.id); this.save(); return {ok:true, id:l.id}; }
@@ -1013,6 +1028,8 @@ export const CloudStore = {
   async commentSubmission(id, f){ return this._e(await this.sb.rpc('teacher_comment',{p_id:id, p:f})); },
   async submitAssignment(p){ return this._e(await this.sb.rpc('student_submit',{p})); },
   async saveMyProfile(p){ return this._e(await this.sb.rpc('teacher_save_profile',{p:checkProfile(p)})); },
+  async createTestTrainee(f){ return this._e(await this.sb.rpc('admin_create_test_trainee',{p:{full_name:f.full_name||'', gender:f.gender||'ذكر', plan_id:f.plan_id, phone:f.phone||''}})); },
+  async purgeTestTrainee(id){ return this._e(await this.sb.rpc('admin_purge_test_trainee',{p_id:id})); },
   async saveLecture(f){ const {id, title, minutes, starts_at, youtube, subject, cohort_id, recording}=f; const yt=ytId(youtube); if(yt===null) throw new Error('رابط يوتيوب غير صحيح');
     return this._e(await this.sb.rpc('teacher_save_lecture',{p:{id:id||null, title, minutes:+minutes, starts_at:new Date(starts_at).toISOString(), youtube_id:yt||'', subject:cohort_id?null:subject, cohort_id:cohort_id||null, recording:recording!==false}})); },
   async setLectureStatus(id, status){ return this._e(await this.sb.rpc('teacher_set_lecture',{p_id:id, p_status:status})); },
