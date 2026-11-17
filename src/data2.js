@@ -1,3 +1,4 @@
+import { defaultResponses, validateResponse } from './assistant_logic.js';
 import { sessionReminders, inboxOf, adminRecipients } from './inbox_logic.js';
 import { checkAcceptance, validatePolicy, nextVersion, demoPolicies } from './policy_logic.js';
 import { catalogPrograms, computeEnd } from './catalog.js';
@@ -307,7 +308,7 @@ export const LocalStore = {
     if(!this.data){ this.data = makeDemo(); }
     this.data.certificates = this.data.certificates || []; if(this.data.settings.cert_threshold==null) this.data.settings.cert_threshold=75;
     if(!this.data.partners || (this.data.partners.length<=2 && this.data.partners.every(x=>x.type==='جهة اعتماد'))) this.data.partners = defaultPartners(); if(this.data.settings.about==null) this.data.settings.about = DEFAULT_ABOUT;
-    const D=this.data; if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
+    const D=this.data; D.assistant_responses=D.assistant_responses||defaultResponses(); if(!D.plans){ D.plans=defaultPlans(); D.schedule_templates=defaultTemplates(); D.schedule_exceptions=[]; D.subscriptions=[]; D.sub_attendance=[]; }
     D.orders=D.orders||[]; D.invoices=D.invoices||[]; (D.trainees||[]).forEach(t=>{ if(t.imported && !t.import_notes) t.import_notes=[]; }); if(!D.settings.bank) D.settings.bank={...BANK_DEFAULT}; if(D.settings.require_order_approval==null) D.settings.require_order_approval=false;
     if(!D.plans.some(p=>p.tier==='custom')) D.plans.push(...customPlans());       // باقة «خصصناها لك» للبيانات المحفوظة قبل إضافتها
     D.checkin_attempts = D.checkin_attempts || []; D.audit_logs = D.audit_logs || []; D.custom_requests = D.custom_requests || []; D.program_requests = D.program_requests || [];
@@ -316,7 +317,7 @@ export const LocalStore = {
     try{ this.admin = sessionStorage.getItem(this.key+'_adm')==='1'; }catch(e){}
   },
   autoArchive(){ const today=riyadhNow().date; this.data.cohorts.forEach(c=>{ if(!c.archived_at && c.end_date<today){ c.archived_at=addDays(c.end_date,1)+'T00:00:00Z'; c.archived_auto=true; c.reg_open=false; issueCertificatesLocal(this.data,c); } }); },
-  save(){ try{ localStorage.setItem(this.key, JSON.stringify(this.data)); }catch(e){} },
+  save(){ try{ const value=JSON.stringify(this.data); if(localStorage.getItem(this.key)===value) return; localStorage.setItem(this.key, value); }catch(e){} },   // الألسنة الأخرى تتلقى حدث storage؛ واللسان نفسه يعيد العرض بعد إجرائه
   _pub(p){ const D=this.data, c=activeCohortOf(D,p.id); return {...p, code:progCode(p), cohort: c?{...c, taken:takenOf(D,c.id)}:null}; },
   async catalog(){ const D=this.data; return { programs:D.programs.filter(p=>p.active).map(p=>this._pub(p)), packages:D.packages.filter(k=>k.active) }; },
   async publicProgram(code){ const p=this.data.programs.find(x=>progCode(x)===code); return p ? this._pub(p) : null; },
@@ -405,6 +406,17 @@ export const LocalStore = {
     if(me?.role!=='owner') throw new Error('إعادة تعيين كلمات المرور للمالك الأساسي وحده'); if(!a) throw new Error('الحساب غير موجود');
     if(a.id===me.id) throw new Error('غيّر كلمة مرورك من «تغيير كلمة المرور»'); if(a.role==='owner') throw new Error('لا تُعاد كلمة مرور المالك الأساسي'); if(a.active===false) throw new Error('فعّل الحساب أولًا');
     this.audit('admins.password_reset', a.email); this.save(); return {ok:true, mode:'password', temp_password:'demo'+String(Math.floor(Math.random()*9e5)+1e5), email:a.email}; },
+  async assistantResponses(){ return structuredClone(this.data.assistant_responses || []); },
+  async saveAssistantResponse(input){
+    if(!await this.isAdmin()) throw new Error('غير مصرح بهذه العملية');
+    const row=validateResponse(input), rows=this.data.assistant_responses;
+    const previous=rows.find(item=>item.id===row.id);
+    if(previous && previous.version !== input.version) throw new Error('تم تعديل الرد من مستخدم آخر. حدّث المكتبة ثم راجع تعديلاتك.');
+    const saved={...row, version:(previous?.version||0)+1, updated_at:new Date().toISOString()};
+    if(previous) Object.assign(previous,saved); else rows.push(saved);
+    this.audit('assistant_responses.'+(previous?'update':'insert'),row.id);
+    this.save(); return structuredClone(saved);
+  },
   async adminData(){ this.ensureLectures(); this.autoArchive(); this.autoReport(); this.autoPurgeArchive(); this.save(); return JSON.parse(JSON.stringify(this.data)); },
   /* تقرير اليوم: محليًا يُولَّد عند أول فتح للإدارة بعد 20:30 (لا خادم مجدول في الوضع التجريبي). سحابيًا: pg_cron */
   autoReport(){ const n=riyadhNow(), D=this.data; D.daily_reports=D.daily_reports||[]; if(isPastReportTime(n) && !D.daily_reports.some(r=>r.date===n.date)){ const r=makeReport(D, n.date, 'snapshot', '', n); if(!r.existing){ r.report.auto=true; D.daily_reports.push(r.report); } } },
@@ -947,6 +959,17 @@ export const CloudStore = {
       if(c==='23514'||/check constraint/.test(m)) throw new Error('إحدى القيم المدخلة غير صالحة؛ راجع الجوال ورقم الهوية والحقول المطلوبة');
       if(/row-level security/.test(m)) throw new Error('غير مصرح بهذه العملية؛ سجّل الدخول كمسؤول');
       throw new Error(/foreign key/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
+  async assistantResponses(){ return this._e(await this.sb.from('assistant_responses').select('*').order('created_at').order('id')); },
+  async saveAssistantResponse(input){
+    const row=validateResponse(input);
+    const query=input.version == null
+      ? this.sb.from('assistant_responses').insert(row)
+      : this.sb.from('assistant_responses').update(row).eq('id',row.id).eq('version',input.version);
+    const saved=this._e(await query.select('*').maybeSingle());
+    if(!saved) throw new Error('تم تعديل الرد من مستخدم آخر. حدّث المكتبة ثم راجع تعديلاتك.');
+    window.dispatchEvent(new Event('sama-data-changed'));
+    return saved;
+  },
   async catalog(){ const d=this._e(await this.sb.rpc('public_catalog')); return {programs:d.programs||[], packages:d.packages||[]}; },
   async publicProgram(code){ return this._e(await this.sb.rpc('public_program',{p_code:code})); },
   async setPublish(id, state, expected){ return this._e(await this.sb.rpc('admin_set_publish',{p_program:id, p_state:state||null, p_expected:expected||null})); },

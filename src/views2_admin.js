@@ -1,3 +1,4 @@
+import { pageAssistant } from './assistant_views.js';
 import { editTraineeModal } from './import_views.js';
 import { statementModal } from './statement_views.js';
 import { adminWeeklyModal } from './weekly_views.js';
@@ -45,7 +46,7 @@ export async function viewAdmin(r){
   const GROUPS=[['التشغيل اليومي',[['display','qr','باركود محاضرات اليوم'],['admin','chart','لوحة التحليلات'],['admin-attendance','calendar','حضور البرامج التدريبية'],['admin-qudurat','award','القدرات والتحصيلي'],['admin-cohorts','users','الدفعات والكشوف'],['admin-followup','alert','المتابعة'],['admin-daily','clipboard','تقرير اليوم']]],
     ['المتدربون والتعليم',[['admin-trainees','id','المتدربون'],['admin-data','search','مراجعة البيانات'],['admin-users','user','المدربون وأولياء الأمور'],['admin-bank','database','بنوك الأسئلة'],['admin-studio','tv','استوديو البث'],['admin-access','key','تفعيل الأجهزة'],['admin-notify','bell','الإشعارات والرسائل']]],
     ['المالية',[['admin-orders','wallet','طلبات الشراء'],['admin-invoices','receipt','الفوترة والمدفوعات']]],
-    ['المحتوى والتقارير',[['admin-programs','book','البرامج والباقات'],['admin-reports','printer','التقارير والطباعة'],['admin-policies','shield','مركز السياسات'],['admin-partners','handshake','النبذة والشركاء']]],
+    ['المحتوى والتقارير',[['admin-programs','book','البرامج والباقات'],['admin-assistant','chat','المساعد الذكي'],['admin-reports','printer','التقارير والطباعة'],['admin-policies','shield','مركز السياسات'],['admin-partners','handshake','النبذة والشركاء']]],
     ['الضبط والحوكمة',[['admin-rules','pie','آلية الاحتساب'],['admin-admins','lock','إدارة المسؤولين'],['admin-audit','history','أرشيف الحركات'],['admin-archive','inbox','بيانات مؤرشفة'],['admin-settings','settings','الإعدادات']]]]
     .map(([g,ps])=>[g,ps.filter(([h])=>canSeePage(me?.role, h))]).filter(([,ps])=>ps.length);
   app.innerHTML = `<div class="admin"><aside class="side">
@@ -65,7 +66,7 @@ export async function viewAdmin(r){
   if(!flt.to){ flt.to=riyadhNow().date; flt.from=addDays(flt.to,-29); }
   const fu=$('.side a[href="#admin-followup"]'); if(fu){ const n=followupRows().filter(x=>x.level==='bad').length; if(n) fu.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} حالة حرجة">${fmtNum(n)}</span>`); }
   { const oa=$('.side a[href="#admin-orders"]'), n=openOrdersCount(AD); if(oa && n) oa.insertAdjacentHTML('beforeend',`<span class="badge-n" aria-label="${n} طلبًا يحتاج إجراء">${fmtNum(n)}</span>`); }
-  ({ 'admin-archive':()=>pageArchive(titleBar, +AD.settings?.archive_retention_days||90), 'admin-studio':()=>pageStudio(titleBar), 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin-notify':pageNotify, 'admin-bank':pageBank, 'admin-orders':pageOrders, 'admin-invoices':pageInvoices, 'admin-data':pageData, 'admin-access':pageAccess, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings, 'admin-admins':pageAdmins, 'admin-audit':pageAudit })[r]();
+  return ({ 'admin-assistant':pageAssistant, 'admin-archive':()=>pageArchive(titleBar, +AD.settings?.archive_retention_days||90), 'admin-studio':()=>pageStudio(titleBar), 'admin-followup':pageFollowup, 'admin-rules':pageRules, 'admin-qudurat':pageQudurat, 'admin-users':pageUsers, 'admin-daily':pageDaily, 'admin-policies':pagePolicies, 'admin-notify':pageNotify, 'admin-bank':pageBank, 'admin-orders':pageOrders, 'admin-invoices':pageInvoices, 'admin-data':pageData, 'admin-access':pageAccess, 'admin':pageDashboard, 'admin-attendance':pageAttendance, 'admin-cohorts':pageCohorts, 'admin-trainees':pageTrainees, 'admin-programs':pagePrograms, 'admin-reports':pageReports, 'admin-partners':pagePartners, 'admin-settings':pageSettings, 'admin-admins':pageAdmins, 'admin-audit':pageAudit })[r]();
 }
 export async function reloadAD(){ AD = await Store.adminData(); }
 
