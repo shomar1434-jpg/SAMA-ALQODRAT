@@ -24,9 +24,12 @@ if (await p.$('[name=p]')) { await p.fill('[name=p]', '1234'); await p.click('#l
 await p.click('#tAdd'); await p.waitForTimeout(300); await p.check('#tf [name=kind][value=programs]'); await p.fill('#tf-name', 'سلطان فهد علي الدوسري'); await p.fill('#tf-phone', '0501000077'); await p.click('#tfS'); await p.waitForTimeout(800);
 D = await data(); const PT = D.teachers.find(t => t.phone === '0501000077');
 ok(PT && PT.active !== false && !PT.subjects.length, 'إضافة مدرب برامج بلا مقررات');
-await p.goto(U + 'admin/#admin-cohorts'); await p.waitForTimeout(900);
-await p.evaluate(id => { const b = document.querySelector(`[data-ec="${id}"]`); if (b) b.click(); }, co.id); await p.waitForTimeout(400);
-if (!(await p.$('#cm'))) { await p.fill('input[type=search], #cq', '').catch(() => {}); await p.evaluate(id => { document.querySelector(`[data-cv="${id}"]`)?.click(); }, co.id); await p.waitForTimeout(600); await p.evaluate(id => document.querySelector(`[data-ec="${id}"]`)?.click(), co.id); await p.waitForTimeout(400); }
+await p.goto(U + 'admin/#admin-cohorts'); await p.waitForSelector('[data-ec], [data-cv]', { timeout: 15000 }).catch(() => {});
+// فتح نموذج الدفعة بانتظار العناصر لا بمهلة ثابتة (CI أبطأ)
+for (let i = 0; i < 20 && !(await p.$('#cm [name=teacher_id]')); i++) {
+  await p.evaluate(id => { const b = document.querySelector(`[data-ec="${id}"]`); if (b) b.click(); else document.querySelector(`[data-cv="${id}"]`)?.click(); }, co.id);
+  await p.waitForTimeout(500);
+}
 ok(await p.$('#cm [name=teacher_id]'), 'نموذج الدفعة فيه قائمة المدربين المسجلين');
 await p.selectOption('#cm [name=teacher_id]', PT.id); await p.waitForTimeout(100);
 ok(await p.inputValue('#cm [name=trainer]') === 'سلطان فهد علي الدوسري', 'اختيار المدرب يملأ اسمه في الكشوف');
