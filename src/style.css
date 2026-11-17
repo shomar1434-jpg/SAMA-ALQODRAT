@@ -1473,3 +1473,4 @@ body.sim-on{overflow:hidden}
 .crs-act{margin-top:auto;padding-top:8px}.crs-act .btn{min-height:44px}
 .crs-empty{text-align:center;color:var(--ink-muted);padding:28px 10px;border:1px dashed var(--border);border-radius:var(--radius-lg)}
 .mnr-steps{padding-inline-start:36px;display:grid;gap:12px;line-height:1.9}
+.filters .field{min-width:0;max-width:100%}.filters select.inp{max-width:100%}
