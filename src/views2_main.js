@@ -5,7 +5,7 @@ import { PAGE, adminBase, publicBase, portalBase } from './config.js';
 import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
 import { liveSay, setBusy, showErrorSummary, toLatin, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
-import { viewPlacement } from './placement_views.js';
+import { viewPlacement, plLinkFields, plLinkDone } from './placement_views.js';
 import { closePrint } from './print.js';
 import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
 import { viewAdmin } from './views2_admin.js';
@@ -323,7 +323,7 @@ export function bindRegForm(target, cohortsFn){
       const manarNote = `<p class="hint" style="max-width:480px;margin:10px auto 0">${ic('award')} شهادتك المعتمدة تصدر عبر <a href="${CENTER.manar}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:500">منصة منار</a> التابعة للمؤسسة العامة للتدريب التقني والمهني. أنشئ حسابك فيها بنفس بياناتك.</p>`;
       const gNote = F.guardian_phone ? `<p class="hint" style="max-width:480px;margin:10px auto 0">${ic('users')} لمتابعة ولي الأمر: يدخل «بوابة ولي الأمر» بجواله ${esc(F.guardian_phone)}، ثم يكتب رقم سجلك المدني مرة واحدة.</p>` : '';
       if(tg.plan_id){
-        const r = await Store.registerSubscription({...F, ...tg});
+        const r = await Store.registerSubscription({...F, ...tg, ...plLinkFields()}); plLinkDone();
         $('#regCard').outerHTML = `<div class="card success rv" id="regCard"><div class="bigcheck">${ic('check')}</div><h2 style="font-size:24px;font-weight:700">اكتمل اشتراكك</h2>
           <p class="hint" style="margin:8px 0 0;font-size:15px">أهلًا ${esc(F.full_name.split(' ')[0])}. رقم تسجيلك:</p><div class="refbox">${esc(r.ref)}</div>
           <div class="grid" style="gap:6px;max-width:480px;margin:0 auto 12px"><div class="pill info" style="justify-content:center;padding:6px 12px">${esc(r.plan)} · ${esc(r.section)}</div>

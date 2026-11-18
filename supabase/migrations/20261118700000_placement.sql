@@ -2,6 +2,7 @@
 -- 20 سؤالًا للزائر بلا تسجيل ولا بيانات شخصية، من البنك المشترك المنشور ذي المفاتيح المعتمدة فقط.
 -- الإجابات الصحيحة لا تغادر الخادم؛ التصحيح والاقتراح هنا. الحدود: دون 40٪ الماسية والذهبية، 40–65٪ الفضية، فوقها الأساسية،
 -- والضعف في مهارة أو مهارتين (مصنّفة، سؤالان فأكثر، دون 50٪) يضيف «خصصناها لك» أولًا.
+-- قرار المالك: تبقى المحاولات 100 يوم ثم تُحذف، وإن سجّل الزائر في باقة من الجهاز نفسه تُربط نتيجته بملفه.
 
 alter table settings add column if not exists placement_enabled boolean not null default true;
 alter table settings add column if not exists placement_sec_per_q int not null default 60;
@@ -23,8 +24,11 @@ create table if not exists placement_attempts (
   started_at timestamptz not null default now(),
   deadline timestamptz not null,
   submitted_at timestamptz,
-  result jsonb
+  result jsonb,
+  trainee_id uuid references trainees(id) on delete cascade,   -- عند التسجيل في باقة من الجهاز نفسه
+  linked_at timestamptz
 );
+create index if not exists placement_attempts_trainee on placement_attempts(trainee_id) where trainee_id is not null;
 create index if not exists placement_attempts_day on placement_attempts(day);
 create index if not exists placement_attempts_session on placement_attempts(session_id, day);
 alter table placement_attempts enable row level security;
@@ -147,8 +151,11 @@ begin
                    'placement_high', placement_high, 'placement_daily_max', placement_daily_max) from settings where id = 1),
     'status', placement_status(),
     'attempts', coalesce((select jsonb_agg(jsonb_build_object('kind', kind, 'day', day, 'submitted', submitted_at is not null,
-                   'pct', (result->>'pct')::int, 'tier', result->'tiers'->>0) order by started_at desc)
-                 from placement_attempts where started_at > now() - interval '400 days'), '[]'));
+                   'pct', (result->>'pct')::int, 'tier', result->'tiers'->>0, 'linked', trainee_id is not null) order by started_at desc)
+                 from placement_attempts where started_at > now() - interval '100 days'), '[]'),
+    'linked', coalesce((select jsonb_agg(jsonb_build_object('trainee_id', a.trainee_id, 'name', t.full_name, 'kind', a.kind, 'day', a.day, 'linked_at', a.linked_at,
+                   'pct', (a.result->>'pct')::int, 'tiers', a.result->'tiers', 'weak', a.result->'weak') order by a.linked_at desc)
+                 from placement_attempts a join trainees t on t.id = a.trainee_id where a.started_at > now() - interval '100 days'), '[]'));
 end $$;
 
 create or replace function admin_placement_settings(p jsonb) returns jsonb language plpgsql volatile security definer set search_path = public, extensions as $$
@@ -167,10 +174,34 @@ end $$;
 create or replace function placement_purge() returns int language plpgsql volatile security definer set search_path = public, extensions as $$
 declare n int;
 begin
-  delete from placement_attempts where started_at < now() - interval '400 days';
+  delete from placement_attempts where started_at < now() - interval '100 days';
   get diagnostics n = row_count; return n;
 end $$;
 
+-- ربط النتيجة بملف المتدرب عند التسجيل في باقة (يطابق plLink): المحاولة المسلّمة لجلسة المتصفح نفسها، غير المرتبطة، خلال 100 يوم
+create or replace function pl_link(p jsonb) returns void language plpgsql volatile security definer set search_path = public, extensions as $$
+declare v_id uuid; v_tr uuid;
+begin
+  begin v_id := nullif(p->>'placement_id','')::uuid; exception when others then return; end;
+  if v_id is null or coalesce(p->>'placement_session','') = '' then return; end if;
+  select id into v_tr from trainees where national_id = translate(trim(coalesce(p->>'national_id','')), '٠١٢٣٤٥٦٧٨٩', '0123456789');
+  if v_tr is null then return; end if;
+  update placement_attempts set trainee_id = v_tr, linked_at = now()
+   where id = v_id and session_id = p->>'placement_session' and submitted_at is not null and trainee_id is null and started_at > now() - interval '100 days';
+end $$;
+
+create or replace function register_subscription(p jsonb) returns jsonb language plpgsql volatile security definer set search_path = public, extensions as $$
+declare v boolean := reg_minor_consent(p); r jsonb;
+begin
+  r := register_subscription_noconsent(p);
+  if v then update trainees set guardian_consent_at = coalesce(guardian_consent_at, now())
+            where national_id = translate(trim(coalesce(p->>'national_id','')), '٠١٢٣٤٥٦٧٨٩', '0123456789'); end if;
+  perform pl_link(p);
+  return r;
+end $$;
+grant execute on function register_subscription(jsonb) to anon, authenticated;
+
+revoke execute on function pl_link(jsonb) from public, anon, authenticated;
 revoke execute on function pl_parts(text), pl_pool_count(text), pl_available(text), pl_minutes(text), pl_tiers(int, int), pl_plans(text, text[]), pl_ip_hash(), placement_purge()
   from public, anon, authenticated;
 revoke execute on function placement_status(), placement_start(text, text), placement_finish(uuid, text, jsonb), admin_placement_data(), admin_placement_settings(jsonb) from public;

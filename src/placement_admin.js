@@ -29,7 +29,7 @@ export async function placementTab(box, rerender){
         <p class="hint">الأسئلة من البنك المشترك المنشور ذي المفاتيح المعتمدة فقط؛ والتحليل بالمهارات يحتاج تصنيف الأسئلة.</p>
         <h4>الباقة الأولى المقترحة</h4>
         ${Object.keys(all.tiers).length ? `<ul>${Object.entries(all.tiers).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<li>${esc(PL_TIER_TXT[t] || t)}: <b class="num">${fmtNum(n)}</b></li>`).join('')}</ul>` : '<p class="hint">لا محاولات مكتملة بعد.</p>'}
-        <p class="hint">لا يُحفظ اسم الزائر ولا جواله؛ تُحذف المحاولات بعد 400 يوم.</p></section>
+        <p class="hint">لا يُحفظ اسم الزائر ولا جواله؛ تُحذف المحاولات بعد 100 يوم. ومن سجّل في باقة من الجهاز نفسه تُربط نتيجته بملفه.</p></section>
       <section class="card pad"><h3 class="ctitle">${ic('settings')}الإعدادات</h3>
         <form id="plSet" class="stack">
           <label class="check"><input type="checkbox" id="pl-en" ${S.placement_enabled !== false ? 'checked' : ''} ${canEdit ? '' : 'disabled'}> الاختبار متاح للزوار</label>
@@ -39,7 +39,13 @@ export async function placementTab(box, rerender){
             <div class="field"><label for="pl-max">محاولات الزائر يوميًا</label><input class="inp num" type="number" inputmode="numeric" id="pl-max" min="1" max="20" value="${esc(S.placement_daily_max ?? 3)}" ${canEdit ? '' : 'disabled'}></div></div>
           <p class="hint">بين الحدين الفضية. والضعف في مهارة أو مهارتين (دون 50٪) يقترح «خصصناها لك» أولًا لمن بلغ الحد الأدنى.</p>
           ${canEdit ? `<button class="btn pri" type="submit">${ic('check')} حفظ</button>` : '<p class="hint">تعديل الإعدادات لمدير النظام.</p>'}
-        </form></section></div>`;
+        </form></section></div>
+    <section class="card pad" style="margin-top:16px" data-pllinked><h3 class="ctitle">${ic('users')}نتائج المتدربين المسجّلين بعد الاختبار</h3>
+      ${(d.linked || []).length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>المتدرب</th><th>الاختبار</th><th>التاريخ</th><th>المؤشر</th><th>المقترح</th><th>مهارات ضعيفة</th></tr></thead><tbody>
+        ${d.linked.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(PL_KINDS[x.kind]?.title || x.kind)}</td><td class="num">${esc(x.day)}</td><td class="num">${fmtNum(x.pct)}٪</td>
+          <td>${(x.tiers || []).map(t => esc(PL_TIER_TXT[t] || t)).join('، ')}</td><td>${(x.weak || []).map(esc).join('، ') || '—'}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="hint">لا نتائج مرتبطة بعد.</p>'}
+      <p class="hint">تُحذف بعد 100 يوم من الاختبار، ومع حذف المتدرب.</p></section>`;
   const f = box.querySelector('#plSet');
   if(canEdit) f.onsubmit = async e => { e.preventDefault(); const b = f.querySelector('[type=submit]'); b.disabled = true; b.setAttribute('aria-busy', 'true');
     try { await Store.savePlacementSettings({ placement_enabled:f.querySelector('#pl-en').checked, placement_low:f.querySelector('#pl-low').value, placement_high:f.querySelector('#pl-high').value,
