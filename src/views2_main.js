@@ -540,7 +540,7 @@ export async function viewQR(code){
 export function todaySessions(D, today=riyadhNow().date){
   const subs = D.subscriptions||[], sa = (D.sub_attendance||[]).filter(a=>a.att_date===today);
   const pk = Object.keys(SECTIONS).map(sec=>{ const ses=sessionOn(D, sec, today); if(!ses) return null;
-    const live = subs.filter(x=>x.section===sec && ['active','pending'].includes(subStatus(x, today)));
+    const live = subs.filter(x=>x.section===sec && subStatus(x, today)==='active');   // بانتظار أول حضور لا يُحسب في المتوقعين
     const ids = new Set(live.map(x=>x.id)), subj=[...new Set(live.flatMap(x=>x.subjects||[]))];
     return {kind:'pkg', key:sec, start:ses.start, end:ses.end, title:`القدرات والتحصيلي · ${SECTIONS[sec]}`, sub:subj.join(' · '), note:ses.kind==='regular'?'':(ses.kind==='makeup'?'جلسة تعويضية':'تغيير وقت'), expected:live.length, present:sa.filter(a=>ids.has(a.subscription_id)).length}; }).filter(Boolean);
   const co = D.cohorts.filter(c=>!cohortArchived(c,today) && isSessionDay(c,today)).map(c=>{ const p=D.programs.find(x=>x.id===c.program_id);

@@ -16,7 +16,7 @@ export function buildDailyReport(D, date, n = riyadhNow()){
   const sections = Object.keys(SECTIONS).map(sec => {
     const ses = sessionOn(D, sec, date);
     const testIds = new Set((D.trainees || []).filter(t => t.is_test).map(t => t.id));
-    const subs = (D.subscriptions || []).filter(s => !testIds.has(s.trainee_id) && s.section === sec && s.status !== 'cancelled' && (!s.start_date || s.start_date <= date) && (!s.end_date || s.end_date >= date) && ['pending', 'active', 'ended'].includes(subStatus(s, date)));
+    const subs = (D.subscriptions || []).filter(s => !testIds.has(s.trainee_id) && s.section === sec && s.status !== 'cancelled' && !!s.start_date && s.start_date <= date && (!s.end_date || s.end_date >= date) && ['pending', 'active', 'ended'].includes(subStatus(s, date)));
     const rows = ses ? subs.map(s => { const t = D.trainees.find(x => x.id === s.trainee_id), a = (D.sub_attendance || []).find(x => x.subscription_id === s.id && x.att_date === date);
       const done = date < n.date || toMin(n.hm) > toMin(ses.end);
       return { name:t?.full_name || '—', plan:planName((D.plans || []).find(p => p.id === s.plan_id)), status: a ? a.status : done ? 'غائب' : 'لم يسجل بعد', time:a?.time?.slice(0, 5) || null, manual:!!a?.manual, pending:!s.start_date }; })

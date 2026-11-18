@@ -56,11 +56,11 @@ ok(!!(await p.$(`[data-qs="${hw.id}"]`)) && !(await p.$(form)) && /تدريب/.t
 await p.click(`[data-qs="${hw.id}"]`); await p.click('#qsGo'); await p.waitForSelector(`.hw-quiz[data-qz="${hw.id}"]`);   // الاختبار يُفتح مرة واحدة
 
 const radios = await p.$$(`${form} input[type=radio]`); for (const i of [0, 4, 8]) await radios[i].check();
-await p.click(`${form} button.pri`); await p.waitForTimeout(900);
+await p.click(`${form} button.pri`); await p.waitForTimeout(900); if(await p.$('#qrX')) await p.click('#qrX');
 D = await data(); const sb = D.submissions.find(x => x.assignment_id === hw.id && x.trainee_id === A.id);
 ok(sb && sb.status === 'graded' && sb.review, 'يُصحَّح على الخادم وتُحفظ المراجعة');
 const after = await text('#sBody');
-ok(/سُلّم الاختبار/.test(after) && /تظهر الإجابات الصحيحة بعد/.test(after) && !(await p.$(form)) && !/الصحيح:/.test(after), 'المراجعة محجوبة عن المتدرب حتى موعد الاستحقاق، ولا يُعاد الحل');
+ok(/الدرجة/.test(after) && /تظهر الإجابات الصحيحة بعد/.test(after) && !(await p.$(form)) && !/الصحيح:/.test(after), 'المراجعة محجوبة عن المتدرب حتى موعد الاستحقاق، ولا يُعاد الحل');
 await p.evaluate(id => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const a = D.assignments.find(x => x.id === id); a.publish_date = '2026-01-01'; a.due_date = '2026-01-02'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); }, hw.id);
 await p.reload(); await p.waitForTimeout(900); await tab('data-st', 'hw');
 ok(/الصحيح:/.test(await text('#sBody')), 'تظهر الإجابات بعد موعد الاستحقاق');

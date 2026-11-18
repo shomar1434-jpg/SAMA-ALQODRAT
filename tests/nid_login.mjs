@@ -36,7 +36,8 @@ await a.click('#acReq [data-rq]'); await a.waitForTimeout(600);
 await ask(p, 'student', st.national_id);
 const c1 = await text('#otpShow b');
 ok(/^\d{6}$/.test(c1), 'الرمز يظهر على جهاز صاحب الحساب');
-await p.fill('#pl-code', c1); await p.click('#plB'); await p.waitForSelector('#sBody');
+await p.fill('#pl-code', c1); await p.click('#plB'); await p.waitForSelector('#ps-new');   // الخطوة BJ: تعيين كلمة المرور بعد أول دخول
+await p.fill('#ps-new', 'Sama2026x'); await p.fill('#ps-conf', 'Sama2026x'); await p.click('#psGo'); await p.waitForSelector('#sBody');
 D = await data();
 ok(D.devices.some(d => d.phone === st.phone && !d.revoked_at) && !(D.notifications || []).some(n => n.kind === 'login_code'), 'الدخول برقم الهوية والرمز، ولا رموز في المراسلات');
 // ولي الأمر بهوية ابنه، والمدرب بهويته
@@ -48,7 +49,8 @@ D = await data();
 await L('openActivation', D.teachers[0].phone, 'teacher', 15);
 await ask(p, 'teacher', '1000000016');
 const tc = await text('#otpShow b');
-await p.fill('#pl-code', tc); await p.click('#plB'); await p.waitForTimeout(900);
+await p.fill('#pl-code', tc); await p.click('#plB'); await p.waitForSelector('#ps-new');
+await p.fill('#ps-new', 'Sama2026x'); await p.fill('#ps-conf', 'Sama2026x'); await p.click('#psGo'); await p.waitForTimeout(900);
 ok(/^\d{6}$/.test(tc) && !!(await p.$('[data-tt]')), 'المدرب يدخل بوابته بالهوية والرمز الظاهر على جهازه');
 
 // تعدد المسؤولين: صفحة «إدارة المسؤولين»، والإزالة تعطيل

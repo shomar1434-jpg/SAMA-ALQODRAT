@@ -19,7 +19,7 @@ import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
 import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
-import { NO_WINDOW, LINK_TTL_MIN } from './device_logic.js';
+import { NO_WINDOW, PW_RULE, pwOk, checkPassword } from './device_logic.js';
 import { analysisHtml } from './analysis_views.js';
 import { weeklyCard, bindWeeklyCard } from './weekly_views.js';
 import { initPwa } from './pwa.js';
@@ -67,6 +67,7 @@ async function renderPortal(){
   if(!s){ unmountInbox(); mountDevicesBtn(false); return viewLogin(); }
   $('#logoutBtn').onclick = async () => { unmountInbox(); await Store.portalLogout(ROLE); location.hash = ''; render(); };
   mountDevicesBtn(!!s);
+  { let st = null; try { st = await Store.passwordStatus(ROLE); } catch(_){} if(st?.must_set){ unmountInbox(); return viewSetPassword(st); } }
   mountInbox(ROLE, s.phone, {
     onOpen: it => { if(it.action === 'msg'){ if(ROLE === 'student') sTab = 'msg'; if(ROLE === 'teacher') tTab = 'msg'; } else if(ROLE !== 'guardian'){ if(ROLE === 'student') sTab = 'dash'; } render(); },
     onNew: () => { if($('.modal-bg') || document.activeElement?.matches('input,textarea,select')) return; render(); } });
@@ -85,50 +86,65 @@ function mountDevicesBtn(on){
   b.hidden = !on;
 }
 async function devicesModal(){
-  let n = 0; try { n = (await Store.myDevices(ROLE))?.count || 0; } catch(_){}
-  modal(`<h3>${ic('smartphone')} أجهزتي</h3><p>الأجهزة المفعّلة على حسابك الآن: <b class="num">${fmtNum(n)}</b></p>
-    <section class="card pad" style="margin:0 0 12px"><h4 style="margin:0 0 6px">إضافة جهاز آخر</h4>
-      <p class="hint" style="margin:0 0 8px">يظهر رمز صالح ${fmtNum(LINK_TTL_MIN)} دقائق لمرة واحدة. في الجهاز الجديد اكتب رقم هويتك، ثم «لدي رمز ربط من جهازي المفعّل» واكتب الرمز. لا تشارك الرمز مع أحد.</p>
-      <label class="check"><input type="checkbox" id="dvOut"> أخرج جميع الأجهزة الأخرى (ومنها هذا) عند ربط الجهاز الجديد</label>
-      <div class="otp-show" id="dvCode" hidden aria-live="polite"></div>
-      <button class="btn pri" id="dvAdd">${ic('plus')} إضافة جهاز آخر</button></section>
+  let n = 0, st = { has:false }; try { n = (await Store.myDevices(ROLE))?.count || 0; st = await Store.passwordStatus(ROLE) || st; } catch(_){}
+  modal(`<h3>${ic('smartphone')} أجهزتي وكلمة المرور</h3><p>الأجهزة الداخلة إلى حسابك الآن: <b class="num">${fmtNum(n)}</b></p>
+    <section class="card pad" style="margin:0 0 12px"><h4 style="margin:0 0 6px">${st.has ? 'تغيير كلمة المرور' : 'تعيين كلمة مرور'}</h4>
+      <p class="hint" style="margin:0 0 8px">تدخل بها من أي جهاز مع رقم هويتك. بعد الحفظ تخرج أجهزتك الأخرى. ${esc(PW_RULE)}.</p>
+      <form id="cpF" class="grid" novalidate>
+        ${st.has ? `<div class="field"><label for="cp-cur">كلمة المرور الحالية</label><div class="pw-wrap"><input class="inp" id="cp-cur" type="password" maxlength="72" dir="ltr" autocomplete="current-password">${PW_EYE('cp-cur')}</div></div>` : ''}
+        <div class="field"><label for="cp-new">كلمة المرور الجديدة</label><div class="pw-wrap"><input class="inp" id="cp-new" type="password" maxlength="72" dir="ltr" autocomplete="new-password">${PW_EYE('cp-new')}</div></div>
+        <div class="field"><label for="cp-conf">تأكيدها</label><div class="pw-wrap"><input class="inp" id="cp-conf" type="password" maxlength="72" dir="ltr" autocomplete="new-password">${PW_EYE('cp-conf')}</div></div>
+        <div class="errtxt" id="cpE" role="alert"></div><button class="btn pri" id="cpGo">${ic('check')} حفظ</button></form></section>
     <section class="card pad" style="margin:0 0 12px"><h4 style="margin:0 0 6px">الخروج من جميع الأجهزة الأخرى</h4>
-      <p class="hint" style="margin:0 0 8px">إن فقدت جهازًا أو استخدمه غيرك: يبقى هذا الجهاز وحده داخل حسابك.</p>
+      <p class="hint" style="margin:0 0 8px">إن فقدت جهازًا أو دخل غيرك بكلمة مرورك: يبقى هذا الجهاز وحده، ويُنصح بتغيير كلمة المرور.</p>
       <button class="btn" id="dvOthers" ${n > 1 ? '' : 'disabled'}>${ic('logout')} الخروج من الأجهزة الأخرى</button></section>
     <div style="text-align:end"><button class="btn" id="dvX">إغلاق</button></div>`);
-  $('#dvX').onclick = closeModal;
-  $('#dvAdd').onclick = async () => { const b = $('#dvAdd'); setBusy(b, true, 'جارٍ إنشاء الرمز');
-    try { const r = await Store.deviceLinkCode(ROLE, $('#dvOut').checked); const el = $('#dvCode'); el.hidden = false;
-      el.innerHTML = `<span>رمز الربط</span><b class="num" dir="ltr">${esc(r.code)}</b><small>صالح حتى ${esc(t12(new Date(r.expires_at).toLocaleTimeString('en-GB', { timeZone:'Asia/Riyadh', hour:'2-digit', minute:'2-digit' })))}${$('#dvOut').checked ? ' · سيخرج هذا الجهاز وغيره عند الربط' : ''}</small>`;
-      setBusy(b, false); b.innerHTML = `${ic('refresh')} رمز جديد`; liveSay('ظهر رمز الربط'); }
-    catch(e){ setBusy(b, false); toast(e.message); } };
+  bindEyes($('.modal')); $('#dvX').onclick = closeModal;
+  $('#cpF').onsubmit = async e => { e.preventDefault(); const b = $('#cpGo'); $('#cpE').textContent = '';
+    try { checkPassword($('#cp-new').value, $('#cp-conf').value); if(st.has && !$('#cp-cur').value) throw new Error('اكتب كلمة المرور الحالية');
+      setBusy(b, true, 'جارٍ الحفظ'); const r = await Store.setPortalPassword(ROLE, $('#cp-new').value, st.has ? $('#cp-cur').value : null);
+      toast(r?.revoked ? `حُفظت كلمة المرور، وخرج حسابك من ${fmtNum(r.revoked)} جهاز آخر` : 'حُفظت كلمة المرور'); closeModal(); }
+    catch(x){ setBusy(b, false); $('#cpE').textContent = x.message; } };
   $('#dvOthers').onclick = async () => { if(!confirm('سيخرج حسابك من كل الأجهزة الأخرى. متابعة؟')) return; const b = $('#dvOthers'); setBusy(b, true, 'جارٍ الإخراج');
     try { const r = await Store.logoutOthers(ROLE); toast(`خرج حسابك من ${fmtNum(r?.revoked || 0)} جهاز`); closeModal(); } catch(e){ setBusy(b, false); toast(e.message); } };
 }
 
-/* ---------- الدخول برقم الجوال ورمز التحقق ---------- */
+/* الدخول (الخطوة BJ، قرار المالك): من أي جهاز برقم الهوية وكلمة المرور. أول مرة (أو «نسيت كلمة المرور»): رقم الهوية ← رمز التحقق
+   بعد تفعيل الإدارة ← تعيين كلمة مرور. في الوضع التجريبي يبدأ برمز التحقق (1234) لتبقى اختبارات البوابات كما هي */
+let loginMode = null;
+const PW_EYE = id => `<button type="button" class="btn sm pw-eye" data-eye="${id}" aria-label="إظهار كلمة المرور" aria-pressed="false">${ic('eye')}</button>`;
+function bindEyes(root = document){ $$('[data-eye]', root).forEach(b => b.onclick = () => { const i = $('#' + b.dataset.eye), on = i.type === 'password'; i.type = on ? 'text' : 'password'; b.setAttribute('aria-pressed', String(on)); }); }
 function viewLogin(){
   const demo = Store.mode !== 'cloud';
+  const mode = loginMode || (demo ? 'code' : 'pw'), forgot = mode === 'forgot', codeMode = mode !== 'pw';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
     <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">${ROLE === 'guardian' ? 'ادخل برقم هوية ابنك المسجّل في المعهد' : 'ادخل برقم هويتك المسجّل في المعهد'}</div></div></div>
-    <form id="pl" class="grid pad" novalidate>
+    <form id="pl" class="grid pad" novalidate data-mode="${mode}">
       <div class="field"><label for="pl-phone">${ROLE === 'guardian' ? 'رقم هوية المتدرب (ابنك)' : 'رقم الهوية'}</label><input class="inp num" id="pl-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="10 أرقام" autocomplete="off"></div>
+      ${codeMode ? `<p class="hint" style="margin:0" id="plModeH">${forgot ? 'نسيت كلمة المرور: اطلب من إدارة المركز «تفعيل» حسابك، ثم اكتب هويتك واضغط «رمز التحقق» فيظهر الرمز على هذا الجهاز، وبعد الدخول تختار كلمة مرور جديدة وتخرج أجهزتك الأخرى.' : 'أول دخول: بعد أن تفتح إدارة المركز «تفعيل» حسابك اضغط «رمز التحقق» فيظهر الرمز على هذا الجهاز، وبعد الدخول تختار كلمة مرورك.'}</p>
       <div class="otp-show" id="otpShow" hidden aria-live="polite"></div>
-      <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
+      <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>`
+      : `<div class="field"><label for="pl-pass">كلمة المرور</label><div class="pw-wrap"><input class="inp" id="pl-pass" name="password" type="password" maxlength="72" dir="ltr" autocomplete="current-password">${PW_EYE('pl-pass')}</div></div>`}
       <div class="errtxt" id="plE" role="alert"></div>
-      <button class="btn pri" id="plB">${ic('lock')} رمز التحقق</button>
-      <button type="button" class="btn sm" id="plLinkT" aria-expanded="false">${ic('smartphone')} لدي رمز ربط من جهازي المفعّل</button>
-      <div id="plLinkF" hidden><div class="field"><label for="pl-link">رمز الربط</label><input class="inp num" id="pl-link" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="off"></div>
-        <p class="hint" style="margin:0 0 8px">افتح حسابك في جهازك المفعّل، واضغط «أجهزتي» ثم «إضافة جهاز آخر»، واكتب الرمز الظاهر هنا مع رقم هويتك.</p>
-        <button type="button" class="btn pri" id="plLinkGo">${ic('check')} ربط هذا الجهاز والدخول</button></div>
+      <button class="btn pri" id="plB">${codeMode ? `${ic('lock')} رمز التحقق` : `${ic('check')} دخول`}</button>
+      <div class="pl-links">${codeMode ? `<button type="button" class="btn sm" id="plPw">${ic('lock')} الدخول بكلمة المرور</button>`
+        : `<button type="button" class="btn sm" id="plFirst">${ic('key')} أول دخول برمز التحقق</button><button type="button" class="btn sm" id="plForgot">نسيت كلمة المرور؟</button>`}</div>
       ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b> (باقات)، أو <b dir="ltr">0550000003</b> (برنامج تدريبي).'}</span></div>` : ''}
     </form></div></div>`;
-  const ph = $('#pl-phone'), code = $('#pl-code'), lk = $('#pl-link');
-  [ph, code, lk].forEach(i => i.addEventListener('input', () => { i.value = toLatin(i.value).replace(/\D/g, ''); }));
+  const ph = $('#pl-phone'), code = $('#pl-code'), pass = $('#pl-pass');
+  [ph, code].filter(Boolean).forEach(i => i.addEventListener('input', () => { i.value = toLatin(i.value).replace(/\D/g, ''); }));
+  bindEyes();
+  const go = m => { const v = ph.value; loginMode = m; viewLogin(); $('#pl-phone').value = v; };
+  if($('#plPw')) $('#plPw').onclick = () => go('pw');
+  if($('#plFirst')) $('#plFirst').onclick = () => go('code');
+  if($('#plForgot')) $('#plForgot').onclick = () => go('forgot');
   let step = 1;
   $('#pl').onsubmit = async e => { e.preventDefault(); const b = $('#plB'); $('#plE').textContent = '';
     try {
-      if(step === 1){ if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('رقم الهوية 10 أرقام');
+      if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('رقم الهوية 10 أرقام');
+      if(!codeMode){ if(!pass.value) throw new Error('اكتب كلمة المرور');
+        setBusy(b, true, 'جارٍ الدخول'); await Store.passwordLogin(ph.value, ROLE, pass.value); loginMode = null; render(); return; }
+      if(step === 1){
         setBusy(b, true, 'جارٍ التحقق'); const rq = await Store.requestOtp(ph.value, ROLE); setBusy(b, false);
         // الرمز يظهر على هذا الجهاز وحده عند فتح الإدارة «تفعيل» الحساب، ثم يختفي بعد الدخول
         if(!rq?.open && !demo){ $('#otpShow').hidden = true; throw new Error(NO_WINDOW); }
@@ -137,12 +153,25 @@ function viewLogin(){
           : `<span>الوضع التجريبي</span><b class="num" dir="ltr">1234</b><small>${esc(NO_WINDOW)}</small>`;
         step = 2; $('#otpF').hidden = false; ph.readOnly = true; b.innerHTML = `${ic('check')} دخول`; code.focus(); liveSay('ظهر رمز التحقق'); return; }
       if(!/^\d{4,6}$/.test(code.value)) throw new Error('اكتب رمز التحقق');
-      setBusy(b, true, 'جارٍ التحقق'); await Store.portalLogin(ph.value, code.value, ROLE); render();
-    } catch(x){ setBusy(b, false); if(step === 2) b.innerHTML = `${ic('check')} دخول`; $('#plE').textContent = x.message; } };  $('#plLinkT').onclick = () => { const f = $('#plLinkF'); f.hidden = !f.hidden; $('#plLinkT').setAttribute('aria-expanded', String(!f.hidden)); if(!f.hidden) (ph.value ? lk : ph).focus(); };
-  $('#plLinkGo').onclick = async () => { const b = $('#plLinkGo'); $('#plE').textContent = '';
-    try { if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('اكتب رقم الهوية (10 أرقام) أولًا'); if(!/^\d{6}$/.test(lk.value)) throw new Error('رمز الربط 6 أرقام');
-      setBusy(b, true, 'جارٍ الربط'); await Store.linkDevice(ph.value, ROLE, lk.value); toast('رُبط هذا الجهاز بحسابك'); render(); }
-    catch(x){ setBusy(b, false); $('#plE').textContent = x.message; } };
+      setBusy(b, true, 'جارٍ التحقق'); await Store.portalLogin(ph.value, code.value, ROLE); loginMode = null; render();
+    } catch(x){ setBusy(b, false); if(codeMode && step === 2) b.innerHTML = `${ic('check')} دخول`; $('#plE').textContent = x.message; } };
+}
+
+/* تعيين كلمة المرور بعد أول دخول أو بعد «نسيت كلمة المرور» (إلزامي قبل البوابة) */
+function viewSetPassword(st){
+  $('#app').innerHTML = `<div class="wrap"><div class="login card rv"><div class="pad">
+    <h2 style="margin:0 0 6px">${ic('lock')} ${st.has ? 'اختر كلمة مرور جديدة' : 'اختر كلمة مرور لحسابك'}</h2>
+    <p class="hint" style="margin:0 0 12px">ستدخل بعدها من أي جهاز برقم هويتك وهذه الكلمة. ${st.has ? 'تخرج أجهزتك الأخرى بعد الحفظ.' : ''} ${esc(PW_RULE)}.</p>
+    <form id="psF" class="grid" novalidate>
+      <div class="field"><label for="ps-new">كلمة المرور</label><div class="pw-wrap"><input class="inp" id="ps-new" type="password" maxlength="72" dir="ltr" autocomplete="new-password">${PW_EYE('ps-new')}</div></div>
+      <div class="field"><label for="ps-conf">تأكيد كلمة المرور</label><div class="pw-wrap"><input class="inp" id="ps-conf" type="password" maxlength="72" dir="ltr" autocomplete="new-password">${PW_EYE('ps-conf')}</div></div>
+      <div class="errtxt" id="psE" role="alert"></div>
+      <button class="btn pri" id="psGo">${ic('check')} حفظ والمتابعة</button>
+    </form></div></div></div>`;
+  bindEyes(); $('#ps-new').focus();
+  $('#psF').onsubmit = async e => { e.preventDefault(); const b = $('#psGo'), n = $('#ps-new'), c = $('#ps-conf'); $('#psE').textContent = ''; [n, c].forEach(x => x.removeAttribute('aria-invalid'));
+    try { checkPassword(n.value, c.value); setBusy(b, true, 'جارٍ الحفظ'); await Store.setPortalPassword(ROLE, n.value); toast('حُفظت كلمة المرور'); render(); }
+    catch(x){ setBusy(b, false); $('#psE').textContent = x.message; (pwOk(n.value) ? c : n).setAttribute('aria-invalid', 'true'); } };
 }
 
 /* ---------- بطاقات المتدرب الثلاث (تُستخدم لولي الأمر أيضًا) ---------- */
@@ -185,17 +214,19 @@ export function gaugeHtml(it){
     <p class="hint" style="margin:10px 0 0">متوسط المحاور الثلاثة: الحضور، ونجاح أداء الواجبات، والمؤقت الزمني (أعلى نسبة حضور نهائية ما زالت ممكنة في المدة المتبقية). الأخضر يبدأ من ${fmtNum(g.thr)}٪ وهو حد استحقاق الشهادة.</p>
   </div>`;
 }
-export function studentPanelHtml(it){
+export function studentPanelHtml(it, links = false){
   const a = it.attendance, hw = it.homework, tm = it.time;
+  /* عناوين البطاقات تفتح تفاصيلها في بوابة المتدرب (طلب المالك 18 نوفمبر) */
+  const head = (k, icon, title) => links ? `<button type="button" class="ind-h ind-link" data-ind="${k}" aria-label="${title}: عرض التفاصيل">${ic(icon)}<b>${title}</b><span class="ind-more">التفاصيل ${ic('prev')}</span></button>` : `<div class="ind-h">${ic(icon)}<b>${title}</b></div>`;
   const tone = a.rate == null ? 'success' : a.rate < 75 ? 'warning' : 'success';
   return `${gaugeHtml(it)}${achievementHtml(it)}<div class="ind3">
-    <div class="card pad ind rv" style="--i:1"><div class="ind-h">${ic('check')}<b>الحضور</b></div>
+    <div class="card pad ind rv" style="--i:1">${head('att', 'check', 'الحضور والغياب')}
       ${a.held ? `<div class="ind-ring">${ringSvg(a.rate ?? 0, 92, 9, tone)}</div><div class="ind-nums"><span><b>${fmtNum(a.attended)}</b>حضور</span><span><b>${fmtNum(a.late)}</b>تأخر</span><span><b>${fmtNum(a.absent)}</b>غياب</span></div>
         <p class="hint">من ${fmtNum(a.held)} جلسة منعقدة، ويتبقى ${fmtNum(a.remaining)} جلسة.</p>` : `<p class="ind-empty">${it.start_date ? 'لا توجد جلسات منعقدة بعد' : 'يبدأ الاشتراك من أول يوم تحضر فيه'}</p>`}</div>
-    <div class="card pad ind rv" style="--i:2"><div class="ind-h">${ic('form')}<b>أداء الواجبات</b></div>
+    <div class="card pad ind rv" style="--i:2">${head('hw', 'form', 'أداء الواجبات')}
       ${hw.due ? `<div class="ind-ring">${ringSvg(hw.pct, 92, 9, hw.pct < 75 ? 'warning' : 'success')}</div><p class="hint">سلّمت ${fmtNum(hw.done)} من ${fmtNum(hw.due)} واجبًا مستحقًا، ونسبة النجاح فيها ${fmtNum(hw.success)}٪.</p>`
         : `<p class="ind-empty">لا توجد واجبات مستحقة بعد</p>`}${hw.pending ? `<span class="pill o">${fmtNum(hw.pending)} واجب ينتظر التسليم</span>` : ''}</div>
-    <div class="card pad ind rv" style="--i:3"><div class="ind-h">${ic('hourglass')}<b>المؤقت الزمني للباقة</b></div>
+    <div class="card pad ind rv" style="--i:3">${head('time', 'hourglass', 'المؤقت الزمني للباقة')}
       ${tm.pct == null ? `<p class="ind-empty">يبدأ العدّ من أول يوم حضور</p>` : `<div class="ind-big"><b>${fmtNum(tm.daysLeft)}</b> يومًا متبقية</div>
         <div class="tbar big" role="img" aria-label="مضى ${fmtNum(tm.pct)}٪ من مدة الباقة"><i style="width:${tm.pct}%"></i></div>
         <p class="hint">من ${fmtShort(it.start_date)} إلى ${fmtShort(it.end_date)} · مضى ${fmtNum(tm.pct)}٪. مرور الوقت لا يعني إتقان المحتوى.</p>`}</div>
@@ -211,6 +242,28 @@ function studentDetailHtml(it, notifications){
         ${it.log.map(l => `<tr><td>${fmtDate(l.date)}</td><td><span class="pill dot ${statusPill(l.status)}">${l.status}</span>${l.manual ? ' <span class="hint">معتمد إداريًا</span>' : ''}</td><td class="num">${l.time ? t12(l.time) : '—'}</td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">لا يوجد سجل بعد.</p>`}</div>
     ${notifications?.length ? `<div class="card pad rv" style="grid-column:1/-1"><h3 class="ctitle">${ic('alert')}الإشعارات</h3><ul class="ntf">${notifications.map(x => `<li class="${x.read_at ? '' : 'new'}"><span class="pill ${x.kind === 'absence' ? 'bad' : x.kind === 'late' ? 'warn' : 'info'}">${KIND_TXT[x.kind] || 'رسالة'}</span><p>${esc(x.text)}</p><span class="hint">${fmtShort(x.at.slice(0, 10))}</span></li>`).join('')}</ul></div>` : ''}
   </div>`;
+}
+
+/* ---------- تفاصيل بطاقات «لوحتي» (الحضور والغياب، المؤقت الزمني) ---------- */
+let sDetail = null, attF = 'all';
+const ATT_F = [['all', 'الكل'], ['حاضر', 'الحضور'], ['متأخر', 'التأخر'], ['غائب', 'الغياب']];
+function attDetailHtml(it){
+  const a = it.attendance, rows = it.log.filter(l => attF === 'all' || l.status === attF);
+  return `<section class="card pad rv" data-detail="att"><div class="det-h"><button type="button" class="btn sm" data-ind-back>${ic('next')} لوحتي</button><h2 class="ctitle" style="margin:0">${ic('check')}الحضور والغياب</h2></div>
+    ${a.held ? `<div class="det-stats"><div><b class="num">${fmtNum(a.rate ?? 0)}٪</b><span>نسبة الحضور</span></div><div><b class="num">${fmtNum(a.attended)}</b><span>حضور</span></div><div><b class="num">${fmtNum(a.late)}</b><span>تأخر</span></div><div><b class="num">${fmtNum(a.absent)}</b><span>غياب</span></div><div><b class="num">${fmtNum(a.held)}</b><span>جلسة منعقدة</span></div><div><b class="num">${fmtNum(a.remaining)}</b><span>جلسة متبقية</span></div></div>
+      <p class="hint">نسبة الحضور = (أيام الحضور والتأخر) ÷ الجلسات المنعقدة منذ بداية باقتك. حد الإفادة ${fmtNum(it.threshold)}٪.${(a.rate ?? 0) < it.threshold ? ` تحتاج الحضور بانتظام لتبلغه.` : ' أنت فوق الحد، استمر.'}</p>
+      <div class="tabs" role="tablist" style="margin:10px 0">${ATT_F.map(([k, t]) => `<button class="tab" role="tab" data-attf="${k}" aria-selected="${attF === k}">${t} (${fmtNum(k === 'all' ? it.log.length : it.log.filter(l => l.status === k).length)})</button>`).join('')}</div>
+      ${rows.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>اليوم</th><th>التاريخ</th><th>الحالة</th><th>وقت التسجيل</th></tr></thead><tbody>${rows.map(l => `<tr><td>${DAYS[new Date(l.date + 'T12:00:00Z').getUTCDay()]}</td><td>${fmtDate(l.date)}</td><td><span class="pill dot ${statusPill(l.status)}">${l.status}</span>${l.manual ? ' <span class="hint">معتمد إداريًا</span>' : ''}</td><td class="num">${l.time ? t12(l.time) : '—'}</td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">لا أيام في هذا التصنيف.</p>`}`
+    : `<p class="ind-empty">${it.start_date ? 'لا توجد جلسات منعقدة بعد' : 'يبدأ اشتراكك من أول يوم تحضر فيه، ويظهر هنا سجل حضورك وغيابك.'}</p>`}</section>`;
+}
+function timeDetailHtml(it){
+  const tm = it.time, a = it.attendance, days = it.start_date && it.end_date ? Math.round((Date.parse(it.end_date) - Date.parse(it.start_date)) / 864e5) + 1 : null;
+  return `<section class="card pad rv" data-detail="time"><div class="det-h"><button type="button" class="btn sm" data-ind-back>${ic('next')} لوحتي</button><h2 class="ctitle" style="margin:0">${ic('hourglass')}المؤقت الزمني للباقة</h2></div>
+    ${tm.pct == null ? `<p class="ind-empty">يبدأ العدّ من أول يوم تحضر فيه بالباركود.</p>` : `<div class="det-stats"><div><b>${fmtShort(it.start_date)}</b><span>البداية</span></div><div><b>${fmtShort(it.end_date)}</b><span>النهاية</span></div><div><b class="num">${fmtNum(days)}</b><span>مدة الباقة (يوم)</span></div><div><b class="num">${fmtNum(Math.max(0, days - tm.daysLeft))}</b><span>يوم مضى</span></div><div><b class="num">${fmtNum(tm.daysLeft)}</b><span>يوم متبقٍ</span></div><div><b class="num">${fmtNum(a.remaining)}</b><span>جلسة متبقية</span></div></div>
+      <div class="tbar big" role="img" aria-label="مضى ${fmtNum(tm.pct)}٪ من مدة الباقة"><i style="width:${tm.pct}%"></i></div>
+      <p class="hint">مضى ${fmtNum(tm.pct)}٪ من مدة باقتك. ${tm.reach != null ? `إن حضرت كل الجلسات المتبقية تبلغ نسبة حضورك ${fmtNum(tm.reach)}٪.` : ''} مرور الوقت لا يعني إتقان المحتوى؛ تابع واجباتك وقياس مستواك.</p>`}
+    <h3 class="ctitle" style="margin-top:14px">${ic('calendar')}جلساتي القادمة</h3>
+    ${it.upcoming.length ? `<ul class="ses-list">${it.upcoming.map(x => `<li><b>${DAYS[new Date(x.date + 'T12:00:00Z').getUTCDay()]}</b><span>${fmtShort(x.date)}</span><span class="num">${t12(x.start)} – ${t12(x.end)}</span></li>`).join('')}</ul>` : '<p class="hint">لا جلسات قادمة ضمن مدة باقتك.</p>'}</section>`;
 }
 
 /* ---------- المتدرب ---------- */
@@ -267,11 +320,16 @@ function viewStudent(D){
     ${tabBar(pr.items.length ? S_TABS : S_TABS.slice(0, 1), sTab, 'data-st', { hw:assignmentsFor(D, pr.trainee.id).filter(a => ['new', 'needs_revision'].includes(a.state)).length, msg:(D.messages || []).filter(m => m.trainee_id === pr.trainee.id && m.from === 'teacher' && !m.read_at).length, live:(D.lectures || []).filter(l => lectureState(l) === 'live').length })}
     <div id="sBody"></div></div>`;
   const tr = D.trainees.find(x => x.id === pr.trainee.id), reload = async () => viewStudent(await Store.portalData('student'));
-  if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
-  if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name, o => planOfOrder(D, o)) + trainersCardHtml(D, pr.trainee.id)); bindOrdersCard($('#sBody'), mo, reload); }
+  if(sTab === 'dash' && it && sDetail) $('#sBody').innerHTML = itemTabs(U, sIdx) + (sDetail === 'att' ? attDetailHtml(it) : timeDetailHtml(it));
+  else if(sTab === 'dash') $('#sBody').innerHTML = !u ? emptyBox('لا توجد اشتراكات أو برامج') : itemTabs(U, sIdx) + (it ? studentPanelHtml(it, true) + studentDetailHtml(it, pr.notifications) + `<a class="card pad tg-card rv" href="${CENTER.telegram}" target="_blank" rel="noopener">${ic('book')}<span><b>قناة المركز على تيليجرام</b><small>مواد علمية خاصة بالقدرات ينشرها المركز لمشتركي الباقات</small></span>${ic('next')}</a>` : programPanelHtml(px, D.settings?.cert_threshold ?? 75)) + helpHtml();
+  if(sTab === 'dash' && it && sDetail){ /* تفاصيل البطاقة مرسومة أعلاه */ }
+  else if(sTab === 'dash'){ const mo = (D.orders || []).filter(o => o.trainee_id === pr.trainee.id); $('#sBody').insertAdjacentHTML('beforeend', ordersCardHtml(mo, pr.trainee.first_name, o => planOfOrder(D, o)) + trainersCardHtml(D, pr.trainee.id)); bindOrdersCard($('#sBody'), mo, reload); }
   else if(sTab === 'live'){ const v = studentLive(D); $('#sBody').innerHTML = v.html; v.bind(() => viewStudent(D), reload); }
   else { const v = ({ hw:() => studentHomework(D, tr, reload), level:() => studentLevel(D, tr, it, reload), msg:() => studentMessages(D, tr, reload), rate:() => studentRating(D, tr, reload) })[sTab](); $('#sBody').innerHTML = v.html; v.bind(); }
-  $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; viewStudent(D); });
+  $$('[data-st]').forEach(b => b.onclick = () => { sTab = b.dataset.st; sDetail = null; viewStudent(D); });
+  $$('[data-ind]').forEach(b => b.onclick = () => { if(b.dataset.ind === 'hw'){ sTab = 'hw'; sDetail = null; } else sDetail = b.dataset.ind; attF = 'all'; viewStudent(D); scrollTo(0, ($('#sBody')?.offsetTop || 0) - 80); });
+  $$('[data-ind-back]').forEach(b => b.onclick = () => { sDetail = null; viewStudent(D); });
+  $$('[data-attf]').forEach(b => b.onclick = () => { attF = b.dataset.attf; viewStudent(D); });
   $$('[data-si]').forEach(b => b.onclick = () => { sIdx = +b.dataset.si; viewStudent(D); });
   $$('[data-pi]').forEach(b => b.onclick = () => { pIdx = +b.dataset.pi; sIdx = 0; viewStudent(D); });
   if(pr.notifications.some(x => !x.read_at)) Store.markRead('student');

@@ -80,9 +80,9 @@ ok(!!(await p.$('#myTrainers img.avt')) && /السيرة المهنية/.test(aw
 await tab('data-st', 'hw');
 await p.click(`[data-qs="${A.id}"]`); await p.click('#qsGo'); await p.waitForSelector(`.hw-quiz[data-qz="${A.id}"]`);
 for (const q of A.quiz) await p.check(`[data-qz="${A.id}"] input[data-q="${q.id}"][value="${q.correct}"]`);
-await p.click(`[data-qz="${A.id}"] button.pri`); await p.waitForTimeout(1000);
+await p.click(`[data-qz="${A.id}"] button.pri`); await p.waitForTimeout(1000); if(await p.$('#qrX')) await p.click('#qrX');
 D = await data(); let sb = D.submissions.find(s => s.assignment_id === A.id && s.trainee_id === st.id);
-ok(sb.status === 'graded' && sb.score === A.max_score && !!(await p.$(`[data-qr="${A.id}"]`)) && !(await p.$('.qres')) && /بقيت لك/.test(await p.content()), 'بعد المحاولة الأولى: زر محاولة جديدة والإجابات محجوبة');
+ok(sb.status === 'graded' && sb.score === A.max_score && !!(await p.$(`[data-qr="${A.id}"]`)) && !/الصحيح:/.test(await p.textContent('#sBody')) && /بقيت لك/.test(await p.content()), 'بعد المحاولة الأولى: زر محاولة جديدة والإجابات محجوبة');
 await p.click(`[data-qr="${A.id}"]`); await p.waitForSelector('#qsGo');
 ok(/محاولة جديدة/.test(await text('.modal h3, #modal h3, dialog h3')), 'تأكيد قبل المحاولة الجديدة');
 await p.click('#qsGo'); await p.waitForSelector(`.hw-quiz[data-qz="${A.id}"]`);

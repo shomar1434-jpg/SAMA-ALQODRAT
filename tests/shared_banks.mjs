@@ -70,7 +70,7 @@ await p.click(`[data-qs="${qa.id}"]`); await p.click('#qsGo'); await p.waitForSe
 ok((await p.$$(`${form} .qimg img`)).length === 2 && (await p.$$(`${form} .q.qi`)).length === 2 && /عرض صفحة القطعة/.test(await text(form)), 'الواجب يعرض صور الأسئلة وخيارات أ ب ج د ورابط صفحة القطعة');
 const radios = await p.$$(`${form} input[type=radio]`);
 await radios[0].check(); await radios[4 + 3].check();   // السؤال الأول (KT-03) أ = صحيح، الثاني (KT-01) د = صحيح
-await p.click(`${form} button.pri`); await p.waitForTimeout(900);
+await p.click(`${form} button.pri`); await p.waitForTimeout(900); if(await p.$('#qrX')) await p.click('#qrX');
 D = await data(); const sb = D.submissions.find(x => x.assignment_id === qa.id && x.trainee_id === st.id);
 ok(sb && sb.status === 'graded' && sb.score === 10, 'التصحيح الآلي بمفاتيح البنك المشترك');
 await tab('data-st', 'level');

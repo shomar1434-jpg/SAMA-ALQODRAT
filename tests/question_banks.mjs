@@ -74,7 +74,7 @@ const first = qa.quiz[0];
 await p.check(`[data-qz="${qa.id}"] input[data-q="${first.id}"][value="${first.correct}"]`);
 await p.click(`[data-qz="${qa.id}"] button.pri`); await p.waitForTimeout(300);
 ok(/لم تُجب عن/.test(await text(`[data-qz="${qa.id}"] .qz-w`)), 'تنبيه الأسئلة غير المجابة قبل التسليم');
-await p.click(`[data-qz="${qa.id}"] button.pri`); await p.waitForTimeout(900);
+await p.click(`[data-qz="${qa.id}"] button.pri`); await p.waitForTimeout(900); if(await p.$('#qrX')) await p.click('#qrX');
 D = await data();
 const sb = D.submissions.find(x => x.assignment_id === qa.id && x.trainee_id === st.id);
 ok(sb && sb.status === 'graded' && Math.abs(sb.score - Math.round(1 / 3 * qa.max_score * 10) / 10) < 0.01, 'تصحيح آلي فوري (1 من 3)');
