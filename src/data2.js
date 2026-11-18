@@ -398,6 +398,7 @@ export const LocalStore = {
     } else if(r.ok && r.already){ r._trainee = D.trainees.find(x=>x.national_id===nid)?.id; }
     if(r.reason!=='choose'){ D.checkin_attempts.push(attemptRecord(nid, opts.device, r)); if(D.checkin_attempts.length>5000) D.checkin_attempts.splice(0, D.checkin_attempts.length-5000); }
     this.save(); delete r._rec; delete r._sub; delete r._start; delete r._trainee;
+    if(!r.ok) delete r.name;   // ↔ checkin: رفض التحضير لا يكشف اسم صاحب الهوية (الخطوة BN)
     return r;
   },
   async isAdmin(){ return this.admin; },
