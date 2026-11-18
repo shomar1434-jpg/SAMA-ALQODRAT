@@ -20,6 +20,7 @@ import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlock
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, isKidsProgram, selfLinkLogic, LINK_FAIL, LINK_LOCKED, checkMinorConsent } from './identity_logic.js';
 import { weeklyNotes } from './weekly_logic.js';
+import { PL_KINDS, PL_GRACE_SEC, plSet, plMinutes, plAvailable, plBuild, plPublicQ, plGrade, plCheckSettings } from './placement_logic.js';
 import { catOk, simOpen, simExpired, simsToday, SIM_DAILY_MAX, sortSubjects, buildSim, cleanAnswers, CATEGORIES } from './sim_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, backfillCategories, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf, snapOf, liveSubsOf } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
@@ -409,6 +410,24 @@ export const LocalStore = {
     if(me?.role!=='owner') throw new Error('إعادة تعيين كلمات المرور للمالك الأساسي وحده'); if(!a) throw new Error('الحساب غير موجود');
     if(a.id===me.id) throw new Error('غيّر كلمة مرورك من «تغيير كلمة المرور»'); if(a.role==='owner') throw new Error('لا تُعاد كلمة مرور المالك الأساسي'); if(a.active===false) throw new Error('فعّل الحساب أولًا');
     this.audit('admins.password_reset', a.email); this.save(); return {ok:true, mode:'password', temp_password:'demo'+String(Math.floor(Math.random()*9e5)+1e5), email:a.email}; },
+  /* الخطوة BH: اختبار تحديد المستوى ↔ placement_status / placement_start / placement_finish / admin_placement_data / admin_placement_settings */
+  async placementStatus(){ const D=this.data, S=plSet(D.settings); return { enabled:S.placement_enabled, qudurat:plAvailable(D.questions, 'qudurat'), tahsili:plAvailable(D.questions, 'tahsili'),
+    minutes:{qudurat:plMinutes('qudurat', D.settings), tahsili:plMinutes('tahsili', D.settings)}, assets:D.settings.bank_assets||'' }; },
+  async placementStart(kind, session){ const D=this.data, S=plSet(D.settings); D.placement_attempts=D.placement_attempts||[];
+    if(!S.placement_enabled) throw new Error('اختبار تحديد المستوى متوقف حاليًا'); if(!PL_KINDS[kind]) throw new Error('اختر نوع الاختبار');
+    if(!/^[A-Za-z0-9_-]{8,64}$/.test(String(session||''))) throw new Error('أعد تحميل الصفحة ثم حاول مجددًا');
+    const today=riyadhNow().date; if(D.placement_attempts.filter(a=>a.session_id===session&&a.day===today).length>=S.placement_daily_max) throw new Error('وصلت إلى حد محاولات اليوم؛ حاول غدًا أو تواصل مع المركز');
+    const snap=plBuild(D.questions, kind), minutes=plMinutes(kind, D.settings), started_at=new Date().toISOString();
+    const at={id:uid(), kind, session_id:session, day:today, snapshot:snap, started_at, deadline:new Date(Date.now()+minutes*60000).toISOString(), submitted_at:null, result:null};
+    D.placement_attempts.push(at); this.save(); const byId=Object.fromEntries(D.questions.map(q=>[q.id,q]));
+    return { id:at.id, kind, minutes, deadline:at.deadline, assets:D.settings.bank_assets||'', questions:snap.map(x=>plPublicQ(byId[x.id])) }; },
+  async placementFinish(id, session, answers){ const D=this.data, at=(D.placement_attempts||[]).find(a=>a.id===id&&a.session_id===session);
+    if(!at) throw new Error('المحاولة غير موجودة'); if(at.submitted_at) return structuredClone(at.result);
+    if(Date.now() > Date.parse(at.deadline)+PL_GRACE_SEC*1000) throw new Error('انتهى وقت الاختبار');
+    at.result=plGrade(at.snapshot, answers, at.kind, D.plans, D.settings); at.submitted_at=new Date().toISOString(); this.save(); return structuredClone(at.result); },
+  async adminPlacement(){ const D=this.data, S=plSet(D.settings), A=(D.placement_attempts||[]).filter(a=>Date.parse(a.started_at)>Date.now()-400*864e5);
+    return { settings:S, status:await this.placementStatus(), attempts:A.map(a=>({kind:a.kind, day:a.day, submitted:!!a.submitted_at, pct:a.result?.pct??null, tier:a.result?.tiers?.[0]||null})) }; },
+  async savePlacementSettings(p){ const x=plCheckSettings(p); Object.assign(this.data.settings, x); this.audit('settings.placement', 'placement', x); this.save(); return x; },
   async assistantResponses(){ return structuredClone(this.data.assistant_responses || []); },
   /* الخطوة BE: المهتمون والطلب والحملات ↔ assistant_note_inquiry / assistant_register_interest / admin_assistant_* */
   _ai(){ const D=this.data; ['assistant_inquiries','assistant_demand','assistant_interests','assistant_campaigns','assistant_sends'].forEach(k=>{ D[k]=D[k]||[]; }); return D; },
@@ -989,6 +1008,11 @@ export const CloudStore = {
       if(c==='23514'||/check constraint/.test(m)) throw new Error('إحدى القيم المدخلة غير صالحة؛ راجع الجوال ورقم الهوية والحقول المطلوبة');
       if(/row-level security/.test(m)) throw new Error('غير مصرح بهذه العملية؛ سجّل الدخول كمسؤول');
       throw new Error(/foreign key/.test(m) ? 'لا يمكن الحذف: توجد سجلات حضور أو شهادات مرتبطة. استخدم الإلغاء أو الأرشفة.' : m); } return r.data; },
+  async placementStatus(){ try{ return this._e(await this.sb.rpc('placement_status')); }catch(e){ return {enabled:false, qudurat:false, tahsili:false, minutes:{}, assets:''}; } },
+  async placementStart(kind, session){ return this._e(await this.sb.rpc('placement_start',{p_kind:kind, p_session:session})); },
+  async placementFinish(id, session, answers){ return this._e(await this.sb.rpc('placement_finish',{p_id:id, p_session:session, p_answers:answers||{}})); },
+  async adminPlacement(){ return this._e(await this.sb.rpc('admin_placement_data')); },
+  async savePlacementSettings(p){ return this._e(await this.sb.rpc('admin_placement_settings',{p:plCheckSettings(p)})); },
   async noteInquiry(session, kind, ref){ try{ return this._e(await this.sb.rpc('assistant_note_inquiry',{p_session:session, p_kind:kind, p_ref:ref})); }catch(e){ return {ok:false}; } },
   async registerInterest(f){ const x=checkInterest(f); return this._e(await this.sb.rpc('assistant_register_interest',{p:{...x, consent:true}})); },
   async adminInterests(){ return this._e(await this.sb.rpc('admin_assistant_interests')); },

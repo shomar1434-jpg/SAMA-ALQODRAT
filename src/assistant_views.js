@@ -4,13 +4,18 @@ import { titleBar } from './views2_main.js';
 import { ic, toast, emptyBox } from './views2_head.js';
 import { matchResponse } from './assistant_logic.js';
 import { interestsTab } from './interest_views.js';
+import { placementTab } from './placement_admin.js';
 
 const state = { query: '', selected: null, tab: 'lib' };
 
-const tabsHtml = () => `<div class="tabs" role="tablist" style="margin:0 0 14px">${[['lib', 'book', 'مكتبة الردود'], ['int', 'users', 'المهتمون والطلب']].map(([k, i, t]) => `<button class="tab" role="tab" data-ast="${k}" aria-selected="${state.tab === k}">${ic(i)}${t}</button>`).join('')}</div>`;
+const tabsHtml = () => `<div class="tabs" role="tablist" style="margin:0 0 14px">${[['lib', 'book', 'مكتبة الردود'], ['int', 'users', 'المهتمون والطلب'], ['pl', 'target', 'اختبار تحديد المستوى']].map(([k, i, t]) => `<button class="tab" role="tab" data-ast="${k}" aria-selected="${state.tab === k}">${ic(i)}${t}</button>`).join('')}</div>`;
 const bindTabs = () => document.querySelectorAll('[data-ast]').forEach(b => b.onclick = () => { state.tab = b.dataset.ast; pageAssistant(); });
 export async function pageAssistant() {
   const main = $('#main');
+  if (state.tab === 'pl') {
+    main.innerHTML = titleBar(`${ic('chat')} المساعد الذكي`, 'اختبار تحديد المستوى', 'اختبار مجاني للزوار من بنك المركز يقترح الباقة المناسبة؛ بلا بيانات شخصية.') + tabsHtml() + '<div id="asPl" aria-busy="true"></div>';
+    bindTabs(); await placementTab($('#asPl'), pageAssistant); $('#asPl')?.removeAttribute('aria-busy'); return;
+  }
   if (state.tab === 'int') {
     main.innerHTML = titleBar(`${ic('chat')} المساعد الذكي`, 'المهتمون والطلب', 'من طلب الإشعار من المساعد، وعدد الاستفسارات عن كل برنامج وباقة، وحملات الإبلاغ والعروض من واتساب المركز.') + tabsHtml() + '<div id="asInt"></div>';
     bindTabs(); await interestsTab($('#asInt'), pageAssistant); return;

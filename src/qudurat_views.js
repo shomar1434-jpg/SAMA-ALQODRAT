@@ -33,7 +33,7 @@ export function plansSectionHtml(plans){
   return `<section class="plans" aria-labelledby="plTitle" id="plans">
     <div class="sec-head" data-reveal><span class="kicker">القدرات والتحصيلي</span><h2 id="plTitle">باقات <em>القدرات والتحصيلي</em></h2>
       <p class="hint" style="margin:8px 0 0">اسحب الشريط أو استخدم الأزرار. الاشتراك يبدأ من أول يوم تحضر فيه.</p>
-      <p style="margin:12px 0 0"><button class="btn sm" id="plCompare">${ic('grid')} قارن بين الباقات</button></p></div>
+      <p style="margin:12px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="plCompare">${ic('grid')} قارن بين الباقات</button><a class="btn sm pri" href="#placement" data-pl-link>${ic('target')} اختبر مستواك مجانًا</a></p></div>
     <div class="pl-filter" role="group" aria-label="نوع الحضور" data-reveal>
       <button class="chip on" data-mode="in_person" aria-pressed="true">${ic('users')} حضوري</button>
       <button class="chip" data-mode="remote" aria-pressed="false">${ic('tv')} عن بُعد <span class="soon-tag">قريبًا</span></button></div>
@@ -140,7 +140,7 @@ export async function viewPlanPage(id){
       ${p.image ? `<div class="pl-hero-img"><img src="${p.image}" alt="${esc(p.name)}"></div>` : ''}</section>
     ${planPoster(p.tier) ? `<div class="card pad rv pl-art" style="margin-top:18px"><div><h3 class="ctitle">${ic('award')}تعريف الباقة</h3>
         <p class="hint" style="margin:0 0 12px">التصميم التعريفي للباقة من مركز سما القدرات: المدة والرسوم والأقساط وما تشمله. اضغط الصورة لتكبيرها.</p>
-        <p style="margin:0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="plZoom">${ic('search')} تكبير التصميم</button><button class="btn sm" id="plCompare">${ic('grid')} قارن بين الباقات</button></p></div>
+        <p style="margin:0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="plZoom">${ic('search')} تكبير التصميم</button><button class="btn sm" id="plCompare">${ic('grid')} قارن بين الباقات</button><a class="btn sm pri" href="#placement" data-pl-link>${ic('target')} اختبر مستواك مجانًا</a></p></div>
       <button class="pl-poster" id="plPoster" aria-label="تكبير التصميم التعريفي لباقة ${esc(p.name)}"><img src="${planPoster(p.tier)}" alt="التصميم التعريفي لباقة ${esc(p.name)}: ${esc(DURATION_TXT(p))}، ${fmtNum(planTotal(p))} ريال ${esc(priceLine(p))}" loading="lazy" width="1024" height="1536"></button></div>` : ''}
     <div class="grid g2" style="margin-top:18px;align-items:start">
       <div class="card pad rv" style="--i:1"><h3 class="ctitle">${ic('check')}مزايا الباقة</h3><ul class="pl-feats">${(p.features || []).map(f => `<li>${ic('check')}${esc(f)}</li>`).join('')}</ul></div>
