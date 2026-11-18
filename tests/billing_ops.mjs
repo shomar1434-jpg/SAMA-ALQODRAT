@@ -17,7 +17,7 @@ const openOrder = async id => { await admin('admin-orders'); await p.selectOptio
 await admin('admin-qudurat');
 const nid = await S(() => window.__SAMA__.makeSaudiId('1'));
 await p.click('#qAdd'); await p.waitForTimeout(300);
-await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'ماجد سعيد علي العتيبي'); await p.fill('#sm-phone', '0557771234'); await p.selectOption('#sm-gender', 'ذكر');
+await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'ماجد سعيد علي العتيبي'); await p.check('[name=minor][value=no]'); await p.fill('#sm-phone', '0557771234'); await p.selectOption('#sm-gender', 'ذكر');
 await p.selectOption('#sm-plan', { label: 'الأساسية' }); await p.click('#smS'); await p.waitForSelector('#om-recv');
 ok(/استلام المبلغ/.test(await text('.modal')) && (await p.inputValue('#opl-a0')) === '690', 'تفتح نافذة الاستلام بالمطلوب الآن');
 await p.fill('#opl-a0', '300'); await p.selectOption('#opl-m0', 'cash'); await p.fill('#opl-r0', 'سند 12');

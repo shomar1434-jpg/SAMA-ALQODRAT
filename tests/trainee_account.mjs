@@ -42,7 +42,7 @@ const data = () => p.evaluate(() => JSON.parse(localStorage.getItem('sama_qudrat
 await admin('admin-qudurat');
 const nid = await p.evaluate(() => window.__SAMA__.makeSaudiId('1'));
 await p.click('#qAdd'); await p.waitForTimeout(300);
-await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'هشام سعيد علي الزهراني'); await p.fill('#sm-phone', '0557776655'); await p.selectOption('#sm-gender', 'ذكر');
+await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'هشام سعيد علي الزهراني'); await p.check('[name=minor][value=no]'); await p.fill('#sm-phone', '0557776655'); await p.selectOption('#sm-gender', 'ذكر');
 await p.selectOption('#sm-plan', { label: 'الأساسية' }); await p.click('#smS'); await p.waitForSelector('#om-recv');
 await p.fill('#opl-a0', '690'); await p.selectOption('#opl-m0', 'cash'); await p.click('#om-recv'); await p.waitForTimeout(800);
 let D = await data(); const t = D.trainees.find(x => x.national_id === nid), o = D.orders.find(x => x.trainee_id === t.id);

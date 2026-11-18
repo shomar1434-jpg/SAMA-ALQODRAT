@@ -23,7 +23,7 @@ const admin = async r => { await p.goto(U + 'admin/#' + r); await p.reload(); aw
 await admin('admin-qudurat');
 const nid = await p.evaluate(() => window.__SAMA__.makeSaudiId('1'));
 await p.click('#qAdd'); await p.waitForTimeout(300);
-await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'راكان سعيد علي القرني'); await p.fill('#sm-phone', '0557771299'); await p.selectOption('#sm-gender', 'ذكر');
+await p.fill('#sm-nid', nid); await p.fill('#sm-name', 'راكان سعيد علي القرني'); await p.check('[name=minor][value=no]'); await p.fill('#sm-phone', '0557771299'); await p.selectOption('#sm-gender', 'ذكر');
 await p.selectOption('#sm-plan', { label: 'الذهبية' }); await p.click('#smS'); await p.waitForSelector('#om-recv');
 await p.fill('#opl-a0', '1190'); await p.click('#om-recv'); await p.waitForTimeout(800);
 let D = await data(); const t = D.trainees.find(x => x.national_id === nid), s = D.subscriptions.find(x => x.trainee_id === t.id), ord = D.orders.find(x => x.subscription_id === s.id);

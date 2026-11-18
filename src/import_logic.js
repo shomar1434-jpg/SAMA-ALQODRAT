@@ -6,6 +6,7 @@
    ===================================================================== */
 import { validSaudiId } from './utils.js';
 import { subEnd, planTotal } from './qudurat.js';
+import { isKidsProgram } from './identity_logic.js';
 
 const AR = '٠١٢٣٤٥٦٧٨٩', lat = v => String(v ?? '').replace(/[٠-٩]/g, d => AR.indexOf(d)).trim();
 export const TIER_KEYS = [['custom', /خصص/], ['diamond', /ماسي/], ['gold', /ذهبي/], ['silver', /فضي/], ['basic', /[أا]ساسي/]];
@@ -78,18 +79,21 @@ export const legacySummary = rows => ({ count:rows.length, ok:rows.filter(r => !
 const UPGRADE_GAP = 200;   // فرق أقل من ذلك زيادة سداد لا ترقية
 const UPGRADE_RX = /تحويل بين الباقات|ترقي|رُقّي|رقي إلى|حول للباقة|حوّل/;
 const planLabel = p => `الباقة ${({ basic:'الأساسية', silver:'الفضية', gold:'الذهبية', diamond:'الماسية', custom:'«خصصناها لك»' })[p.tier] || p.name}`;
+/* نوع خدمات المتدرب يحدد عناصر نموذجه: الباقات فقط، أم برامج (ومنها برامج الأطفال) */
+export const hasProgram = (D, t) => (D.enrollments || []).some(e => e.trainee_id === t.id) || (D.program_requests || []).some(r => r.trainee_id === t.id);
+export const needsBirth = (D, t) => (D.enrollments || []).some(e => { if(e.trainee_id !== t.id) return false; const c = (D.cohorts || []).find(x => x.id === e.cohort_id), p = c && (D.programs || []).find(x => x.id === c.program_id); return !!p && isKidsProgram(p); });
 export function dataIssues(D){
   const byPhone = {}; (D.trainees || []).forEach(t => { if(t.phone) (byPhone[t.phone] = byPhone[t.phone] || []).push(t.id); });
   const out = [];
   for(const t of D.trainees || []){
     const I = [], add = (text, field) => I.push({ text, field });
-    if(!t.birth_date) add('تاريخ الميلاد غير مسجّل', 'birth_date');
+    /* المطلوب يطابق نموذج التسجيل (قرار المالك 18 نوفمبر): تاريخ الميلاد لبرامج الأطفال وحدها، ولا شرط للمدينة */
+    if(!t.birth_date && needsBirth(D, t)) add('تاريخ الميلاد غير مسجّل', 'birth_date');
     if(!t.email) add('البريد الإلكتروني غير مسجّل', 'email');
     if(!t.guardian_phone) add('جوال ولي الأمر غير مسجّل', 'guardian_phone'); else if(t.guardian_phone === t.phone) add('جوال ولي الأمر هو جوال المتدرب نفسه', 'guardian_phone');
     if(!/^05\d{8}$/.test(t.phone || '')) add('رقم الجوال غير صحيح', 'phone');
     if((t.full_name || '').trim().split(/\s+/).length < 3) add('الاسم غير ثلاثي', 'full_name');
-    if(!validSaudiId(t.national_id || '')) add('رقم الهوية لا يجتاز فحص الصحة', 'national_id');
-    if(!t.city) add('المدينة غير مسجّلة', 'city');
+    if(!t.is_test && !validSaudiId(t.national_id || '')) add('رقم الهوية لا يجتاز فحص الصحة', 'national_id');
     if((byPhone[t.phone] || []).length > 1) add('الجوال مشترك مع متدرب آخر (يدخلان من الجوال نفسه)', null);
     for(const o of (D.orders || []).filter(x => x.trainee_id === t.id && x.approval !== 'rejected')){
       const sub = o.subscription_id && (D.subscriptions || []).find(s => s.id === o.subscription_id), plan = sub && (D.plans || []).find(p => p.id === sub.plan_id);
