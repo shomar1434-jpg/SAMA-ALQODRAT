@@ -9,6 +9,7 @@ import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy } from './features.js';
 import { assetUrl } from './learning_logic.js';
+import { bankAttr } from './bank_media.js';
 import { qStem, getBankAssets } from './learning_views.js';
 import { simSubjects, simOpen, simExpired, simSet, simMinutes, simsToday, SIM_DAILY_MAX, pct, readyOf, sortSubjects, SIM_GRACE_SEC, UNCAT } from './sim_logic.js';
 import { liveSubsOf } from './learning_logic.js';
@@ -70,7 +71,7 @@ export function runSim(at, reload){
   const queue = () => { const s = $('#simSave'); if(s) s.textContent = 'جارٍ الحفظ…'; clearTimeout(saveT); saveT = setTimeout(flush, 700); };
   const answered = () => qs.filter(q => ans[q.id] != null).length;
   const stem = q => { const pg = q.page_image ? assetUrl(q.page_image, getBankAssets()) : '';
-    return `${pg ? `<details class="sim-pg" open><summary>${ic('book')} نص القطعة</summary><img src="${esc(pg)}" alt="صفحة القطعة" loading="lazy"></details>` : ''}${q.image ? qStem({ ...q, page_image:'' }) : `<p class="sim-text">${esc(q.text)}</p>`}`; };
+    return `${pg ? `<details class="sim-pg" open><summary>${ic('book')} نص القطعة</summary><img ${bankAttr(q.page_image, getBankAssets())} alt="صفحة القطعة" loading="lazy"></details>` : ''}${q.image ? qStem({ ...q, page_image:'' }) : `<p class="sim-text">${esc(q.text)}</p>`}`; };
   const paint = () => {
     const q = qs[i], s = secOf(i), inSec = qs.filter(x => x.subject === q.subject), k = inSec.indexOf(q) + 1;
     root.innerHTML = `<header class="sim-h"><div class="sim-h-a"><b>محاكي الاختبار</b><span class="pill info">${esc(q.subject)} · القسم ${fmtNum(s + 1)} من ${fmtNum(secs.length)}</span></div>

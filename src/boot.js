@@ -1,4 +1,5 @@
 import { startLiveRefresh } from './live_refresh.js';
+import { initBankMedia } from './bank_media.js';
 import { mountAssistant } from './assistant_chat.js';
 /* نقطة التشغيل المشتركة لكل الصفحات: تُستدعى بعد تحميل كل الوحدات */
 import { setPage } from './config.js';
@@ -26,6 +27,6 @@ export function boot(page){
   route();
   startLiveRefresh(Store, route, { minGap: page === 'admin' ? 20000 : 3000 });
   if(page === 'public') mountAssistant(Store);
-  initPwa();
+  initPwa(); initBankMedia();
   if(page === 'admin') mountGuide('admin');
 }

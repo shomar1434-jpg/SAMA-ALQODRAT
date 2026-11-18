@@ -11,6 +11,7 @@ import { SECTIONS, subStatus, planName } from './qudurat.js';
 import { simCard, bindSimCard, simResult } from './sim_views.js';
 import { analysisHtml, bindAnalysis } from './analysis_views.js';
 import { CATEGORIES } from './sim_logic.js';
+import { bankAttr } from './bank_media.js';
 import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen, attemptsLeft, attemptsOf, MAX_ATTEMPTS } from './learning_logic.js';
 
 const STATE_TXT = { new:'جديد', draft:'قيد الحل', submitted:'مُرسل', needs_revision:'يحتاج تعديلًا', graded:'مصحح', late:'متأخر' };
@@ -113,7 +114,7 @@ export const setBankAssets = b => { ASSETS = b || ''; };
 export const getBankAssets = () => ASSETS;
 export function qStem(q, thumb){
   const src = q.image ? assetUrl(q.image, ASSETS) : '', pg = q.page_image ? assetUrl(q.page_image, ASSETS) : '';
-  return q.image ? `<span class="qimg ${thumb ? 'th' : ''}">${src ? `<img src="${esc(src)}" alt="سؤال مصوَّر ${esc(q.code || '')}" loading="lazy">` : `<span class="hint">صورة السؤال ${esc(q.code || '')} غير متاحة (لم يُضبط مسار تخزين صور البنك)</span>`}${!thumb && pg ? `<a class="linkbtn" href="${esc(pg)}" target="_blank" rel="noopener">عرض صفحة القطعة</a>` : ''}</span>${q.text ? `<p>${esc(q.text)}</p>` : ''}` : `<p>${esc(q.text)}</p>`;
+  return q.image ? `<span class="qimg ${thumb ? 'th' : ''}">${src ? `<img ${bankAttr(q.image, ASSETS)} alt="سؤال مصوَّر ${esc(q.code || '')}" loading="lazy">` : `<span class="hint">صورة السؤال ${esc(q.code || '')} غير متاحة (لم يُضبط مسار تخزين صور البنك)</span>`}${!thumb && pg ? `<a class="linkbtn" ${bankAttr(q.page_image, ASSETS, 'href')} target="_blank" rel="noopener">عرض صفحة القطعة</a>` : ''}</span>${q.text ? `<p>${esc(q.text)}</p>` : ''}` : `<p>${esc(q.text)}</p>`;
 }
 /* ملاحظات المدرب بعد التسليم: العامة، ولكل سؤال برقمه */
 const fbHtml = (a, sb) => { if(!sb || (!sb.teacher_note && !sb.comments)) return ''; const idx = Object.fromEntries((a.quiz || []).map((q, i) => [q.id, i + 1]));

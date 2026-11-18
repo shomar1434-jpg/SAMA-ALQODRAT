@@ -555,6 +555,8 @@ export const LocalStore = {
     this.audit('attendance.manual', subscription_id, {date, before, after:status}); this.save(); },
   async requestCustomPlan(f){ (this.data.custom_requests=this.data.custom_requests||[]).push({id:uid(), name:String(f.name||'').trim().slice(0,80), phone:String(f.phone||''), program:f.program, section:f.section, mode:f.mode, notes:String(f.notes||'').slice(0,600), status:'new', created_at:new Date().toISOString()}); this.save(); return {ok:true}; },
   async setCustomRequestStatus(id, status){ const r=(this.data.custom_requests||[]).find(x=>x.id===id); if(r){ r.status=status; this.audit('custom_request.status', id, {status}); this.save(); } },
+  /* صور البنك (الخطوة BO): محليًا بلا توقيع؛ المسار يُلحق بقاعدة الصور كما هو */
+  async signBankAssets(paths){ const b=String(this.data.settings?.bank_assets||'').replace(/\/+$/,''); const out={}; (paths||[]).forEach(p=>{ if(p) out[p]=b?b+'/'+String(p).replace(/^\/+/,''):''; }); return out; },
   /* تنبيه الغياب (الخطوة BM) ↔ admin_absence_alert */
   async absenceAlertAct(subId, level, action){ const D=this.data; if(!['sent','dismissed'].includes(action)) throw new Error('إجراء غير معروف'); level=+level;
     if(!Number.isInteger(level)||level<1||level>1000) throw new Error('عدد الغياب غير صالح'); if(!(D.subscriptions||[]).some(s=>s.id===subId)) throw new Error('الاشتراك غير موجود');
@@ -1148,6 +1150,10 @@ export const CloudStore = {
   async requestCustomPlan(f){ return this._e(await this.sb.rpc('request_custom_plan',{p:f})); },
   async setCustomRequestStatus(id, status){ this._e(await this.sb.from('custom_requests').update({status}).eq('id',id)); },
   async absenceAlertAct(subId, level, action){ this._e(await this.sb.rpc('admin_absence_alert',{p_sub:subId, p_level:+level, p_action:action})); return {ok:true}; },
+  /* روابط موقّعة لصور البنك الخاصة (الخطوة BO): يصدرها التخزين وفق سياسة bank_signed_read ↔ bank_object_ok */
+  async signBankAssets(paths){ const list=[...new Set((paths||[]).filter(Boolean))].slice(0,100); if(!list.length) return {};
+    const {data,error}=await this.sb.storage.from('bank').createSignedUrls(list, 21600); if(error) throw error;
+    const out={}; (data||[]).forEach(x=>{ if(x && x.signedUrl && !x.error) out[x.path]=x.signedUrl; }); return out; },
   /* ---- البوابات: Supabase Auth برقم الجوال ورمز SMS، والصلاحية من portal_roles() على الخادم ---- */
   _e164(phone){ return '+966' + normPhone(phone).slice(1); },
   async requestOtp(ident, role){ let {data:{session}}=await this.sb.auth.getSession(); if(!session){ const r=await this.sb.auth.signInAnonymously(); if(r.error) throw new Error('تعذّر بدء الجلسة. حاول بعد قليل.'); session=r.data.session; }

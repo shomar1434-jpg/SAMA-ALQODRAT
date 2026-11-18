@@ -8,7 +8,7 @@ import { $, $$, esc, fmtNum, uid } from './utils.js';
 import { ic, toast, ringSvg, emptyBox } from './views2_head.js';
 import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
-import { assetUrl } from './learning_logic.js';
+import { bankAttr } from './bank_media.js';
 import { readyOf, pct, UNCAT } from './sim_logic.js';
 import { PL_KINDS, PL_TIER_TXT, plCount, plWaText } from './placement_logic.js';
 import { waLink } from './landing.js';
@@ -53,9 +53,8 @@ function runner(run){
   document.body.appendChild(root); document.body.classList.add('sim-on');
   const persist = () => saveRun({ ...run, answers:ans, i });
   const answered = () => qs.filter(q => ans[q.id] != null).length;
-  const img = p => p ? assetUrl(p, run.assets) : '';
-  const stem = q => `${q.page_image ? `<details class="sim-pg" open><summary>${ic('book')} نص القطعة</summary><img src="${esc(img(q.page_image))}" alt="صفحة القطعة" loading="lazy"></details>` : ''}
-    ${q.image ? `<span class="qimg"><img src="${esc(img(q.image))}" alt="نص السؤال ${esc(q.code)}" loading="lazy"></span>` : ''}${q.text ? `<p class="sim-text">${esc(q.text)}</p>` : ''}`;
+  const stem = q => `${q.page_image ? `<details class="sim-pg" open><summary>${ic('book')} نص القطعة</summary><img ${bankAttr(q.page_image, run.assets)} alt="صفحة القطعة" loading="lazy"></details>` : ''}
+    ${q.image ? `<span class="qimg"><img ${bankAttr(q.image, run.assets)} alt="نص السؤال ${esc(q.code)}" loading="lazy"></span>` : ''}${q.text ? `<p class="sim-text">${esc(q.text)}</p>` : ''}`;
   const paint = () => { const q = qs[i];
     root.innerHTML = `<header class="sim-h"><div class="sim-h-a"><b>اختبار تحديد المستوى</b><span class="pill info">${esc(q.subject)}</span></div>
         <div class="sim-h-b"><span class="sim-t" role="timer" aria-live="off">${ic('timer')} <b id="plT" class="num">—</b></span><span class="hint num">${fmtNum(answered())}/${fmtNum(N)}</span></div></header>
