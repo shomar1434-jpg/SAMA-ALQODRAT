@@ -1,4 +1,5 @@
 import { startLiveRefresh } from './live_refresh.js';
+import { initBankMedia } from './bank_media.js';
 import { mountAssistant } from './assistant_chat.js';
 /* =====================================================================
    البوابات: المتدرب، والمدرب، وولي الأمر. لكل بوابة صفحة مستقلة ودور محدد،
@@ -47,7 +48,7 @@ export function bootPortal(role){
   render();
   startLiveRefresh(Store, render, { minGap: 5000 });
   mountAssistant(Store);
-  initPwa();
+  initPwa(); initBankMedia();
   mountGuide(role);
 }
 
