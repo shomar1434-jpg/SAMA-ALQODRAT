@@ -5,6 +5,7 @@ import { PAGE, adminBase, publicBase, portalBase } from './config.js';
 import { STATE_TXT, Store, activeCohortOf, cohortArchived, cohortState, isSessionDay, priceTxt, progCode, takenOf } from './data2.js';
 import { liveSay, setBusy, showErrorSummary, toLatin, wireFormA11y } from './features.js';
 import { siteFooter, viewHome } from './landing.js';
+import { viewPlacement } from './placement_views.js';
 import { closePrint } from './print.js';
 import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
 import { viewAdmin } from './views2_admin.js';
@@ -50,7 +51,7 @@ export function cohortPublicState(c, today=riyadhNow().date){
 /* =====================================================================
    التوجيه
    ===================================================================== */
-export const ROUTES = ['admin-assistant','admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','manar-guide','checkin','portals','policies','display','admin','admin-attendance','admin-studio','admin-archive','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
+export const ROUTES = ['placement','admin-assistant','admin-join','admin-audit','admin-admins','home','register','enroll','contact','me','manar-guide','checkin','portals','policies','display','admin','admin-attendance','admin-studio','admin-archive','admin-cohorts','admin-followup','admin-rules','admin-qudurat','admin-users','admin-bank','admin-orders','admin-invoices','admin-data','admin-access','admin-daily','admin-policies','admin-notify','admin-trainees','admin-programs','admin-reports','admin-partners','admin-settings'];
 export let charts = [], timers = [];
 export function cleanup(){ charts.forEach(c=>c.destroy()); charts=[]; timers.forEach(clearInterval); timers=[]; }
 /* حالة قاعدة البيانات: أيقونة خضراء متصلة، حمراء غير متصلة (لا شبكة)، ذهبية للبيانات التجريبية */
@@ -93,6 +94,7 @@ async function renderRoute(){
   if(h.startsWith('plan-')) return viewPlanPage(h.slice(5));
   if(h==='enroll' || h.startsWith('enroll-')) return viewEnroll(h.slice(7));
   if(h==='contact') return viewContact();
+  if(h==='placement') return viewPlacement();   // الخطوة BH: اختبار تحديد المستوى
   if(h.startsWith('policy-')) return viewPolicy(h.slice(7));
   if(/^p[a-z0-9]+$/i.test(h) && !ROUTES.includes(h)) return viewProgramPage(h);
   if(h.startsWith('qr-')){ if(!(await Store.isAdmin())) return viewLogin(); return h==='qr-checkin' ? viewQRCheckin() : viewQR(h.slice(3)); }

@@ -1530,3 +1530,11 @@ body.sim-on{overflow:hidden}
 @media (max-width:600px){.as-fab{width:56px;height:56px}.as-panel{position:fixed;right:12px;left:12px;bottom:calc(88px + env(safe-area-inset-bottom));width:auto;max-width:none}}
 @media (prefers-reduced-motion:reduce){.as-fab,.as-ico,.as-dot,.as-pop,.as-rays{animation:none!important;transition:none}}
 @media print{.sama-assistant{display:none}}
+/* اختبار تحديد المستوى (الخطوة BH) */
+.pl-facts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pl-facts li{display:flex;gap:8px;align-items:flex-start;color:var(--ink-muted)}
+.pl-facts svg{flex:0 0 18px;width:18px;height:18px;color:var(--brand);margin-top:3px}
+.pl-kind{border-top:3px solid var(--brand)}
+.pl-pick{border:1px solid var(--border)}
+.pl-pick.best{border-color:var(--brand);background:var(--brand-tint)}
+.pl-pick .btn{margin-top:4px}
