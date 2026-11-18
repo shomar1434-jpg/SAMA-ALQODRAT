@@ -16,7 +16,7 @@ begin
   assert ok, 'مستهدف خارج النطاق يُرفض';
   perform teacher_save_assignment(jsonb_build_object('kind','quiz','type','practice','reveal','after_due','subject','كمي','title','تدريب مستهدف','publish_date',d,'due_date',d + 2,'question_ids',ids,'targets',jsonb_build_array(s1),'target_label','متدرب واحد'));
   select * into a from assignments where title = 'تدريب مستهدف';
-  assert a.type = 'practice' and a.reveal = 'after_due' and a.targets = array[s1] and a.target_label = 'متدرب واحد', 'الواجب بنوعه وسياسته وقائمته الثابتة';
+  assert a.type = 'practice' and a.reveal = 'after_submit' and a.targets = array[s1] and a.target_label = 'متدرب واحد', 'الواجب بنوعه وسياسته وقائمته الثابتة';
   -- المستهدَف يراه دون معرّفات غيره، وغير المستهدَف لا يراه ولا يسلّم
   perform set_config('app.phone', p1, true); pd := portal_data('student');
   select y into x from jsonb_array_elements(pd->'assignments') y where y->>'id' = a.id::text;
@@ -32,7 +32,7 @@ begin
   r := student_submit(jsonb_build_object('trainee_id', s1, 'assignment_id', a.id, 'answers', q));
   pd := portal_data('student');
   select y into x from jsonb_array_elements(pd->'submissions') y where y->>'assignment_id' = a.id::text;
-  assert x->>'status' = 'graded' and not (x ? 'review') and (x->>'review_hidden')::boolean, 'المراجعة محجوبة قبل موعد الاستحقاق';
+  assert x->>'status' = 'graded' and x ? 'review', 'قرار المالك 18 نوفمبر: الإجابة الصحيحة تظهر في المراجعة بعد التسليم مباشرة';
   update assignments set publish_date = d - 5, due_date = d - 1 where id = a.id;
   pd := portal_data('student');
   select y into x from jsonb_array_elements(pd->'submissions') y where y->>'assignment_id' = a.id::text;

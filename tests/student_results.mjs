@@ -53,7 +53,7 @@ await p.click('[data-goto="tq1"]'); await p.waitForTimeout(300);
 ok(await p.evaluate(() => document.querySelector('[data-rev="tq1"]').open) && /الصحيح/.test(await text('[data-rev="tq1"]')), 'مراجعة الإجابات مع الصحيح حين يسمح الاختبار');
 await p.click('[data-rev="tq2"] summary'); await p.waitForTimeout(200);
 const r2 = await text('[data-rev="tq2"]');
-ok(/إجابتك/.test(r2) && !/الصحيح:/.test(r2) && /لم يُتح الإجابات الصحيحة/.test(r2), 'المفتاح المخفي: إجاباتي فقط');
+ok(/إجابتك/.test(r2) && /الصحيح:/.test(r2), 'قرار المالك: الإجابة الصحيحة تظهر مع إجابتي دائمًا للمراجعة');
 
 // الحل ثم نافذة النتيجة
 await p.click('[data-qs="tq3"]'); await p.click('#qsGo'); await p.waitForSelector('[data-qz="tq3"]');

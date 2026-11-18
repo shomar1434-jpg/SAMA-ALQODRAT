@@ -38,7 +38,8 @@ export const isTargeted = (a, trainee_id) => !Array.isArray(a.targets) || a.targ
 export const MAX_ATTEMPTS = 3;
 export const attemptsOf = a => Math.min(MAX_ATTEMPTS, Math.max(1, +a?.max_attempts || 1));
 export const attemptsLeft = (a, s) => a?.kind === 'quiz' && s?.status === 'graded' ? Math.max(0, attemptsOf(a) - (s.attempt_no || 1)) : 0;
-export const canReveal = (a, today) => (a.reveal || 'after_submit') === 'after_submit' || (a.reveal === 'after_due' && today > a.due_date);
+/* قرار المالك 18 نوفمبر: الإجابة الصحيحة تظهر للمتدرب مع إجابته بعد التسليم دائمًا للمراجعة (وبعد آخر محاولة إن تعددت المحاولات) */
+export const canReveal = () => true;
 /* نسخة الواجب للمتدرب: بلا مفاتيح وبلا معرّفات زملائه في قائمة المستهدفين */
 export const assignmentPublic = (a, ids, started) => { let x = quizPublic(a); if(Array.isArray(x.targets)) x = { ...x, targets:x.targets.filter(t => (ids || []).includes(t)) };
   return x.kind === 'quiz' && !started ? { ...x, quiz:null, quiz_count:(a.quiz || []).length, quiz_minutes:quizMinutes(a) } : x.kind === 'quiz' ? { ...x, quiz_count:(a.quiz || []).length, quiz_minutes:quizMinutes(a) } : x; };
