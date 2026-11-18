@@ -4,7 +4,7 @@
    dataIssues: يفحص قاعدة المتدربين ويستخرج ما ينقص أو يحتاج مراجعة ليكمله مدير النظام.
    مطابق لـ admin_import_legacy في supabase/migrations/…_legacy_import.sql.
    ===================================================================== */
-import { validSaudiId } from './utils.js';
+import { validSaudiId, nameCmp } from './utils.js';
 import { subEnd, planTotal } from './qudurat.js';
 import { isKidsProgram } from './identity_logic.js';
 
@@ -110,7 +110,7 @@ export function dataIssues(D){
     (t.import_notes || []).forEach((n, i) => { if(!n.done) I.push({ text:n.text, field:null, note:i, upgrade:UPGRADE_RX.test(n.text) || undefined }); });
     if(I.length) out.push({ trainee:t, issues:I });
   }
-  return out.sort((a, b) => b.issues.length - a.issues.length || a.trainee.full_name.localeCompare(b.trainee.full_name, 'ar'));
+  return out.sort((a, b) => nameCmp(a.trainee.full_name, b.trainee.full_name));
 }
 /* ملاحظات الاستيراد التي تبقى مع المتدرب (ما لا يُكتشف من البيانات نفسها) */
 export const keepNote = n => !/غير مسجّل|غير ثلاثي|جوال ولي الأمر هو|لا دفعات|أكثر من الرسوم|دون سبب مكتوب|لا يجتاز|انتهت مدة/.test(n);

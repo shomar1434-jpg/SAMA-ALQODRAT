@@ -2,7 +2,7 @@
    واجهات بوابة المدرب: ملخص عمل اليوم، المجموعات الذكية وتجهيز الواجب العلاجي، وملف المدرب؛
    وبطاقة «مدربو مقرراتي» في بوابة المتدرب (النبذة ورابط قناة المدرب لمتدربيه فقط).
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort, riyadhNow, t12 } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, riyadhNow, t12, nameCmp } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { modal, closeModal } from './views2_programs.js';
 import { docShell, printDocs, fmtGreg, fmtHijri } from './print.js';
@@ -123,7 +123,7 @@ export function teacherPeople(D, reload, go){
 
 /* ---------- طباعة كشف الحضور والغياب اليومي للمدرب (A4): الغائبون ومن لم يسجل أولًا ---------- */
 export function daySheetDoc(dash, n){
-  const ORD = { 'غائب':0, 'لم يسجل بعد':1, 'متأخر':2, 'حاضر':3 }, rows = dash.rows.slice().sort((a, b) => (ORD[a.today] ?? 4) - (ORD[b.today] ?? 4) || a.name.localeCompare(b.name, 'ar'));
+  const rows = dash.rows.slice().sort((a, b) => nameCmp(a.name, b.name));
   const c = k => rows.filter(r => r.today === k).length;
   return docShell({ docNo:`DAY-${n.date.replace(/-/g, '')}`, title:'كشف الحضور والغياب اليومي', sub:`${fmtGreg(n.date)} · ${fmtHijri(n.date)}`,
     info:[['المدرب', dash.teacher.name, 'wide'], ['القسم', dash.teacher.section], ['المقررات', dash.teacher.subjects.join('، ')], ['وقت الجلسة', dash.session ? `${t12(dash.session.start)} – ${t12(dash.session.end)}` : 'لا جلسة اليوم']],

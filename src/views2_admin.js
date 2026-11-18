@@ -11,7 +11,7 @@ import { PROFILE_FIELDS, STATE_PILL, STATE_TXT, Store, activeCohortOf, cohortArc
 import { bindCertSection, certSectionHtml, followupRows, pageFollowup, pageRules, setBusy } from './features.js';
 import { pagePartners } from './partners.js';
 import { exportCSV, pageReports, printDayModal, printSheets, traineesRows } from './print.js';
-import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin, matchQ, matchPerson, scopeSelect } from './utils.js';
+import { $, $$, DAYS, EDU, addDays, dowOf, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, toMin, matchQ, matchPerson, scopeSelect, nameCmp } from './utils.js';
 import { countUp, emptyBox, ic, reduceMotion, quiet, ringSvg, skeleton, statusPill, toast } from './views2_head.js';
 import { catSort, charts, cleanup, cohortLabel, copyText, daysList, daysTxt, hoursTxt, kpiCard, makeQR, programUrl, route, short, titleBar } from './views2_main.js';
 import { closeModal, confirmBox, modal, pagePrograms, swRow } from './views2_programs.js';
@@ -27,6 +27,8 @@ import { pageOrders, openOrdersCount } from './order_views.js';
 import { pageInvoices } from './invoice_views.js';
 import { pageData } from './import_views.js';
 import { pageAccess } from './access_views.js';
+import { absenceBanner } from './absence_alerts.js';
+import { bindAbsenceAlerts } from './absence_alert_views.js';
 import { requestsHtml, bindRequests } from './request_views.js';
 import { PUB_STATES, PUB_TONE, pubState } from './courses.js';
 import { pageStudio } from './studio_views.js';
@@ -96,6 +98,7 @@ export function pageDashboard(){
       <span class="lbl">${ic('grid')}المجال</span><select class="inp" id="fCat"><option value="all">كل المجالات</option>${allCats().map(c=>`<option ${flt.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <span class="lbl">${ic('book')}البرنامج</span><select class="inp" id="fProg" style="max-width:260px"><option value="all">جميع البرامج</option>${allCats().map(c=>{ const ps=programs.filter(p=>p.category===c&&(flt.cat==='all'||flt.cat===c)); return ps.length?`<optgroup label="${esc(c)}">${ps.map(p=>`<option value="${p.id}" ${flt.prog===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select>
       <span style="flex:1"></span><div class="seg" style="margin:0">${[7,30,90].map(d=>`<button data-q="${d}">آخر ${fmtNum(d)} يومًا</button>`).join('')}</div></div>
+    ${absenceBanner(AD)}
     <h2 class="sec-title rv" style="--i:1;margin-top:6px">${ic('award')}باقات القدرات والتحصيلي <span class="hint" style="font-size:13px;font-weight:400">البنون والبنات · حسب الفترة المختارة</span></h2>
     <div class="grid g2" id="qSec" style="margin-bottom:14px"></div>
     <div class="charts" style="margin-bottom:18px">
@@ -121,7 +124,7 @@ export function pageDashboard(){
   $('#fCat').onchange=e=>{ flt.cat=e.target.value; flt.prog='all'; cleanup(); pageDashboard(); };
   $$('[data-q]').forEach(b=>b.onclick=()=>{ $('#fTo').value=riyadhNow().date; $('#fFrom').value=addDays(riyadhNow().date,-(+b.dataset.q-1)); apply(); });
   $('#rf').onclick=()=>route();
-  drawDashboard();
+  drawDashboard(); bindAbsenceAlerts(()=>pageDashboard());
 }
 /* باقات القدرات والتحصيلي في لوحة التحليلات: بطاقة لكل قسم، ورسم الحضور اليومي، ونسبة كل باقة */
 function drawQudurat(from, to){
@@ -241,7 +244,7 @@ export function pageAttendance(){
   const match=t=>matchQ(attQ,t.full_name,t.national_id,t.phone);
   $('#sessList').innerHTML += sess.map((c,si)=>{
     const roster=rosterOf(c), present=dayAtt.filter(a=>a.cohort_id===c.id), pct=roster.length?Math.round(present.length/roster.length*100):0;
-    const rows=roster.map(e=>({e,t:trainees.find(x=>x.id===e.trainee_id),a:present.find(x=>x.enrollment_id===e.id)})).filter(x=>x.t&&match(x.t)).sort((x,y)=>(x.a?0:1)-(y.a?0:1)||(x.a&&y.a?x.a.time.localeCompare(y.a.time):0));
+    const rows=roster.map(e=>({e,t:trainees.find(x=>x.id===e.trainee_id),a:present.find(x=>x.enrollment_id===e.id)})).filter(x=>x.t&&match(x.t)).sort((x,y)=>nameCmp(x.t.full_name,y.t.full_name));
     return `<div class="card prog-sec rv" style="--i:${si+4}"><div class="hd">${ringSvg(pct,58,6,pct>=85?'success':pct>=70?'brand':'warning')}
       <div style="flex:1;min-width:200px"><h3>${esc(progName(c.program_id))} · ${cohortLabel(c)}</h3><div class="hint" style="display:flex;gap:12px;flex-wrap:wrap"><span>${ic('clock')} ${t12(c.start_time)} – ${t12(c.end_time)}</span>${c.hall?`<span>${ic('pin')} ${esc(c.hall)}</span>`:''}<span class="pill dot ${STATE_PILL[cohortState(c)]}">${STATE_TXT[cohortState(c)]}</span></div></div>
       <span class="pill dot ok">${fmtNum(present.length)} حاضر</span><span class="pill dot bad">${fmtNum(roster.length-present.length)} غائب</span>${future?'':`<button class="btn sm" data-pr="${c.id}">${ic('form')} طباعة</button>`}<button class="btn sm" data-cv="${c.id}">${ic('users')} كشف الدفعة</button></div>
@@ -449,7 +452,7 @@ export function pageTrainees(){
   const m=$('#main'); queueMicrotask(bindChangeReq); queueMicrotask(bindTestAccounts); const {programs,trainees,enrollments,attendance}=AD;
   const ensOf = t => enrollments.filter(e=>e.trainee_id===t.id);
   const list = trainees.filter(t=>matchPerson(trSc,trQ,t,...ensOf(t).map(e=>e.ref)) && (trP==='all'||ensOf(t).some(e=>e.program_id===trP)))
-    .sort((a,b)=>(ensOf(b).map(e=>e.created_at).sort().pop()||'').localeCompare(ensOf(a).map(e=>e.created_at).sort().pop()||''));
+    .sort((a,b)=>nameCmp(a.full_name,b.full_name));
   m.innerHTML = titleBar(`${ic('id')}المتدربون`, `سجل المتدربين، <em>${fmtNum(list.length)} متدرب</em>`, 'كل متدرب بسجله المدني مرة واحدة، مع كل الدفعات التي سجّل فيها ونسبة حضوره في كل منها.', `<button class="btn sm" id="csvx">${ic('database')} تصدير Excel</button><button class="btn sm" id="csv">${ic('copy')} نسخ كجدول</button>`)+
    `${changeReqHtml()}${testAccountsHtml()}<div class="filters rv" style="--i:1"><span class="lbl">${ic('search')}</span><input class="inp" id="tq" placeholder="أي جزء من الاسم، السجل المدني، الجوال، رقم الطلب" value="${esc(trQ)}" style="min-width:260px;flex:1">${scopeSelect('tsc',trSc)}
      <select class="inp" id="tp" style="max-width:280px"><option value="all">كل البرامج</option>${allCats().map(c=>{ const ps=programs.filter(p=>p.category===c&&enrollments.some(e=>e.program_id===p.id)); return ps.length?`<optgroup label="${esc(c)}">${ps.map(p=>`<option value="${p.id}" ${trP===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select></div>

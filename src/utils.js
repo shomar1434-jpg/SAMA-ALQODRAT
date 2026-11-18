@@ -55,5 +55,8 @@ export function matchPerson(scope, q, t, ...extra){
   if(scope === 'phone') { const ph = digits(t?.phone), g = digits(t?.guardian_phone), d = dq.replace(/^(966|0)/, ''); return [ph, g].some(x => x && x.replace(/^(966|0)/, '').includes(d)); }
   return matchQ(q, t?.full_name);
 }
+/* ترتيب الأسماء هجائيًا عربيًا (أ ب ت ث…؛ قرار المالك 18 نوفمبر) للبنين والبنات في كل القوائم؛ الهمزات وال المسافات لا تغيّر الترتيب */
+let _arColl = null;
+export const nameCmp = (a, b) => { _arColl = _arColl || new Intl.Collator('ar', { sensitivity:'base', ignorePunctuation:true, numeric:true }); return _arColl.compare(String(a ?? '').trim(), String(b ?? '').trim()); };
 export const matchQ = (q, ...fields) => { const toks = normAr(q).split(' ').filter(Boolean); if(!toks.length) return true;
   const hay = normAr(fields.filter(x => x != null && x !== '').join(' ')); return toks.every(t => hay.includes(t)); };
