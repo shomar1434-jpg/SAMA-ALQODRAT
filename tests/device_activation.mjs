@@ -38,7 +38,10 @@ const L = await data(s1);
 ok(!JSON.stringify(L.login_requests || []).includes(shown), 'الرمز محفوظ مجزّأً لا نصًّا');
 await s1.fill('#pl-code', '000000'); await s1.click('#plB'); await s1.waitForTimeout(500);
 ok(/غير صحيح أو منتهٍ/.test(await text('#plE', s1)), 'رمز خاطئ يُرفض');
-await s1.fill('#pl-code', shown); await s1.click('#plB'); await s1.waitForSelector('#sBody');
+await s1.fill('#pl-code', shown); await s1.click('#plB');
+await s1.waitForSelector('#ps-new');   // الخطوة BJ: بعد أول دخول برمز التفعيل تُعيَّن كلمة المرور
+ok(true, 'أول دخول برمز التفعيل يطلب تعيين كلمة المرور');
+await s1.fill('#ps-new', 'Sama2026x'); await s1.fill('#ps-conf', 'Sama2026x'); await s1.click('#psGo'); await s1.waitForSelector('#sBody');
 const S = await data(s1);
 ok(S.devices.some(d => d.phone === st.phone && !d.revoked_at && d.label === '') && S.act_windows.find(w => w.phone === st.phone && !w.revoked).used_at, 'الدخول يعتمد الجهاز ويُغلق التفعيل، ولا يُحفظ نوع الجهاز');
 const s2 = await ctxS.newPage(); await s2.goto(U + 'student/'); await s2.waitForTimeout(1200);

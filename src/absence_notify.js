@@ -26,7 +26,7 @@ export function absentees(D, kind, key, date){
   if(kind === 'pkg'){
     const ses = sessionOn(D, key, date), att = (D.sub_attendance || []).filter(a => a.att_date === date);
     what = `جلسة القدرات والتحصيلي (قسم ${SECTIONS[key]})`; time = ses ? `${t12(ses.start)} – ${t12(ses.end)}` : '';
-    rows = (D.subscriptions || []).filter(s => s.section === key && ['active', 'pending'].includes(subStatus(s, date)) && (s.created_at || '').slice(0, 10) <= date && !att.some(a => a.subscription_id === s.id))
+    rows = (D.subscriptions || []).filter(s => s.section === key && subStatus(s, date) === 'active' && (s.created_at || '').slice(0, 10) <= date && !att.some(a => a.subscription_id === s.id))
       .map(s => ({ id:s.id, t:D.trainees.find(x => x.id === s.trainee_id), note:subStatus(s, date) === 'pending' ? 'لم يبدأ اشتراكه بعد' : '' }));
   } else {
     const c = D.cohorts.find(x => x.id === key), p = c && D.programs.find(x => x.id === c.program_id);

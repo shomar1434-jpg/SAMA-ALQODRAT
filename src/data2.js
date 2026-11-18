@@ -14,7 +14,7 @@ import { checkLecture, lecturesForTrainees, ytId, checkSlot, slotLectures, assig
 import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
 import { archiveList, dueForPurge, purgeTraineeData, confirmNameOk, ARCHIVE_DAYS } from './archive_logic.js';
-import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256, LINK_TTL_MIN, LINK_MAX_HOUR, DEV_LINK_FAIL, linkLive } from './device_logic.js';
+import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256, LINK_TTL_MIN, LINK_MAX_HOUR, DEV_LINK_FAIL, linkLive, pwOk, PW_RULE, PW_FAIL } from './device_logic.js';
 import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
@@ -596,7 +596,7 @@ export const LocalStore = {
     else if(code==='1234'){ ok=true; }   // الرمز التجريبي 1234 في الوضع التجريبي فقط
     if(!ok){ D.activation_attempts.push({phone:ph, ok:false, at:new Date().toISOString()}); this.save(); throw new Error(ACT_FAIL); }
     if(!rolesOfPhone(D, ph).includes(role)) throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}. راجع إدارة المعهد.`);
-    D.devices=D.devices||[]; const d={id:uid(), phone:ph, role, label:'', created_at:new Date().toISOString(), revoked_at:null}; D.devices.push(d); this.save();
+    D.devices=D.devices||[]; const d={id:uid(), phone:ph, role, label:'', created_at:new Date().toISOString(), revoked_at:null, via:lr?'window':'demo'}; D.devices.push(d); this.save();
     try{ localStorage.setItem(this.key+'_dev_'+role, JSON.stringify({phone:ph, id:d.id})); }catch(e){}
     try{ sessionStorage.setItem(this.key+'_p_'+role, ph); }catch(e){} return {ok:true};
   },
@@ -616,6 +616,23 @@ export const LocalStore = {
     const at=new Date(now).toISOString(); c.used_at=at; D.devices=D.devices||[];
     if(c.logout_others) D.devices.forEach(x=>{ if(x.phone===ph && x.role===role && !x.revoked_at) x.revoked_at=at; });
     const d={id:uid(), phone:ph, role, label:'', created_at:at, revoked_at:null}; D.devices.push(d); D.activation_attempts.push({phone:ph, ok:true, at}); this.save();
+    try{ localStorage.setItem(this.key+'_dev_'+role, JSON.stringify({phone:ph, id:d.id})); sessionStorage.setItem(this.key+'_p_'+role, ph); }catch(e){} return {ok:true}; },
+  /* كلمة مرور البوابات (↔ portal_password_status / portal_set_password / portal_password_login)؛ محليًا تجزئة SHA-256 للتجربة فقط */
+  _pwHash(ph, role, p){ return sha256('sama-pw:'+ph+':'+role+':'+p); },
+  async passwordStatus(role){ const d=this._myDev(role); if(!d) return {has:false, must_set:false}; const pw=(this.data.portal_passwords||[]).find(x=>x.phone===d.phone && x.role===role);
+    const fresh=d.via==='window' && Date.now()-Date.parse(d.created_at)<30*60000 && (!pw || d.created_at>pw.set_at);
+    return {has:!!pw, must_set: pw ? fresh : d.via!=='demo'}; },
+  async setPortalPassword(role, p, current=null){ const D=this.data, d=this._myDev(role); if(!d) throw new Error('سجّل الدخول أولًا'); if(!pwOk(p)) throw new Error(PW_RULE);
+    D.portal_passwords=D.portal_passwords||[]; const pw=D.portal_passwords.find(x=>x.phone===d.phone && x.role===role), st=await this.passwordStatus(role);
+    if(pw && !st.must_set && pw.hash!==await this._pwHash(d.phone, role, current||'')) throw new Error('كلمة المرور الحالية غير صحيحة');
+    const at=new Date().toISOString(), h=await this._pwHash(d.phone, role, p); if(pw) Object.assign(pw, {hash:h, set_at:at}); else D.portal_passwords.push({phone:d.phone, role, hash:h, set_at:at});
+    let n=0; (D.devices||[]).forEach(x=>{ if(x.phone===d.phone && x.role===role && !x.revoked_at && x.id!==d.id){ x.revoked_at=at; n++; } }); d.via='password'; this.save(); return {ok:true, revoked:n}; },
+  async passwordLogin(ident, role, p){ const D=this.data, ph=resolveIdent(D, ident, role), now=Date.now(), key=ph||String(ident||'').replace(/\D/g,'');
+    D.activation_attempts=D.activation_attempts||[];
+    if(D.activation_attempts.filter(a=>a.phone===key && !a.ok && now-Date.parse(a.at)<3600e3).length>=ACT_MAX_FAILS) throw new Error('محاولات كثيرة خاطئة. حاول بعد ساعة، أو اضغط «نسيت كلمة المرور».');
+    const pw=ph && rolesOfPhone(D, ph).includes(role) ? (D.portal_passwords||[]).find(x=>x.phone===ph && x.role===role) : null;
+    if(!pw || pw.hash!==await this._pwHash(ph, role, String(p||''))){ D.activation_attempts.push({phone:key, ok:false, at:new Date(now).toISOString()}); this.save(); throw new Error(PW_FAIL); }
+    const at=new Date(now).toISOString(), d={id:uid(), phone:ph, role, label:'', created_at:at, revoked_at:null, via:'password'}; D.devices=D.devices||[]; D.devices.push(d); D.activation_attempts.push({phone:ph, ok:true, at}); this.save();
     try{ localStorage.setItem(this.key+'_dev_'+role, JSON.stringify({phone:ph, id:d.id})); sessionStorage.setItem(this.key+'_p_'+role, ph); }catch(e){} return {ok:true}; },
   async myDevices(role){ const d=this._myDev(role); return {count:d ? (this.data.devices||[]).filter(x=>x.phone===d.phone && x.role===role && !x.revoked_at).length : 0}; },
   async logoutOthers(role){ const D=this.data, d=this._myDev(role); if(!d) throw new Error('سجّل الدخول أولًا'); const at=new Date().toISOString(); let n=0;
@@ -1136,6 +1153,11 @@ export const CloudStore = {
   async linkDevice(ident, role, code){ let {data:{session}}=await this.sb.auth.getSession(); if(!session){ const r=await this.sb.auth.signInAnonymously(); if(r.error) throw new Error('تعذّر بدء الجلسة. حاول بعد قليل.'); }
     const r=this._e(await this.sb.rpc('link_device',{p_ident:String(ident), p_role:role, p_code:String(code||'')})); if(r && r.ok===false) throw new Error(r.error||DEV_LINK_FAIL);
     const roles=this._e(await this.sb.rpc('portal_roles'))||[]; if(!roles.includes(role)) throw new Error(DEV_LINK_FAIL); return {ok:true}; },
+  async passwordStatus(role){ return this._e(await this.sb.rpc('portal_password_status',{p_role:role}))||{has:false, must_set:false}; },
+  async setPortalPassword(role, p, current=null){ return this._e(await this.sb.rpc('portal_set_password',{p_role:role, p_new:String(p||''), p_current:current==null?null:String(current)})); },
+  async passwordLogin(ident, role, p){ let {data:{session}}=await this.sb.auth.getSession(); if(!session){ const r=await this.sb.auth.signInAnonymously(); if(r.error) throw new Error('تعذّر بدء الجلسة. حاول بعد قليل.'); }
+    const r=this._e(await this.sb.rpc('portal_password_login',{p_ident:String(ident), p_role:role, p_pass:String(p||'')})); if(r && r.ok===false) throw new Error(r.error||PW_FAIL);
+    const roles=this._e(await this.sb.rpc('portal_roles'))||[]; if(!roles.includes(role)) throw new Error(PW_FAIL); return {ok:true}; },
   async myDevices(role){ return this._e(await this.sb.rpc('portal_devices',{p_role:role}))||{count:0}; },
   async logoutOthers(role){ return this._e(await this.sb.rpc('portal_logout_others',{p_role:role})); },
   async openActivation(phone, role, minutes=15){ return this._e(await this.sb.rpc('admin_open_activation',{p_phone:normPhone(phone), p_role:role, p_minutes:+minutes})); },

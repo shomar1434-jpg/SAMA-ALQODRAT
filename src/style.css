@@ -1538,3 +1538,26 @@ body.sim-on{overflow:hidden}
 .pl-pick{border:1px solid var(--border)}
 .pl-pick.best{border-color:var(--brand);background:var(--brand-tint)}
 .pl-pick .btn{margin-top:4px}
+/* كلمة مرور البوابات (الخطوة BJ) */
+.pw-wrap{display:flex;gap:6px;align-items:stretch}
+.pw-wrap .inp{flex:1;min-width:0}
+.pw-wrap .pw-eye{flex:0 0 44px;min-height:44px;padding:0;display:grid;place-items:center}
+.pw-eye[aria-pressed="true"]{background:var(--brand-tint);border-color:var(--brand)}
+.pl-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+/* تفاصيل بطاقات «لوحتي» */
+.ind-link{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;cursor:pointer;min-height:44px;border-radius:10px}
+.ind-link:hover b,.ind-link:focus-visible b{color:var(--brand-strong);text-decoration:underline}
+.ind-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.ind-link .ind-more{margin-inline-start:auto;font-size:13px;color:var(--brand-strong);display:inline-flex;align-items:center;gap:2px}
+.ind-link .ind-more svg{width:14px;height:14px}
+.det-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.det-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:0 0 12px}
+.det-stats>div{border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;display:grid;gap:2px}
+.det-stats b{font-size:20px}.det-stats span{font-size:13px;color:var(--ink-muted)}
+/* نتائجي ومراجعة الإجابات */
+.hw-res{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin:8px 0 0;background:var(--surface-card)}
+.hw-res-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}.hw-res-h b{font-size:22px}
+.tbar.sm{height:6px;margin-bottom:2px}
+.qrev{margin:8px 0 0}.qrev>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;color:var(--brand-strong);font-weight:500}
+.qrev>summary svg{width:18px;height:18px}
+.qres li.mine{border-inline-start:3px solid var(--brand)}.qres li.blank{border-inline-start:3px solid var(--border);opacity:.85}

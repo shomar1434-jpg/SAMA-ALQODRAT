@@ -37,3 +37,12 @@ export const actMessage = (name, url) => `السلام عليكم ${name}،\nف�
 /* بصمة الرمز (محليًا كما في act_hash بالخادم): SHA-256 عند توفره، وإلا بصمة بديلة للوضع التجريبي */
 export async function sha256(t){ try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
   catch(_){ let h = 2166136261; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return 'f' + (h >>> 0).toString(16); } }
+/* كلمة مرور البوابات (الخطوة BJ ↔ pw_ok / portal_set_password / portal_password_login) */
+export const PW_RULE = 'كلمة المرور 8 أحرف على الأقل، وفيها حرف ورقم';
+export const PW_FAIL = 'رقم الهوية أو كلمة المرور غير صحيحة. إن كانت أول مرة فاختر «أول دخول برمز التحقق».';
+export const pwOk = p => typeof p === 'string' && p.length >= 8 && p.length <= 72 && /[0-9]/.test(p) && /[^0-9\s]/.test(p);
+export function checkPassword(p, confirm){
+  if(!pwOk(p)) throw new Error(PW_RULE);
+  if(p !== confirm) throw new Error('كلمتا المرور غير متطابقتين');
+  return true;
+}

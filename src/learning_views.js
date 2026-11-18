@@ -18,19 +18,69 @@ const STATE_TONE = { new:'info', draft:'o', submitted:'ok', needs_revision:'warn
 const secOf = t => Object.keys(SECTIONS).find(k => k === t?.section) || t?.section;
 
 /* ======================= المتدرب ======================= */
+/* نتائجي (طلب المالك 18 نوفمبر): لكل واجب أو اختبار مصحَّح نسبته وشرحها، والمتوسطات، ومراجعة الإجابات */
+const pctOf = a => { const sb = a.submission; return sb && sb.score != null && a.max_score ? Math.round(sb.score / a.max_score * 100) : null; };
+const VERDICTS = [[90, 'ممتاز', 'ok'], [75, 'جيد جدًا', 'ok'], [60, 'جيد', 'info'], [50, 'مقبول', 'warn'], [0, 'يحتاج مراجعة', 'bad']];
+const verdictOf = p => VERDICTS.find(([m]) => p >= m);
+/* تفصيل الاختبار: الصحيحة والخاطئة والمتروكة (الصحيحة من المراجعة إن أُتيحت، وإلا من الدرجة) */
+export function quizCounts(a){
+  const sb = a.submission, total = (a.quiz || []).length || a.quiz_count || 0, ans = sb?.answers || {};
+  const answered = Object.values(ans).filter(v => v !== null && v !== undefined && v !== '').length;
+  const rv = sb?.review ? Object.fromEntries(sb.review.map(x => [x.id, x.correct])) : null;
+  const right = rv ? Object.entries(ans).filter(([k, v]) => v != null && rv[k] === v).length : Math.round((pctOf(a) ?? 0) / 100 * total);
+  const blank = Math.max(0, total - answered);
+  return { total, right, blank, wrong:Math.max(0, total - right - blank) };
+}
+function resultLine(a){
+  const p = pctOf(a); if(p == null) return '';
+  const [, label, tone] = verdictOf(p), q = a.kind === 'quiz' ? quizCounts(a) : null;
+  return `<div class="hw-res" data-hwres="${a.id}"><div class="hw-res-h"><b class="num">${fmtNum(p)}٪</b><span class="pill ${tone}">${label}</span><span class="hint">الدرجة ${fmtNum(a.submission.score)} من ${fmtNum(a.max_score)}</span></div>
+    <div class="tbar" role="img" aria-label="النسبة ${fmtNum(p)}٪"><i style="width:${p}%"></i></div>
+    <p class="hint" style="margin:6px 0 0">${q ? `أجبت إجابة صحيحة عن ${fmtNum(q.right)} من ${fmtNum(q.total)} سؤالًا${q.wrong ? `، وأخطأت في ${fmtNum(q.wrong)}` : ''}${q.blank ? `، وتركت ${fmtNum(q.blank)} دون إجابة` : ''}. النسبة = الصحيحة ÷ عدد الأسئلة.` : 'النسبة = درجتك ÷ الدرجة الكاملة التي وضعها المدرب.'}${p < 60 ? ' راجع إجاباتك وملاحظات المدرب، وتدرّب على المهارات الأضعف من «قياس مستواي».' : ''}</p></div>`;
+}
+function resultsHtml(list){
+  const done = list.filter(a => pctOf(a) != null);
+  if(!done.length) return '';
+  const avg = xs => xs.length ? Math.round(xs.reduce((s, a) => s + pctOf(a), 0) / xs.length) : null;
+  const groups = [['all', 'كل المصحَّح', done], ...Object.entries(HW_TYPES).map(([k, t]) => [k, t, done.filter(a => (a.type || 'homework') === k)])].filter(g => g[2].length);
+  return `<section class="card pad rv" style="margin-bottom:14px" data-results><h3 class="ctitle">${ic('chart')}نتائجي في الواجبات والاختبارات</h3>
+    <div class="det-stats">${groups.map(([, t, xs]) => `<div><b class="num">${fmtNum(avg(xs))}٪</b><span>متوسط ${t} (${fmtNum(xs.length)})</span></div>`).join('')}</div>
+    <div class="tblwrap"><table class="tb"><thead><tr><th>العنوان</th><th>النوع</th><th>المقرر</th><th>الدرجة</th><th>النسبة</th><th>التقدير</th></tr></thead><tbody>
+      ${done.map(a => { const p = pctOf(a), [, label, tone] = verdictOf(p); return `<tr><td><button type="button" class="linkbtn" data-goto="${a.id}">${esc(a.title)}</button></td><td>${HW_TYPES[a.type || 'homework'] || 'واجب'}</td><td>${esc(a.subject)}</td><td class="num">${fmtNum(a.submission.score)} / ${fmtNum(a.max_score)}</td>
+        <td><div class="tbar sm" style="min-width:70px"><i style="width:${p}%"></i></div><span class="num">${fmtNum(p)}٪</span></td><td><span class="pill ${tone}">${label}</span></td></tr>`; }).join('')}</tbody></table></div>
+    <p class="hint" style="margin:8px 0 0">النسبة لكل واجب = درجتك ÷ الدرجة الكاملة، والتقدير: ممتاز 90٪ فأكثر، جيد جدًا 75٪، جيد 60٪، مقبول 50٪. اضغط العنوان لمراجعة إجاباتك.</p></section>`;
+}
+/* نافذة النتيجة بعد التسليم */
+export function quizResultModal(a, onReview){
+  modal(`<h3>${ic('check')} نتيجتك في «${esc(a.title)}»</h3>${resultLine(a)}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" id="qrX">إغلاق</button><button class="btn pri" id="qrRev">${ic('eye')} مراجعة إجاباتي</button></div>`);
+  $('#qrX').onclick = closeModal; $('#qrRev').onclick = () => { closeModal(); onReview?.(); };
+}
+/* مراجعة الإجابات: إجابتي دائمًا، والصحيحة والتفسير متى سمحت سياسة الاختبار */
+function reviewHtml(a){
+  const sb = a.submission; if(!sb || !a.quiz) return '';
+  const rv = sb.review ? Object.fromEntries(sb.review.map(x => [x.id, x])) : null;
+  const note = rv ? '' : `<p class="hint">${attemptsLeft(a, sb) ? 'تظهر الإجابات الصحيحة بعد آخر محاولة.' : a.reveal === 'after_due' ? `تظهر الإجابات الصحيحة بعد ${fmtShort(a.due_date)}.` : 'المدرب لم يُتح الإجابات الصحيحة لهذا الاختبار؛ تظهر هنا إجاباتك فقط.'}</p>`;
+  return `<details class="qrev" data-rev="${a.id}"><summary>${ic('eye')} مراجعة إجاباتي</summary>${note}<ol class="qres">${a.quiz.map(q => { const mine = sb.answers?.[q.id], c = rv?.[q.id]?.correct;
+    const cls = !rv ? (mine == null ? 'blank' : 'mine') : mine === c ? 'ok' : 'bad';
+    return `<li class="${cls}">${qStem(q)}${q.image ? '' : ''}<p>${mine == null ? '<b>لم تُجب</b>' : `<b>إجابتك:</b> ${esc(q.options[mine] ?? '')}`}${rv ? ` · <b>الصحيح:</b> ${esc(q.options[c] ?? '')}` : ''}</p>${rv?.[q.id]?.explanation ? `<p class="hint">${esc(rv[q.id].explanation)}</p>` : ''}</li>`; }).join('')}</ol></details>`;
+}
 export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
   const list = assignmentsFor(D, tr.id), counts = {};
   list.forEach(a => counts[a.state] = (counts[a.state] || 0) + 1);
-  return { html:`<div class="card pad rv"><div class="hw-counts">${Object.keys(STATE_TXT).map(k => `<span class="pill ${STATE_TONE[k]}">${STATE_TXT[k]}: ${fmtNum(counts[k] || 0)}</span>`).join('')}</div>
-    ${list.length ? `<div class="hw-list">${list.map(a => `<article class="hw"><div class="hw-h"><b>${esc(a.title)}${a.type && a.type !== 'homework' ? ` <span class="pill ${a.type === 'exam' ? 'warn' : 'g'}">${HW_TYPES[a.type]}</span>` : ''}</b><span class="pill dot ${STATE_TONE[a.state]}">${STATE_TXT[a.state]}</span></div>
+  return { html:`${resultsHtml(list)}<div class="card pad rv"><div class="hw-counts">${Object.keys(STATE_TXT).map(k => `<span class="pill ${STATE_TONE[k]}">${STATE_TXT[k]}: ${fmtNum(counts[k] || 0)}</span>`).join('')}</div>
+    ${list.length ? `<div class="hw-list">${list.map(a => `<article class="hw" id="hw-a-${a.id}"><div class="hw-h"><b>${esc(a.title)}${a.type && a.type !== 'homework' ? ` <span class="pill ${a.type === 'exam' ? 'warn' : 'g'}">${HW_TYPES[a.type]}</span>` : ''}</b><span class="pill dot ${STATE_TONE[a.state]}">${STATE_TXT[a.state]}</span></div>
       <div class="hint">${esc(a.subject)} · نُشر ${fmtShort(a.publish_date)} · يُستحق ${fmtShort(a.due_date)}${a.submission?.late ? ' · سُلّم متأخرًا' : ''}</div>
       ${a.body ? `<p>${esc(a.body)}</p>` : ''}
       ${a.kind === 'quiz' ? quizHtml(a) : ''}
-      ${a.submission?.status === 'graded' || a.submission?.status === 'needs_revision' ? `<div class="hw-fb"><b>${a.submission.score != null ? `الدرجة ${fmtNum(a.submission.score)} من ${fmtNum(a.max_score)}` : 'ملاحظات المدرب'}</b>${a.submission.feedback ? `<p>${esc(a.submission.feedback)}</p>` : ''}</div>` : ''}
+      ${a.kind !== 'quiz' && a.submission?.status === 'graded' ? resultLine(a) : ''}${a.submission?.status === 'graded' || a.submission?.status === 'needs_revision' ? `<div class="hw-fb"><b>${a.submission.score != null ? `الدرجة ${fmtNum(a.submission.score)} من ${fmtNum(a.max_score)}` : 'ملاحظات المدرب'}</b>${a.submission.feedback ? `<p>${esc(a.submission.feedback)}</p>` : ''}</div>` : ''}
       ${a.kind !== 'quiz' && a.submission?.status !== 'graded' ? `<form class="hw-f" data-hw="${a.id}"><label class="sr-only" for="hw-${a.id}">إجابتك</label><textarea class="inp" id="hw-${a.id}" rows="3" maxlength="6000" placeholder="اكتب إجابتك هنا" style="padding:10px 14px;line-height:1.8">${esc(a.submission?.answer || '')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn sm" data-draft>حفظ مسودة</button><button class="btn pri sm">${ic('check')} إرسال</button></div></form>` : ''}
     </article>`).join('')}</div>` : emptyBox('لا توجد واجبات منشورة لك بعد')}</div>`,
   bind(){ clearInterval(QZ_TICK);
+    const openRev = id => { const d = $(`[data-rev="${id}"]`), el = $(`#hw-a-${id}`); if(d) d.open = true; el?.scrollIntoView({ block:'start', behavior:'smooth' }); };
+    $$('[data-goto]').forEach(b => b.onclick = () => openRev(b.dataset.goto));
+    if(RESULT_FOR){ const id = RESULT_FOR; RESULT_FOR = null; const a = list.find(x => x.id === id); if(a && pctOf(a) != null) quizResultModal(a, () => openRev(id)); }
     $$('[data-qs]').forEach(b => b.onclick = () => confirmStart(async () => { try { await Store.startQuiz({ trainee_id:tr.id, assignment_id:b.dataset.qs }); } catch(x){ toast(x.message); } reload(); }));
     $$('[data-qr]').forEach(b => b.onclick = () => confirmStart(async () => { try { await Store.startQuiz({ trainee_id:tr.id, assignment_id:b.dataset.qr, retry:true }); } catch(x){ toast(x.message); } reload(); }, true));
     if($('[data-qexp]')) setTimeout(async () => { for(const el of $$('[data-qexp]')){ try { await Store.submitAssignment({ trainee_id:tr.id, assignment_id:el.dataset.qexp, answers:{} }); } catch(_){} } reload(); }, 600);
@@ -43,7 +93,7 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
       $$('input[type=radio]:checked', f).forEach(r => ans[r.dataset.q] = +r.value);
       const miss = a.quiz.length - Object.keys(ans).length, b = $('button.pri', f);
       const go = async () => { setBusy(b, true, 'جارٍ التصحيح'); try { const r = await Store.submitAssignment({ trainee_id:tr.id, assignment_id:a.id, answers:ans });
-          toast(`النتيجة ${fmtNum(r.right)} من ${fmtNum(r.total)}`); reload(); } catch(x){ setBusy(b, false); toast(x.message); } };
+          RESULT_FOR = a.id; reload(); } catch(x){ setBusy(b, false); toast(x.message); } };
       if(miss > 0 && !f.dataset.warned){ f.dataset.warned = '1'; $('.qz-w', f).textContent = `لم تُجب عن ${fmtNum(miss)} من الأسئلة. التسليم نهائي ويُصحَّح فورًا؛ اضغط مرة أخرى للتسليم.`; b.lastChild.textContent = ' تسليم رغم ذلك'; return; }
       go(); });
     $$('[data-hw]').forEach(f => { const send = async draft => { const b = draft ? $('[data-draft]', f) : $('button.pri', f); setBusy(b, true, draft ? 'جارٍ الحفظ' : 'جارٍ الإرسال');
@@ -53,7 +103,7 @@ export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
 
 /* واجب اختبار من بنك المدرب: قبل التسليم أسئلة بلا إجابات، وبعده مراجعة بالإجابة الصحيحة والتفسير */
 /* تجهيز واجب علاجي من مجموعة ذكية: يفتح نموذج الواجب بقائمة مستهدفين جاهزة، والنشر بيد المدرب */
-let HW_PRESET = null, QZ_TICK = null;
+let HW_PRESET = null, QZ_TICK = null, RESULT_FOR = null;
 function confirmStart(fn, again){ modal(`<h3>${again ? 'محاولة جديدة' : 'بدء الاختبار'}</h3><p>${again ? 'تبدأ محاولة جديدة بوقت جديد، وتُحتسب أعلى درجة بين محاولاتك. يبدأ الوقت الآن ولا يتوقف. هل أنت مستعد؟' : 'يُفتح الاختبار مرة واحدة ويبدأ الوقت الآن ولا يتوقف. هل أنت مستعد؟'}</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="qsNo">ليس الآن</button><button class="btn pri" id="qsGo">${ic('timer')} ابدأ</button></div>`);
   $('#qsNo').onclick = closeModal; $('#qsGo').onclick = async e => { setBusy(e.currentTarget, true, 'جارٍ البدء'); closeModal(); await fn(); }; }
 export const setHwPreset = p => { HW_PRESET = p; };
@@ -73,13 +123,10 @@ function quizHtml(a){ const fb = fbHtml(a, a.submission); return fb + quizCore(a
 function quizCore(a){
   const sb = a.submission, done = sb?.status === 'graded' && sb.review;
   const left = attemptsLeft(a, sb);
-  if(left) return `<div class="alert t-info" style="margin:8px 0 0"><span class="aic">${ic('check')}</span><div style="flex:1"><span>سُلّم الاختبار: ${esc(sb.feedback || '')} · درجتك ${fmtNum(sb.score ?? 0)} من ${fmtNum(a.max_score)}.</span>
+  if(left) return resultLine(a) + reviewHtml(a) + `<div class="alert t-info" style="margin:8px 0 0"><span class="aic">${ic('check')}</span><div style="flex:1"><span>سُلّم الاختبار: ${esc(sb.feedback || '')} · درجتك ${fmtNum(sb.score ?? 0)} من ${fmtNum(a.max_score)}.</span>
       <p style="margin:6px 0 8px">بقيت لك ${fmtNum(left)} ${left === 1 ? 'محاولة' : 'محاولتان'} من ${fmtNum(attemptsOf(a))}؛ تُحتسب أعلى درجة، وتظهر الإجابات الصحيحة بعد آخر محاولة.</p>
       <button type="button" class="btn sm" data-qr="${a.id}">${ic('timer')} محاولة جديدة</button></div></div>`;
-  if(sb?.status === 'graded' && !sb.review) return `<p class="alert t-info" style="margin:8px 0 0"><span class="aic">${ic('check')}</span><span>سُلّم الاختبار: ${esc(sb.feedback || '')}. ${a.reveal === 'after_due' ? `تظهر الإجابات الصحيحة بعد ${fmtShort(a.due_date)}.` : 'الإجابات الصحيحة لا تُعرض في هذا الاختبار.'}</span></p>`;
-  if(done){ const rv = Object.fromEntries((sb.review || []).map(x => [x.id, x]));
-    return `<ol class="qres">${a.quiz.map(q => { const c = rv[q.id]?.correct, mine = sb.answers?.[q.id];
-      return `<li class="${mine === c ? 'ok' : 'bad'}">${qStem(q)}<p><b>الصحيح:</b> ${esc(q.options[c] ?? '')}${mine != null && mine !== c ? ` · <b>إجابتك:</b> ${esc(q.options[mine])}` : mine == null ? ' · <b>لم تُجب</b>' : ''}</p>${rv[q.id]?.explanation ? `<p class="hint">${esc(rv[q.id].explanation)}</p>` : ''}</li>`; }).join('')}</ol>`; }
+  if(sb?.status === 'graded') return resultLine(a) + reviewHtml(a);
   if(!sb) return `<div class="qz-start" data-qsb="${a.id}"><p><b>${fmtNum(a.quiz_count || 0)} سؤالًا · المدة ${fmtNum(a.quiz_minutes || 0)} دقيقة</b> (دقيقتان لكل سؤال)</p>
       <p class="hint" style="margin:4px 0 10px">يُفتح مرة واحدة فقط: يبدأ الوقت عند الضغط ولا يتوقف إن أغلقت الصفحة، وعند انتهائه يُسلَّم ما أجبت عنه تلقائيًا ولا تُعاد المحاولة.</p>
       <button type="button" class="btn pri sm" data-qs="${a.id}">${ic('timer')} ابدأ الآن</button></div>`;
