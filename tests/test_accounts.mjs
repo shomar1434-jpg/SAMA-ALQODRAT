@@ -60,6 +60,10 @@ await p.fill('#nid', tt.national_id); await p.click('#cBtn'); await p.waitForTim
 ok(!/رقم السجل غير صحيح/.test(await p.textContent('#cErr')), 'التحضير لا يرفض هوية الحساب التجريبي بالصيغة');
 await p.reload(); await p.waitForSelector('#nid'); await p.fill('#nid', '3123456789'); await p.click('#cBtn'); await p.waitForTimeout(300);
 ok(/رقم السجل غير صحيح/.test(await p.textContent('#cErr')), 'الصيغة الخاطئة ما زالت مرفوضة');
+// الخطوة BN: رفض التحضير لا يكشف اسم صاحب الهوية (لا جلسة الآن لحساب حقيقي)
+const realT = (await data()).trainees.find(t => !t.is_test && (D.subscriptions || []).some(x => x.trainee_id === t.id));
+if (realT) { const rr = await p.evaluate(async nid => { const S = window.__SAMA__?.LocalStore; if (!S) return null; return S.checkin(nid, null, null, { device:'t' }); }, realT.national_id);
+  if (rr) ok(rr.ok || !('name' in rr), 'رفض التحضير بلا اسم المتدرب'); }
 await admin('admin-trainees'); await p.waitForSelector('#taBox'); await p.click('#taBox summary');
 
 // الإزالة: التجريبي وحده

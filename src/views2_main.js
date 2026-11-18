@@ -387,7 +387,7 @@ export function deviceId(){ try{ let d=localStorage.getItem('sama_device'); if(!
 /* عند وجود أكثر من تسجيل له جلسة الآن: يختار المتدرب برنامجه */
 export function showChoice(r, send, onBack){
   const box=$('#cRes'); $('#cf').classList.add('hidden'); box.classList.remove('hidden');
-  box.innerHTML = `<div style="text-align:center" class="rv"><h2 style="font-size:21px;font-weight:700">أهلًا ${esc(r.name.split(' ')[0])}، اختر برنامج جلستك الآن</h2>
+  box.innerHTML = `<div style="text-align:center" class="rv"><h2 style="font-size:21px;font-weight:700">${r.name ? `أهلًا ${esc(r.name.split(' ')[0])}، ` : ''}اختر برنامج جلستك الآن</h2>
     <p class="hint">لديك أكثر من تسجيل في هذا الوقت.</p></div>
     <div class="grid" style="gap:8px;margin-top:12px">${r.options.map(o=>`<button class="btn lg" data-ch="${esc(o.id)}" style="width:100%">${ic('book')} ${esc(o.label)}</button>`).join('')}</div>
     <button class="btn" style="width:100%;margin-top:12px" id="cAgain">${ic('prev')} رجوع</button>`;
