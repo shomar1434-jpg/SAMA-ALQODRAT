@@ -11,6 +11,8 @@ import { Store } from './data2.js';
 import { sectionDaysTxt } from './data2.js';
 import { TIERS, MODES, DURATION_TXT, planTotal, planName, planOpen, SECTIONS, SUB_STATUS, SUB_TONE, EXC_TXT, subStats, subStatus, sessionOn, sessionsBetween, sectionOfGender, priorSessions, subEnd } from './qudurat.js';
 import { initMarquee } from './marquee.js';
+import { absenceBanner } from './absence_alerts.js';
+import { bindAbsenceAlerts } from './absence_alert_views.js';
 import { regFormHtml, bindRegForm, titleBar, kpiCard } from './views2_main.js';
 import { siteFooter } from './landing.js';
 import { modal, closeModal, confirmBox } from './views2_programs.js';
@@ -172,10 +174,10 @@ export function pageQudurat(){
       ${kpiCard(1, 'check', 'success', 'حضور اليوم', new Set(todayAtt.map(a => a.subscription_id)).size, '', fmtDate(n.date))}
       ${kpiCard(2, 'timer', 'gold', 'تنتهي خلال 7 أيام', ending.length, '', 'اشتراكات قاربت نهايتها')}
       ${kpiCard(3, 'award', 'early', 'الباقات المتاحة', (D.plans || []).filter(planOpen).length, '', `من ${fmtNum((D.plans || []).length)} باقة`)}</div>
-    ${deviceAlerts(D, n)}
+    ${deviceAlerts(D, n)}${absenceBanner(D, n)}
     <div class="tabs" role="tablist" style="margin:16px 0">${tabs.map(([k, i, l]) => `<button class="tab" role="tab" data-qt="${k}" aria-selected="${qTab === k}">${ic(i)}${l}${k === 'requests' && (D.custom_requests || []).filter(r => r.status === 'new').length ? ` <span class="badge-n">${fmtNum((D.custom_requests || []).filter(r => r.status === 'new').length)}</span>` : ''}</button>`).join('')}</div>
     <div id="qBody"></div>`;
-  countUp(m);
+  countUp(m); bindAbsenceAlerts(() => pageQudurat());
   $$('[data-qt]').forEach(b => b.onclick = () => { qTab = b.dataset.qt; pageQudurat(); });
   $('#qAdd').onclick = () => subModal();
   $('#qImp').onclick = importModal;

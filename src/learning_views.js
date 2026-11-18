@@ -2,7 +2,7 @@
    واجهات الجانب التعليمي داخل البوابات: الواجبات، وقياس المستوى وبنك الأسئلة،
    والمراسلة، وتقييم المدرب بالنجوم.
    ===================================================================== */
-import { $, $$, esc, fmtNum, fmtShort, riyadhNow, addDays, matchQ } from './utils.js';
+import { $, $$, esc, fmtNum, fmtShort, riyadhNow, addDays, matchQ, nameCmp } from './utils.js';
 import { ic, emptyBox, toast } from './views2_head.js';
 import { Store } from './data2.js';
 import { modal, closeModal } from './views2_programs.js';
@@ -211,7 +211,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
   const me = D.me, list = (D.assignments || []).slice().sort((a, b) => b.publish_date.localeCompare(a.publish_date));
   const students = (D.trainees || []).length;
   return { html:`<div class="card pad rv"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px"><h3 class="ctitle">${ic('form')}واجباتي</h3><button class="btn pri sm" id="hwAdd">${ic('plus')} واجب</button></div>
-    ${list.length ? list.map(a => { const subs = (D.submissions || []).filter(s => s.assignment_id === a.id), done = subs.filter(s => ['submitted', 'graded', 'needs_revision'].includes(s.status));
+    ${list.length ? list.map(a => { const subs = (D.submissions || []).filter(s => s.assignment_id === a.id).sort((x, y) => nameCmp(D.trainees.find(t => t.id === x.trainee_id)?.full_name, D.trainees.find(t => t.id === y.trainee_id)?.full_name)), done = subs.filter(s => ['submitted', 'graded', 'needs_revision'].includes(s.status));
       return `<details class="hw" ${a.due_date >= riyadhNow().date ? 'open' : ''}><summary><b>${esc(a.title)}</b> ${a.type && a.type !== 'homework' ? `<span class="pill ${a.type === 'exam' ? 'warn' : 'g'}">${HW_TYPES[a.type]}</span> ` : ''}${a.kind === 'quiz' ? `<span class="pill info">اختبار · ${fmtNum(a.quiz?.length || 0)} أسئلة${attemptsOf(a) > 1 ? ` · ${fmtNum(attemptsOf(a))} محاولات` : ''}</span> ` : ''}${Array.isArray(a.targets) ? `<span class="pill g">${esc(a.target_label || '')}</span> ` : ''}<span class="hint">${esc(a.subject)} · يُستحق ${fmtShort(a.due_date)} · سلّم ${fmtNum(done.length)} من ${fmtNum(Array.isArray(a.targets) ? a.targets.length : students)}</span></summary>
         ${subs.length ? `<div class="tblwrap"><table class="tb"><thead><tr><th>المتدرب</th><th>الحالة</th><th>الإجابة</th><th>التصحيح</th></tr></thead><tbody>${subs.map(s => `<tr><td>${esc(D.trainees.find(t => t.id === s.trainee_id)?.full_name || '')}</td>
           <td><span class="pill dot ${STATE_TONE[s.status]}">${SUB_TXT[s.status]}</span>${s.late ? ' <span class="hint">متأخر</span>' : ''}</td><td style="max-width:320px">${a.kind === 'quiz' ? esc(s.feedback || '') : esc(s.answer || '')}</td>
@@ -248,7 +248,7 @@ export function teacherHomework(D, reload){ setBankAssets(D.bank_assets);
       $('#hfC').onclick = closeModal;
       const pub = (D.questions || []).filter(q => q.status === 'published');
       /* المستهدفون: قائمة ثابتة وقت الإرسال (باقة أو أفراد)، من متدربي القسم والمقرر باشتراك قائم */
-      const tgPicked = new Set(), eligible = () => { const sub = $('#hf-s').value; return (D.trainees || []).map(t => ({ t, subs:(D.subscriptions || []).filter(s => s.trainee_id === t.id && (s.subjects || []).includes(sub) && ['pending', 'active'].includes(subStatus(s))) })).filter(x => x.subs.length); };
+      const tgPicked = new Set(), eligible = () => { const sub = $('#hf-s').value; return (D.trainees || []).map(t => ({ t, subs:(D.subscriptions || []).filter(s => s.trainee_id === t.id && (s.subjects || []).includes(sub) && ['pending', 'active'].includes(subStatus(s))) })).filter(x => x.subs.length).sort((a, b) => nameCmp(a.t.full_name, b.t.full_name)); };
       const tgIds = () => { const m = $('#hf-tg').value; const gp = m === 'group' ? (D.groups || []).find(g => g.id === $('#hf-gp').value) : null; return m === 'all' ? null : m === 'group' ? eligible().filter(x => gp?.trainee_ids.includes(x.t.id)).map(x => x.t.id) : m === 'plan' ? eligible().filter(x => x.subs.some(s => s.plan_id === $('#hf-tp').value)).map(x => x.t.id) : eligible().filter(x => tgPicked.has(x.t.id)).map(x => x.t.id); };
       const tgDraw = () => { const m = $('#hf-tg').value, el = eligible(); $('[data-tgp]').hidden = m === 'all'; $('#hfTgPlanF').hidden = m !== 'plan'; $('#hfTgGrpF').hidden = m !== 'group'; $('#hfTgList').hidden = m !== 'pick'; $('#hfTgTools').hidden = m !== 'pick';
         if(m === 'plan'){ const ps = [...new Set(el.flatMap(x => x.subs.map(s => s.plan_id)))], cur = $('#hf-tp').value; $('#hf-tp').innerHTML = ps.map(id => { const p = (D.plans || []).find(y => y.id === id); return `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(p ? planName(p) : id)}</option>`; }).join(''); }
