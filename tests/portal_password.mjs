@@ -16,7 +16,7 @@ const KEY = 'sama_qudrat_v4';
 const data = () => p.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
 const text = async sel => ((await p.textContent(sel).catch(() => '')) || '').trim();
 const active = async ph => (await data()).devices.filter(d => d.phone === ph && d.role === 'student' && !d.revoked_at).length;
-const newDevice = async () => { await p.evaluate(k => { localStorage.removeItem(k + '_dev_student'); sessionStorage.removeItem(k + '_p_student'); }, KEY); await p.reload(); await p.waitForSelector('#pl-phone'); };
+const newDevice = async () => { await p.evaluate(k => { localStorage.removeItem(k + '_dev_student'); localStorage.removeItem('sama_pw_known_student'); sessionStorage.removeItem(k + '_p_student'); }, KEY); await p.reload(); await p.waitForSelector('#pl-phone'); };
 const openWindow = async ph => { await p.evaluate(([k, x]) => { const D = JSON.parse(localStorage.getItem(k)); D.act_windows = D.act_windows || [];
   D.act_windows.push({ id:'w' + Date.now(), phone:x, role:'student', created_at:new Date().toISOString(), expires_at:new Date(Date.now() + 900000).toISOString(), used_at:null, revoked:false });
   localStorage.setItem(k, JSON.stringify(D)); }, [KEY, ph]); await p.reload(); await p.waitForSelector('#pl-phone'); };
@@ -73,6 +73,12 @@ await newDevice(); await p.click('#plPw'); await p.fill('#pl-phone', st.national
 ok(await active(st.phone) === 3, 'ثلاثة أجهزة');
 await p.click('#devBtn'); await p.waitForSelector('#dvOthers:not([disabled])'); await p.click('#dvOthers'); await p.waitForTimeout(500);
 ok(await active(st.phone) === 1 && await p.isVisible('#logoutBtn'), 'الخروج من الأجهزة الأخرى ويبقى هذا الجهاز');
+
+// قرار المالك: بعد أول دخول تعرض الشاشة على هذا الجهاز الهوية وكلمة المرور فقط
+await p.click('#logoutBtn'); await p.waitForSelector('#pl-phone');
+ok(await p.isVisible('#pl-pass') && !(await p.$('#plFirst')) && await p.isVisible('#plForgot'), 'جهاز دخل من قبل: الهوية وكلمة المرور، بلا «أول دخول برمز التحقق»');
+await newDevice(); await p.click('#plPw'); await p.waitForSelector('#pl-pass');
+ok(await p.isVisible('#plFirst'), 'الجهاز الجديد يعرض «أول دخول برمز التحقق»');
 
 ok(!errs.length, 'بلا أخطاء صفحة' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
