@@ -11,7 +11,7 @@ import { AD, reloadAD } from './views2_admin.js';
 import { setBusy, toLatin } from './features.js';
 import { exportCSV } from './print.js';
 import { TIERS } from './qudurat.js';
-import { parseLegacy, legacySummary, dataIssues } from './import_logic.js';
+import { parseLegacy, legacySummary, dataIssues, hasProgram, needsBirth } from './import_logic.js';
 import { statementModal } from './statement_views.js';
 
 let dTab = 'issues', dQ = '', dSc = 'all', dOnly = 'all', preview = null;
@@ -51,14 +51,16 @@ function fixModal(x, after){
   modal(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${x.issues.length ? 'استكمال بيانات' : 'بيانات المتدرب'} ${esc(t.full_name)}</h3><button type="button" class="btn sm" id="fxSt">${ic('receipt')} كشف الحساب</button></div>
     <p class="hint" style="margin:6px 0 10px">التعديل مسجّل في أرشيف الحركات. رقم الهوية يكتبه المتدرب عند الحضور، والجوال مفتاح دخول بوابته: أبلغه بأي تغيير فيهما.</p>
     <form id="fxF" novalidate><div class="grid g2">
-      <div${miss('full_name')} style="grid-column:1/-1"><label for="fx-n">الاسم الكامل</label><input class="inp" id="fx-n" name="full_name" value="${esc(t.full_name)}"></div>
-      <div${miss('national_id')}><label for="fx-i">رقم الهوية</label><input class="inp num" id="fx-i" name="national_id" dir="ltr" inputmode="numeric" maxlength="10" value="${esc(t.national_id)}"></div>
-      <div${miss('birth_date')}><label for="fx-b">تاريخ الميلاد</label><input class="inp" id="fx-b" name="birth_date" type="date" max="${riyadhNow().date}" value="${esc(t.birth_date || '')}"></div>
-      <div${miss('phone')}><label for="fx-p">الجوال (مفتاح دخول البوابة)</label><input class="inp num" id="fx-p" name="phone" dir="ltr" inputmode="numeric" maxlength="10" value="${esc(t.phone || '')}"></div>
+      ${(() => { const prog = hasProgram(AD, t), birth = needsBirth(AD, t) || !!t.birth_date; /* عناصر نموذج التسجيل نفسه بترتيبه (قرار المالك 18 نوفمبر) */
+        return `<div${miss('full_name')} style="grid-column:1/-1"><label for="fx-n">الاسم الرباعي</label><input class="inp" id="fx-n" name="full_name" value="${esc(t.full_name)}"></div>
+      <div${miss('national_id')}><label for="fx-i">رقم السجل المدني أو الإقامة</label><input class="inp num" id="fx-i" name="national_id" dir="ltr" inputmode="numeric" maxlength="10" value="${esc(t.national_id)}"></div>
+      <div${miss('phone')}><label for="fx-p">رقم الجوال (مفتاح دخول البوابة)</label><input class="inp num" id="fx-p" name="phone" dir="ltr" inputmode="numeric" maxlength="10" value="${esc(t.phone || '')}"></div>
+      <div${miss('email')}><label for="fx-e">البريد الإلكتروني</label><input class="inp" id="fx-e" name="email" type="email" dir="ltr" value="${esc(t.email || '')}"></div>
+      <div class="field"><label for="fx-s">الجنس</label>${sel('fx-s', 'gender', ['ذكر', 'أنثى'], t.gender)}</div>
+      ${birth ? `<div${miss('birth_date')}><label for="fx-b">تاريخ الميلاد</label><input class="inp" id="fx-b" name="birth_date" type="date" max="${riyadhNow().date}" value="${esc(t.birth_date || '')}"></div>` : ''}
       <div${miss('guardian_phone')}><label for="fx-g">جوال ولي الأمر</label><input class="inp num" id="fx-g" name="guardian_phone" dir="ltr" inputmode="numeric" maxlength="10" value="${esc(t.guardian_phone || '')}"></div>
-      <div${miss('email')} style="grid-column:1/-1"><label for="fx-e">البريد الإلكتروني</label><input class="inp" id="fx-e" name="email" type="email" dir="ltr" value="${esc(t.email || '')}"></div>
-      <div${miss('city')}><label for="fx-c">المدينة</label>${sel('fx-c', 'city', CITIES.includes(t.city) || !t.city ? CITIES : [t.city, ...CITIES], t.city)}</div>
-      <div class="field"><label for="fx-d">المؤهل</label>${sel('fx-d', 'education', EDU.includes(t.education) || !t.education ? EDU : [t.education, ...EDU], t.education)}</div></div>
+      ${prog ? `<div class="field"><label for="fx-c">المدينة أو المحافظة</label>${sel('fx-c', 'city', CITIES.includes(t.city) || !t.city ? CITIES : [t.city, ...CITIES], t.city)}</div>
+      <div class="field"><label for="fx-d">المؤهل العلمي</label>${sel('fx-d', 'education', EDU.includes(t.education) || !t.education ? EDU : [t.education, ...EDU], t.education)}</div>` : ''}`; })()}</div>
       ${orders.map(o => `<fieldset class="fx-o" data-fo="${o.id}"><legend>رسوم الطلب <span dir="ltr">${o.number}</span> — ${esc(o.title)}</legend><div class="grid g2"><div class="field"><label>إجمالي الرسوم (ريال) · المدفوع ${fmtNum(o.paid_amount || 0)}</label><input class="inp num" name="total" inputmode="decimal" value="${o.total}"></div><div class="field"><label>سبب الخصم أو الفرق</label><input class="inp" name="discount_note" maxlength="200" value="${esc(o.discount_note || '')}"></div></div></fieldset>`).join('')}
       ${(t.import_notes || []).length ? `<h4 class="ord-sec">ملاحظات الكشف السابق</h4>${t.import_notes.map((n, i) => `<label class="chk fx-note"><input type="checkbox" data-fn="${i}" ${n.done ? 'checked' : ''}> <span>${esc(n.text)}</span></label>`).join('')}<p class="hint" style="margin:4px 0 0">ضع علامة على ما عولج ليختفي من قائمة المراجعة.</p>` : ''}
       <div class="errtxt" id="fxE" role="alert"></div>
@@ -68,7 +70,7 @@ function fixModal(x, after){
   $('#fxSt').onclick = () => statementModal(t.id);
   $('#fxF').onsubmit = async e => { e.preventDefault(); const f = e.target, b = $('#fxS'); $('#fxE').textContent = ''; setBusy(b, true, 'جارٍ الحفظ');
     try {
-      const p = {}; for(const k of ['full_name', 'national_id', 'birth_date', 'phone', 'guardian_phone', 'email', 'city', 'education']){ const v = f[k].value.trim(); if(v !== String(t[k] || '')) p[k] = v; }
+      const p = {}; for(const k of ['full_name', 'national_id', 'birth_date', 'phone', 'guardian_phone', 'email', 'gender', 'city', 'education']){ if(!f[k]) continue; const v = f[k].value.trim(); if(v !== String(t[k] || '')) p[k] = v; }
       if(Object.keys(p).length) await Store.saveTrainee(t.id, p);
       for(const fs of $$('[data-fo]', f)){ const o = AD.orders.find(y => y.id === fs.dataset.fo), total = +toLatin(fs.querySelector('[name=total]').value), dn = fs.querySelector('[name=discount_note]').value.trim();
         if(total !== +o.total || dn !== (o.discount_note || '')) await Store.saveOrderMeta(o.id, { total, discount_note:dn }); }

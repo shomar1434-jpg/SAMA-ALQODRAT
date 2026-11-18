@@ -358,10 +358,14 @@ function subModal(s){
   modal(`<h3>${s ? 'تعديل الاشتراك' : 'إضافة مشترك'}</h3>
     <form id="smF" class="grid g2" novalidate>
       ${s ? `<div class="field" style="grid-column:1/-1"><label>المتدرب</label><div class="inp" style="display:flex;align-items:center;background:var(--surface-sunken)">${esc(t?.full_name || '')} · <span dir="ltr">${esc(t?.national_id || '')}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn sm" id="smTE">${ic('edit')} تعديل بيانات المتدرب</button><button type="button" class="btn sm" id="smST">${ic('receipt')} كشف الحساب</button> <button type="button" class="btn sm" id="smWR">${ic('calendar')} تقرير الأسبوع</button></div></div>`
-        : `<div class="field"><label for="sm-nid">السجل المدني <i>*</i></label><input class="inp num" id="sm-nid" name="national_id" inputmode="numeric" maxlength="10" dir="ltr"><span class="hint" id="smFound"></span></div>
+        : `<label class="check" style="grid-column:1/-1"><input type="checkbox" id="sm-test" name="is_test"> حساب تجريبي للمتابعة (برقم هوية وجوال اصطناعيين، لمدير النظام)</label>
            <div class="field"><label for="sm-name">الاسم الرباعي <i>*</i></label><input class="inp" id="sm-name" name="full_name" maxlength="80"></div>
-           <div class="field"><label for="sm-phone">الجوال</label><input class="inp num" id="sm-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr"></div>
-           <div class="field"><label for="sm-gender">الجنس</label><select class="inp" id="sm-gender" name="gender"><option>ذكر</option><option>أنثى</option></select></div>`}
+           <div class="field" id="smNidF"><label for="sm-nid">رقم السجل المدني أو الإقامة <i>*</i></label><input class="inp num" id="sm-nid" name="national_id" inputmode="numeric" maxlength="10" dir="ltr"><span class="hint" id="smFound"></span></div>
+           <div class="field"><label for="sm-phone">رقم الجوال <i>*</i></label><input class="inp num" id="sm-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="05XXXXXXXX"></div>
+           <div class="field"><label for="sm-email">البريد الإلكتروني</label><input class="inp" id="sm-email" name="email" type="email" maxlength="100" dir="ltr"></div>
+           <div class="field"><label for="sm-gender">الجنس <i>*</i></label><select class="inp" id="sm-gender" name="gender"><option>ذكر</option><option>أنثى</option></select></div>
+           <fieldset class="field" id="smMinor" style="grid-column:1/-1"><legend>هل عمر المتدرب أقل من 18 سنة؟ <i>*</i></legend><label class="check" style="display:inline-flex;margin-inline-end:14px"><input type="radio" name="minor" value="yes"> نعم</label><label class="check" style="display:inline-flex"><input type="radio" name="minor" value="no"> لا</label></fieldset>
+           <div class="field" style="grid-column:1/-1"><label for="sm-gphone">جوال ولي الأمر <i id="smGReq" hidden>*</i></label><input class="inp num" id="sm-gphone" name="guardian_phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="05XXXXXXXX"><span class="hint">إلزامي لمن هم دون 18 سنة، ويستقل عن جوال المتدرب.</span></div>`}
       <div class="field"><label for="sm-plan">الباقة <i>*</i></label><select class="inp" id="sm-plan" name="plan_id">${plans.map(p => `<option value="${p.id}" ${s?.plan_id === p.id ? 'selected' : ''}>${esc(planName(p))}${p.mode === 'remote' ? ' (قريبًا)' : ''}</option>`).join('')}</select></div>
       <div class="field"><label for="sm-sec">القسم</label><select class="inp" id="sm-sec" name="section">${Object.entries(SECTIONS).map(([k, v]) => `<option value="${k}" ${(s?.section || 'boys') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="field" style="grid-column:1/-1"><label for="sm-start">تاريخ البداية الفعلي</label><input class="inp" type="date" id="sm-start" name="start_date" value="${s?.start_date || ''}" max="${riyadhNow().date}">
@@ -374,16 +378,35 @@ function subModal(s){
   $('#smC').onclick = closeModal;
   const nid = $('#sm-nid');
   if(nid){ nid.addEventListener('input', () => { nid.value = toLatin(nid.value).replace(/\D/g, ''); const x = nid.value.length === 10 && D.trainees.find(y => y.national_id === nid.value);
-      $('#smFound').textContent = x ? `متدرب مسجّل: ${x.full_name}` : ''; if(x){ $('#sm-name').value = x.full_name; $('#sm-phone').value = x.phone || ''; $('#sm-gender').value = x.gender; $('#sm-sec').value = sectionOfGender(x.gender); } });
+      $('#smFound').textContent = x ? `متدرب مسجّل: ${x.full_name}` : ''; if(x){ $('#sm-name').value = x.full_name; $('#sm-phone').value = x.phone || ''; $('#sm-email').value = x.email || ''; $('#sm-gphone').value = x.guardian_phone || ''; $('#sm-gender').value = x.gender; $('#sm-sec').value = sectionOfGender(x.gender); } });
     $('#sm-gender').onchange = e => { $('#sm-sec').value = sectionOfGender(e.target.value); };
-    $('#sm-phone').addEventListener('input', e => e.target.value = toLatin(e.target.value).replace(/\D/g, '')); }
+    ['#sm-phone', '#sm-gphone'].forEach(q => $(q).addEventListener('input', e => e.target.value = toLatin(e.target.value).replace(/\D/g, '')));
+    $$('[name=minor]').forEach(r => r.onchange = () => { $('#smGReq').hidden = r.value !== 'yes' || !r.checked; });
+    $('#sm-test').onchange = e => { $('#smNidF').hidden = e.target.checked; $('#smMinor').hidden = e.target.checked; }; }
   if($('#smTE')) $('#smTE').onclick = () => editTraineeModal(t.id, () => pageQudurat());
   if($('#smST')) $('#smST').onclick = () => statementModal(t.id);
   if($('#smWR')) $('#smWR').onclick = () => adminWeeklyModal(AD, t.id, id => Store.traineeLearning(id));
   $('#smF').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#smE').textContent = '';
-    if(!s){ if(!validSaudiId(f.national_id)) return $('#smE').textContent = 'رقم السجل المدني غير صحيح.'; if(f.full_name.trim().split(/\s+/).length < 3) return $('#smE').textContent = 'اكتب الاسم الثلاثي على الأقل.'; }
+    /* الحقول نفسها في التسجيل العام للباقات (قرار المالك 18 نوفمبر) */
+    if(!s && f.is_test){ const b = $('#smS'); setBusy(b, true, 'جارٍ الإنشاء');
+      try { const r = await Store.createTestTrainee({ full_name:f.full_name, gender:f.gender, plan_id:f.plan_id, phone:f.phone }); await reloadAD(); closeModal(); toast(`أُنشئ الحساب التجريبي: هوية ${r.national_id} · جوال ${r.phone}`); pageQudurat(); }
+      catch(x){ setBusy(b, false); $('#smE').textContent = x.message; } return; }
+    if(!s){ const err = m => { $('#smE').textContent = m; };
+      if(f.full_name.trim().split(/\s+/).length < 3) return err('اكتب الاسم الثلاثي على الأقل.');
+      if(!validSaudiId(f.national_id)) return err('رقم السجل المدني غير صحيح (10 أرقام تبدأ بـ1 أو 2). لحساب تجريبي اختر «حساب تجريبي للمتابعة».');
+      if(!/^05\d{8}$/.test(f.phone || '')) return err('رقم الجوال 10 أرقام يبدأ بـ05.');
+      if(f.email && !/^\S+@\S+\.\S+$/.test(f.email)) return err('البريد الإلكتروني غير صحيح.');
+      if(!f.minor) return err('أجب: هل عمر المتدرب أقل من 18 سنة؟');
+      if(f.minor === 'yes' && !/^05\d{8}$/.test(f.guardian_phone || '')) return err('جوال ولي الأمر إلزامي لمن هم دون 18 سنة.');
+      if(f.guardian_phone && !/^05\d{8}$/.test(f.guardian_phone)) return err('جوال ولي الأمر غير صحيح.');
+      if(f.guardian_phone && f.guardian_phone === f.phone) return err('جوال ولي الأمر يجب أن يختلف عن جوال المتدرب.'); }
     const b = $('#smS'); setBusy(b, true, 'جارٍ الحفظ');
-    try { const r = await Store.saveSubscription({ ...f, id:s?.id, trainee_id:s?.trainee_id, start_date:f.start_date || null }); await reloadAD(); closeModal(); toast(s ? 'حُفظ الاشتراك' : 'أُضيف المشترك'); pageQudurat(); if(!s && r?.order_id) receiveModal(r.order_id, () => pageQudurat()); }
+    try { const { email, guardian_phone, minor, is_test, ...rest } = f;
+      const r = await Store.saveSubscription({ ...rest, id:s?.id, trainee_id:s?.trainee_id, start_date:f.start_date || null }); await reloadAD();
+      if(!s){ const t2 = (AD.trainees || []).find(x => x.national_id === f.national_id), extra = {};
+        if(t2 && email && !t2.email) extra.email = email; if(t2 && guardian_phone && !t2.guardian_phone) extra.guardian_phone = guardian_phone;
+        if(t2 && Object.keys(extra).length){ await Store.saveTrainee(t2.id, extra); await reloadAD(); } }
+      closeModal(); toast(s ? 'حُفظ الاشتراك' : 'أُضيف المشترك'); pageQudurat(); if(!s && r?.order_id) receiveModal(r.order_id, () => pageQudurat()); }
     catch(x){ setBusy(b, false); $('#smE').textContent = x.message; } };
 }
 

@@ -44,17 +44,17 @@ ok(D.plans.find(x => x.id === s2.plan_id).tier === 'silver' && o2.total === 1150
 ok(/ما يحتاج مراجعة/.test(await text('#main')) && (await text('#dBody')).includes('بدر خالد'), 'بعد الاستيراد تُعرض قائمة ما يحتاج مراجعة');
 await p.fill('#dq', 'بدر خالد'); await p.waitForTimeout(600);
 const row = await text('#dBody');
-ok(/تاريخ الميلاد غير مسجّل/.test(row) && /البريد الإلكتروني غير مسجّل/.test(row) && /جوال ولي الأمر/.test(row) && /الاسم غير ثلاثي/.test(row) && /تحويل بين الباقات/.test(row), 'النظام يستخرج الناقص وملاحظات الكشف للمتدرب');
+ok(!/تاريخ الميلاد غير مسجّل/.test(row) && !/المدينة/.test(row) && /البريد الإلكتروني غير مسجّل/.test(row) && /جوال ولي الأمر/.test(row) && /الاسم غير ثلاثي/.test(row) && /تحويل بين الباقات/.test(row), 'النظام يستخرج الناقص وملاحظات الكشف للمتدرب');
 await p.click(`[data-de="${t2.id}"]`); await p.waitForSelector('#fxF');
-ok((await p.$$('#fxF .field.need')).length >= 4, 'الحقول الناقصة مميَّزة في نموذج الاستكمال');
+ok((await p.$$('#fxF .field.need')).length >= 3 && !(await p.$('#fx-c')) && !!(await p.$('#fx-s')), 'الحقول الناقصة مميَّزة، ونموذج المشترك في الباقة بعناصر نموذج التسجيل (بلا مدينة)');
 await p.fill('#fx-g', '123'); await p.click('#fxS'); await p.waitForTimeout(300);
 ok(/جوال ولي الأمر/.test(await text('#fxE')), 'قيمة خاطئة تُرفض');
-await p.fill('#fx-n', 'بدر خالد علي الحازمي'); await p.fill('#fx-b', '2009-05-01'); await p.fill('#fx-g', '٠٥٥٦٦٦٣٠٠٩'); await p.fill('#fx-e', 'badr@example.com'); await p.selectOption('#fx-c', 'جازان');
+await p.fill('#fx-n', 'بدر خالد علي الحازمي'); await p.fill('#fx-g', '٠٥٥٦٦٦٣٠٠٩'); await p.fill('#fx-e', 'badr@example.com');
 await p.check('[data-fn="0"]'); await p.click('#fxS'); await p.waitForTimeout(800);
 D = await data(); const t2b = D.trainees.find(t => t.id === t2.id);
-ok(t2b.full_name === 'بدر خالد علي الحازمي' && t2b.birth_date === '2009-05-01' && t2b.guardian_phone === '0556663009' && t2b.email === 'badr@example.com' && t2b.city === 'جازان' && t2b.import_notes[0].done, 'الاستكمال يُحفظ، والملاحظة تُعلَّم معالَجة');
+ok(t2b.full_name === 'بدر خالد علي الحازمي' && t2b.guardian_phone === '0556663009' && t2b.email === 'badr@example.com' && t2b.import_notes[0].done, 'الاستكمال يُحفظ، والملاحظة تُعلَّم معالَجة');
 await p.fill('#dq', 'بدر خالد'); await p.waitForTimeout(600);
-ok(!/تاريخ الميلاد غير مسجّل/.test(await text('#dBody')), 'ما اكتمل يختفي من قائمة المراجعة');
+ok(!/البريد الإلكتروني غير مسجّل/.test(await text('#dBody')), 'ما اكتمل يختفي من قائمة المراجعة');
 
 // طرق السداد والدفعة الإضافية
 await p.goto(U + 'admin/#admin-orders'); await p.reload(); await p.waitForSelector('#of-st'); await p.selectOption('#of-st', 'all'); await p.fill('#of-q', o1.number); await p.waitForTimeout(600);

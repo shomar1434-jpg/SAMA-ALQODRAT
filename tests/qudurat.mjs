@@ -76,7 +76,7 @@ ok(await p.$$eval('#qBody tbody tr', x => x.length) > 10, 'قائمة المشت
 const nid2 = await S(() => window.__SAMA__.makeSaudiId('1'));
 const past = await S(() => { const d = new Date(); d.setDate(d.getDate() - 20); return d.toISOString().slice(0, 10); });
 await p.click('#qAdd'); await p.waitForTimeout(300);
-await p.fill('#sm-nid', nid2); await p.fill('#sm-name', 'نورة علي محمد الحازمي'); await p.fill('#sm-phone', '0559998877'); await p.selectOption('#sm-gender', 'أنثى');
+await p.fill('#sm-nid', nid2); await p.fill('#sm-name', 'نورة علي محمد الحازمي'); await p.check('[name=minor][value=no]'); await p.fill('#sm-phone', '0559998877'); await p.selectOption('#sm-gender', 'أنثى');
 await p.selectOption('#sm-plan', { label: 'الذهبية' }); await p.fill('#sm-start', past); await p.click('#smS'); await p.waitForTimeout(800);
 const s2 = await S(n => { const D = window.__SAMA__.LocalStore.data; const t = D.trainees.find(x => x.national_id === n); return D.subscriptions.find(s => s.trainee_id === t?.id); }, nid2);
 ok(s2 && s2.section === 'girls' && s2.start_date === past && s2.start_manual && s2.status === 'active', 'إضافة طالبة حالية بتاريخ بداية يدوي وقسم البنات');

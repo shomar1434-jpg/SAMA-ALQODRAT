@@ -11,7 +11,8 @@ await p.goto(U + 'admin/#admin'); await p.waitForSelector('#lf'); await p.fill('
 await p.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const dow = new Date(Date.now() + 3 * 3600e3).getUTCDay();
   D.schedule_exceptions = []; D.schedule_templates = [{ id:'t1', section:'boys', dow, start:'00:00', end:'00:01' }, { id:'t2', section:'girls', dow, start:'00:00', end:'23:59' }];
   const today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
-  D.subscriptions.filter(s => s.section === 'boys').forEach(s => { const t = D.trainees.find(x => x.id === s.trainee_id); if (t) t.guardian_phone = '0551112222'; });
+  D.subscriptions.filter(s => s.section === 'boys').forEach(s => { const t = D.trainees.find(x => x.id === s.trainee_id); if (t) t.guardian_phone = '0551112222';
+    if (!s.start_date && s.status !== 'cancelled') { s.start_date = new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10); s.end_date = null; s.status = 'active'; } });   // «بانتظار أول حضور» لا يُعدّ غائبًا (BJ)
   localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
 await p.reload(); await p.waitForTimeout(600); await p.goto(U + 'admin/#display'); await p.waitForTimeout(1000);
 ok(!!(await p.$('[data-abs^="pkg:boys"]')), 'زر «الغائبون وإبلاغ أولياء الأمور» في جلسة اليوم');
