@@ -112,11 +112,15 @@ async function devicesModal(){
 /* الدخول (الخطوة BJ، قرار المالك): من أي جهاز برقم الهوية وكلمة المرور. أول مرة (أو «نسيت كلمة المرور»): رقم الهوية ← رمز التحقق
    بعد تفعيل الإدارة ← تعيين كلمة مرور. في الوضع التجريبي يبدأ برمز التحقق (1234) لتبقى اختبارات البوابات كما هي */
 let loginMode = null;
+/* قرار المالك 18 نوفمبر: الجهاز الذي عُيّنت فيه كلمة المرور أو دخل بها لا يعرض «أول دخول برمز التحقق»؛ تبقى «نسيت كلمة المرور» */
+const PW_KNOWN = () => 'sama_pw_known_' + ROLE;
+const pwKnown = () => { try { return localStorage.getItem(PW_KNOWN()) === '1'; } catch(_){ return false; } };
+const markPwKnown = () => { try { localStorage.setItem(PW_KNOWN(), '1'); } catch(_){} };
 const PW_EYE = id => `<button type="button" class="btn sm pw-eye" data-eye="${id}" aria-label="إظهار كلمة المرور" aria-pressed="false">${ic('eye')}</button>`;
 function bindEyes(root = document){ $$('[data-eye]', root).forEach(b => b.onclick = () => { const i = $('#' + b.dataset.eye), on = i.type === 'password'; i.type = on ? 'text' : 'password'; b.setAttribute('aria-pressed', String(on)); }); }
 function viewLogin(){
   const demo = Store.mode !== 'cloud';
-  const mode = loginMode || (demo ? 'code' : 'pw'), forgot = mode === 'forgot', codeMode = mode !== 'pw';
+  const mode = loginMode || (demo && !pwKnown() ? 'code' : 'pw'), forgot = mode === 'forgot', codeMode = mode !== 'pw';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
     <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">${ROLE === 'guardian' ? 'ادخل برقم هوية ابنك المسجّل في المعهد' : 'ادخل برقم هويتك المسجّل في المعهد'}</div></div></div>
     <form id="pl" class="grid pad" novalidate data-mode="${mode}">
@@ -128,7 +132,7 @@ function viewLogin(){
       <div class="errtxt" id="plE" role="alert"></div>
       <button class="btn pri" id="plB">${codeMode ? `${ic('lock')} رمز التحقق` : `${ic('check')} دخول`}</button>
       <div class="pl-links">${codeMode ? `<button type="button" class="btn sm" id="plPw">${ic('lock')} الدخول بكلمة المرور</button>`
-        : `<button type="button" class="btn sm" id="plFirst">${ic('key')} أول دخول برمز التحقق</button><button type="button" class="btn sm" id="plForgot">نسيت كلمة المرور؟</button>`}</div>
+        : `${pwKnown() ? '' : `<button type="button" class="btn sm" id="plFirst">${ic('key')} أول دخول برمز التحقق</button>`}<button type="button" class="btn sm" id="plForgot">نسيت كلمة المرور؟</button>`}</div>
       ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b> (باقات)، أو <b dir="ltr">0550000003</b> (برنامج تدريبي).'}</span></div>` : ''}
     </form></div></div>`;
   const ph = $('#pl-phone'), code = $('#pl-code'), pass = $('#pl-pass');
@@ -143,7 +147,7 @@ function viewLogin(){
     try {
       if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('رقم الهوية 10 أرقام');
       if(!codeMode){ if(!pass.value) throw new Error('اكتب كلمة المرور');
-        setBusy(b, true, 'جارٍ الدخول'); await Store.passwordLogin(ph.value, ROLE, pass.value); loginMode = null; render(); return; }
+        setBusy(b, true, 'جارٍ الدخول'); await Store.passwordLogin(ph.value, ROLE, pass.value); markPwKnown(); loginMode = null; render(); return; }
       if(step === 1){
         setBusy(b, true, 'جارٍ التحقق'); const rq = await Store.requestOtp(ph.value, ROLE); setBusy(b, false);
         // الرمز يظهر على هذا الجهاز وحده عند فتح الإدارة «تفعيل» الحساب، ثم يختفي بعد الدخول
@@ -170,7 +174,7 @@ function viewSetPassword(st){
     </form></div></div></div>`;
   bindEyes(); $('#ps-new').focus();
   $('#psF').onsubmit = async e => { e.preventDefault(); const b = $('#psGo'), n = $('#ps-new'), c = $('#ps-conf'); $('#psE').textContent = ''; [n, c].forEach(x => x.removeAttribute('aria-invalid'));
-    try { checkPassword(n.value, c.value); setBusy(b, true, 'جارٍ الحفظ'); await Store.setPortalPassword(ROLE, n.value); toast('حُفظت كلمة المرور'); render(); }
+    try { checkPassword(n.value, c.value); setBusy(b, true, 'جارٍ الحفظ'); await Store.setPortalPassword(ROLE, n.value); markPwKnown(); loginMode = null; toast('حُفظت كلمة المرور'); render(); }
     catch(x){ setBusy(b, false); $('#psE').textContent = x.message; (pwOk(n.value) ? c : n).setAttribute('aria-invalid', 'true'); } };
 }
 
