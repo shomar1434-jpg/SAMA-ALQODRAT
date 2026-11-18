@@ -19,7 +19,7 @@ import { setBusy, toLatin, liveSay } from './features.js';
 import { studentHomework, studentLevel, studentMessages, studentRating, teacherHomework, teacherBank, teacherMessages, teacherRatings } from './learning_views.js';
 import { assignmentsFor } from './learning_logic.js';
 import { mountInbox, unmountInbox } from './inbox_ui.js';
-import { NO_WINDOW } from './device_logic.js';
+import { NO_WINDOW, LINK_TTL_MIN } from './device_logic.js';
 import { analysisHtml } from './analysis_views.js';
 import { weeklyCard, bindWeeklyCard } from './weekly_views.js';
 import { initPwa } from './pwa.js';
@@ -64,8 +64,9 @@ async function renderPortal(){
   clearInterval(timer);
   const s = await Store.portalSession(ROLE);
   $('#logoutBtn').hidden = !s;
-  if(!s){ unmountInbox(); return viewLogin(); }
+  if(!s){ unmountInbox(); mountDevicesBtn(false); return viewLogin(); }
   $('#logoutBtn').onclick = async () => { unmountInbox(); await Store.portalLogout(ROLE); location.hash = ''; render(); };
+  mountDevicesBtn(!!s);
   mountInbox(ROLE, s.phone, {
     onOpen: it => { if(it.action === 'msg'){ if(ROLE === 'student') sTab = 'msg'; if(ROLE === 'teacher') tTab = 'msg'; } else if(ROLE !== 'guardian'){ if(ROLE === 'student') sTab = 'dash'; } render(); },
     onNew: () => { if($('.modal-bg') || document.activeElement?.matches('input,textarea,select')) return; render(); } });
@@ -75,6 +76,34 @@ async function renderPortal(){
     if(ROLE === 'teacher'){ viewTeacher(D); timer = setInterval(async () => { if(!$('#tSheet') || $('.modal-bg')) return; try { viewTeacher(await Store.portalData('teacher'), true); } catch(_){} }, 30000); return; }
     return viewGuardian(D, s);
   } catch(e){ $('#app').innerHTML = `<div class="wrap">${emptyBox('تعذّر تحميل البيانات', esc(e.message))}</div>`; }
+}
+
+/* ---------- أجهزتي (الخطوة BI): إضافة جهاز آخر برمز ربط، والخروج من الأجهزة الأخرى ---------- */
+function mountDevicesBtn(on){
+  let b = $('#devBtn');
+  if(!b){ const lo = $('#logoutBtn'); if(!lo) return; b = document.createElement('button'); b.className = 'btn sm'; b.id = 'devBtn'; b.innerHTML = `${ic('smartphone')} أجهزتي`; lo.before(b); b.onclick = devicesModal; }
+  b.hidden = !on;
+}
+async function devicesModal(){
+  let n = 0; try { n = (await Store.myDevices(ROLE))?.count || 0; } catch(_){}
+  modal(`<h3>${ic('smartphone')} أجهزتي</h3><p>الأجهزة المفعّلة على حسابك الآن: <b class="num">${fmtNum(n)}</b></p>
+    <section class="card pad" style="margin:0 0 12px"><h4 style="margin:0 0 6px">إضافة جهاز آخر</h4>
+      <p class="hint" style="margin:0 0 8px">يظهر رمز صالح ${fmtNum(LINK_TTL_MIN)} دقائق لمرة واحدة. في الجهاز الجديد اكتب رقم هويتك، ثم «لدي رمز ربط من جهازي المفعّل» واكتب الرمز. لا تشارك الرمز مع أحد.</p>
+      <label class="check"><input type="checkbox" id="dvOut"> أخرج جميع الأجهزة الأخرى (ومنها هذا) عند ربط الجهاز الجديد</label>
+      <div class="otp-show" id="dvCode" hidden aria-live="polite"></div>
+      <button class="btn pri" id="dvAdd">${ic('plus')} إضافة جهاز آخر</button></section>
+    <section class="card pad" style="margin:0 0 12px"><h4 style="margin:0 0 6px">الخروج من جميع الأجهزة الأخرى</h4>
+      <p class="hint" style="margin:0 0 8px">إن فقدت جهازًا أو استخدمه غيرك: يبقى هذا الجهاز وحده داخل حسابك.</p>
+      <button class="btn" id="dvOthers" ${n > 1 ? '' : 'disabled'}>${ic('logout')} الخروج من الأجهزة الأخرى</button></section>
+    <div style="text-align:end"><button class="btn" id="dvX">إغلاق</button></div>`);
+  $('#dvX').onclick = closeModal;
+  $('#dvAdd').onclick = async () => { const b = $('#dvAdd'); setBusy(b, true, 'جارٍ إنشاء الرمز');
+    try { const r = await Store.deviceLinkCode(ROLE, $('#dvOut').checked); const el = $('#dvCode'); el.hidden = false;
+      el.innerHTML = `<span>رمز الربط</span><b class="num" dir="ltr">${esc(r.code)}</b><small>صالح حتى ${esc(t12(new Date(r.expires_at).toLocaleTimeString('en-GB', { timeZone:'Asia/Riyadh', hour:'2-digit', minute:'2-digit' })))}${$('#dvOut').checked ? ' · سيخرج هذا الجهاز وغيره عند الربط' : ''}</small>`;
+      setBusy(b, false); b.innerHTML = `${ic('refresh')} رمز جديد`; liveSay('ظهر رمز الربط'); }
+    catch(e){ setBusy(b, false); toast(e.message); } };
+  $('#dvOthers').onclick = async () => { if(!confirm('سيخرج حسابك من كل الأجهزة الأخرى. متابعة؟')) return; const b = $('#dvOthers'); setBusy(b, true, 'جارٍ الإخراج');
+    try { const r = await Store.logoutOthers(ROLE); toast(`خرج حسابك من ${fmtNum(r?.revoked || 0)} جهاز`); closeModal(); } catch(e){ setBusy(b, false); toast(e.message); } };
 }
 
 /* ---------- الدخول برقم الجوال ورمز التحقق ---------- */
@@ -88,10 +117,14 @@ function viewLogin(){
       <div class="field" id="otpF" hidden><label for="pl-code" id="plCodeL">رمز التحقق</label><input class="inp num" id="pl-code" name="code" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="one-time-code"></div>
       <div class="errtxt" id="plE" role="alert"></div>
       <button class="btn pri" id="plB">${ic('lock')} رمز التحقق</button>
+      <button type="button" class="btn sm" id="plLinkT" aria-expanded="false">${ic('smartphone')} لدي رمز ربط من جهازي المفعّل</button>
+      <div id="plLinkF" hidden><div class="field"><label for="pl-link">رمز الربط</label><input class="inp num" id="pl-link" inputmode="numeric" maxlength="6" dir="ltr" autocomplete="off"></div>
+        <p class="hint" style="margin:0 0 8px">افتح حسابك في جهازك المفعّل، واضغط «أجهزتي» ثم «إضافة جهاز آخر»، واكتب الرمز الظاهر هنا مع رقم هويتك.</p>
+        <button type="button" class="btn pri" id="plLinkGo">${ic('check')} ربط هذا الجهاز والدخول</button></div>
       ${demo ? `<div class="alert t-gold"><span class="aic">${ic('alert')}</span><span>بيانات تجريبية: رمز التحقق <b>1234</b>.${ROLE === 'teacher' ? ' جرّب رقم المدرب <b dir="ltr">0501000003</b>.' : ROLE === 'guardian' ? ' جرّب رقم ولي الأمر <b dir="ltr">0509000010</b>.' : ' جرّب رقم المتدرب <b dir="ltr">0550000001</b> أو المتدربة <b dir="ltr">0550000002</b> (باقات)، أو <b dir="ltr">0550000003</b> (برنامج تدريبي).'}</span></div>` : ''}
     </form></div></div>`;
-  const ph = $('#pl-phone'), code = $('#pl-code');
-  [ph, code].forEach(i => i.addEventListener('input', () => { i.value = toLatin(i.value).replace(/\D/g, ''); }));
+  const ph = $('#pl-phone'), code = $('#pl-code'), lk = $('#pl-link');
+  [ph, code, lk].forEach(i => i.addEventListener('input', () => { i.value = toLatin(i.value).replace(/\D/g, ''); }));
   let step = 1;
   $('#pl').onsubmit = async e => { e.preventDefault(); const b = $('#plB'); $('#plE').textContent = '';
     try {
@@ -105,7 +138,11 @@ function viewLogin(){
         step = 2; $('#otpF').hidden = false; ph.readOnly = true; b.innerHTML = `${ic('check')} دخول`; code.focus(); liveSay('ظهر رمز التحقق'); return; }
       if(!/^\d{4,6}$/.test(code.value)) throw new Error('اكتب رمز التحقق');
       setBusy(b, true, 'جارٍ التحقق'); await Store.portalLogin(ph.value, code.value, ROLE); render();
-    } catch(x){ setBusy(b, false); if(step === 2) b.innerHTML = `${ic('check')} دخول`; $('#plE').textContent = x.message; } };
+    } catch(x){ setBusy(b, false); if(step === 2) b.innerHTML = `${ic('check')} دخول`; $('#plE').textContent = x.message; } };  $('#plLinkT').onclick = () => { const f = $('#plLinkF'); f.hidden = !f.hidden; $('#plLinkT').setAttribute('aria-expanded', String(!f.hidden)); if(!f.hidden) (ph.value ? lk : ph).focus(); };
+  $('#plLinkGo').onclick = async () => { const b = $('#plLinkGo'); $('#plE').textContent = '';
+    try { if(!/^([12]\d{9}|05\d{8})$/.test(ph.value)) throw new Error('اكتب رقم الهوية (10 أرقام) أولًا'); if(!/^\d{6}$/.test(lk.value)) throw new Error('رمز الربط 6 أرقام');
+      setBusy(b, true, 'جارٍ الربط'); await Store.linkDevice(ph.value, ROLE, lk.value); toast('رُبط هذا الجهاز بحسابك'); render(); }
+    catch(x){ setBusy(b, false); $('#plE').textContent = x.message; } };
 }
 
 /* ---------- بطاقات المتدرب الثلاث (تُستخدم لولي الأمر أيضًا) ---------- */
