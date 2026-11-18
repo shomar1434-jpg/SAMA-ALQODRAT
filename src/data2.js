@@ -14,7 +14,7 @@ import { checkLecture, lecturesForTrainees, ytId, checkSlot, slotLectures, assig
 import { checkLines, linesMethod, linesText, linesRef, refundable, refundNumber, r2 } from './billing_logic.js';
 import { keepNote } from './import_logic.js';
 import { archiveList, dueForPurge, purgeTraineeData, confirmNameOk, ARCHIVE_DAYS } from './archive_logic.js';
-import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256 } from './device_logic.js';
+import { newActCode, resolveIdent, reqLive, REQ_TTL_MIN, REQ_MAX_HOUR, ACT_FAIL, ACT_LOCKED, ACT_MAX_FAILS, WINDOW_MINUTES, windowLive, sha256, LINK_TTL_MIN, LINK_MAX_HOUR, DEV_LINK_FAIL, linkLive } from './device_logic.js';
 import { checkProfile, checkGroup, GROUPS_MAX } from './trainer_logic.js';
 import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlocked, orderPublic, checkTransfer, validIban } from './order_logic.js';
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
@@ -600,6 +600,27 @@ export const LocalStore = {
     try{ localStorage.setItem(this.key+'_dev_'+role, JSON.stringify({phone:ph, id:d.id})); }catch(e){}
     try{ sessionStorage.setItem(this.key+'_p_'+role, ph); }catch(e){} return {ok:true};
   },
+  /* إضافة جهاز آخر من الجهاز المفعّل (↔ portal_device_link / link_device / portal_devices / portal_logout_others) */
+  _myDev(role){ try{ const d=JSON.parse(localStorage.getItem(this.key+'_dev_'+role)||'null'); return d && (this.data.devices||[]).find(x=>x.id===d.id && x.role===role && !x.revoked_at) || null; }catch(e){ return null; } },
+  async deviceLinkCode(role, logoutOthers=false){ const D=this.data, d=this._myDev(role), now=Date.now(); if(!d) throw new Error('سجّل الدخول من جهازك المفعّل أولًا');
+    D.link_codes=D.link_codes||[]; if(D.link_codes.filter(c=>c.phone===d.phone && c.role===role && now-Date.parse(c.created_at)<3600e3).length>=LINK_MAX_HOUR) throw new Error('طلبت رموزًا كثيرة. حاول بعد ساعة.');
+    D.link_codes.forEach(c=>{ if(c.phone===d.phone && c.role===role && !c.used_at) c.used_at=new Date(now).toISOString(); });
+    const code=newActCode(), c={id:uid(), phone:d.phone, role, code_hash:await sha256('sama-act:'+d.phone+':link:'+code), created_by:d.id, logout_others:!!logoutOthers, created_at:new Date(now).toISOString(), expires_at:new Date(now+LINK_TTL_MIN*60000).toISOString(), used_at:null};
+    D.link_codes.push(c); this.save(); return {ok:true, code, expires_at:c.expires_at}; },
+  async linkDevice(ident, role, code){ const D=this.data, ph=resolveIdent(D, ident, role), now=Date.now(), key=ph||String(ident||'').replace(/\D/g,'');
+    D.activation_attempts=D.activation_attempts||[];
+    if(D.activation_attempts.filter(a=>a.phone===key && !a.ok && now-Date.parse(a.at)<3600e3).length>=ACT_MAX_FAILS) throw new Error(ACT_LOCKED);
+    const h=ph ? await sha256('sama-act:'+ph+':link:'+String(code||'')) : null;
+    const c=ph && rolesOfPhone(D, ph).includes(role) ? (D.link_codes||[]).find(x=>x.phone===ph && x.role===role && linkLive(x, now) && x.code_hash===h) : null;
+    if(!c){ D.activation_attempts.push({phone:key, ok:false, at:new Date(now).toISOString()}); this.save(); throw new Error(DEV_LINK_FAIL); }
+    const at=new Date(now).toISOString(); c.used_at=at; D.devices=D.devices||[];
+    if(c.logout_others) D.devices.forEach(x=>{ if(x.phone===ph && x.role===role && !x.revoked_at) x.revoked_at=at; });
+    const d={id:uid(), phone:ph, role, label:'', created_at:at, revoked_at:null}; D.devices.push(d); D.activation_attempts.push({phone:ph, ok:true, at}); this.save();
+    try{ localStorage.setItem(this.key+'_dev_'+role, JSON.stringify({phone:ph, id:d.id})); sessionStorage.setItem(this.key+'_p_'+role, ph); }catch(e){} return {ok:true}; },
+  async myDevices(role){ const d=this._myDev(role); return {count:d ? (this.data.devices||[]).filter(x=>x.phone===d.phone && x.role===role && !x.revoked_at).length : 0}; },
+  async logoutOthers(role){ const D=this.data, d=this._myDev(role); if(!d) throw new Error('سجّل الدخول أولًا'); const at=new Date().toISOString(); let n=0;
+    (D.devices||[]).forEach(x=>{ if(x.phone===d.phone && x.role===role && !x.revoked_at && x.id!==d.id){ x.revoked_at=at; n++; } });
+    (D.link_codes||[]).forEach(c=>{ if(c.phone===d.phone && c.role===role && !c.used_at) c.used_at=at; }); this.save(); return {ok:true, revoked:n}; },
   /* فتح التفعيل (↔ admin_open_activation): مهلة لجهاز واحد، والأحدث يلغي السابق؛ لا رمز للإدارة */
   async openActivation(phone, role, minutes=15){ const ph=normPhone(phone), D=this.data; if(!WINDOW_MINUTES.some(([m])=>m===+minutes)) throw new Error('مدة غير صالحة');
     if(!rolesOfPhone(D, ph).includes(role)) throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}`);
@@ -1111,6 +1132,12 @@ export const CloudStore = {
     const roles=this._e(await this.sb.rpc('portal_roles'))||[]; if(!roles.includes(role)){ await this.sb.auth.signOut(); throw new Error(`هذا الرقم غير مرتبط بحساب ${ROLE_TXT[role]}. راجع إدارة المعهد.`); } return {ok:true};
   },
   async portalSession(role){ const {data:{session}}=await this.sb.auth.getSession(); if(!session) return null; const r=await this.sb.rpc('portal_roles'); if(!(r.data||[]).includes(role)) return null; const ph=await this.sb.rpc('my_phone'); return {phone:normPhone(ph.data||session.user.phone||''), role}; },
+  async deviceLinkCode(role, logoutOthers=false){ return this._e(await this.sb.rpc('portal_device_link',{p_role:role, p_logout_others:!!logoutOthers})); },
+  async linkDevice(ident, role, code){ let {data:{session}}=await this.sb.auth.getSession(); if(!session){ const r=await this.sb.auth.signInAnonymously(); if(r.error) throw new Error('تعذّر بدء الجلسة. حاول بعد قليل.'); }
+    const r=this._e(await this.sb.rpc('link_device',{p_ident:String(ident), p_role:role, p_code:String(code||'')})); if(r && r.ok===false) throw new Error(r.error||DEV_LINK_FAIL);
+    const roles=this._e(await this.sb.rpc('portal_roles'))||[]; if(!roles.includes(role)) throw new Error(DEV_LINK_FAIL); return {ok:true}; },
+  async myDevices(role){ return this._e(await this.sb.rpc('portal_devices',{p_role:role}))||{count:0}; },
+  async logoutOthers(role){ return this._e(await this.sb.rpc('portal_logout_others',{p_role:role})); },
   async openActivation(phone, role, minutes=15){ return this._e(await this.sb.rpc('admin_open_activation',{p_phone:normPhone(phone), p_role:role, p_minutes:+minutes})); },
   async openActivationBulk(role, phones, minutes=1440){ return this._e(await this.sb.rpc('admin_open_activation_bulk',{p_role:role, p_phones:[...new Set((phones||[]).map(normPhone))], p_minutes:+minutes})); },
   async closeActivation(phone, role){ return this._e(await this.sb.rpc('admin_close_activation',{p_phone:normPhone(phone), p_role:role})); },

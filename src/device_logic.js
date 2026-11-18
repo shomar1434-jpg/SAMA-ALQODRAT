@@ -28,7 +28,11 @@ export const reqLive = (r, now = Date.now()) => !r.used_at && Date.parse(r.expir
 export const WINDOW_MINUTES = [[15, '15 دقيقة'], [60, 'ساعة'], [1440, '24 ساعة'], [4320, '3 أيام']];
 export const windowLive = (w, now = Date.now()) => !!w && !w.used_at && !w.revoked && Date.parse(w.expires_at) > now;
 export const ACT_STATE = { on:'تم التفعيل', wait:'بانتظار التفعيل', none:'لم يُفعَّل' };
-export const NO_WINDOW = 'لا يوجد تفعيل مفتوح لحسابك على جهاز جديد. اطلب من إدارة المركز «تفعيل» حسابك، ثم اضغط «رمز التحقق» مرة أخرى.';
+export const NO_WINDOW = 'لا يوجد تفعيل مفتوح لحسابك على جهاز جديد. إن كان لك جهاز مفعّل فاستخدم «رمز الربط من جهازي المفعّل»، وإلا اطلب من إدارة المركز «تفعيل» حسابك ثم اضغط «رمز التحقق» مرة أخرى.';
+/* إضافة جهاز آخر من الجهاز المفعّل (الخطوة BI ↔ portal_device_link / link_device) */
+export const LINK_TTL_MIN = 10, LINK_MAX_HOUR = 5;
+export const DEV_LINK_FAIL = 'رمز الربط غير صحيح أو منتهٍ. اطلب رمزًا جديدًا من جهازك المفعّل.';
+export const linkLive = (c, now = Date.now()) => !!c && !c.used_at && Date.parse(c.expires_at) > now;
 export const actMessage = (name, url) => `السلام عليكم ${name}،\nفُتح تفعيل حسابك في ${'مركز سما القدرات للتدريب'}.\nادخل من: ${url}\nاكتب رقم هويتك ثم اضغط «رمز التحقق»، فيظهر لك الرمز على جهازك، اكتبه ليُعتمد جهازك ويبقى داخلًا.\nلا تشارك الرمز مع أحد.`;
 /* بصمة الرمز (محليًا كما في act_hash بالخادم): SHA-256 عند توفره، وإلا بصمة بديلة للوضع التجريبي */
 export async function sha256(t){ try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
