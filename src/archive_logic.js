@@ -45,7 +45,7 @@ export function purgeTraineeData(D, id){
   drop('sub_attendance', a => a.trainee_id === id || subs.has(a.subscription_id)); drop('attendance', a => a.trainee_id === id || ens.has(a.enrollment_id));
   drop('certificates', c => c.trainee_id === id || ens.has(c.enrollment_id)); drop('program_requests', r => r.trainee_id === id || ens.has(r.enrollment_id));
   drop('enrollments', e => ens.has(e.id)); drop('subscriptions', s => subs.has(s.id));
-  ['submissions', 'attempts', 'messages', 'ratings', 'notifications', 'guardian_links', 'profile_change_requests', 'policy_acceptances'].forEach(k => drop(k, x => x.trainee_id === id));
+  ['submissions', 'attempts', 'messages', 'ratings', 'notifications', 'guardian_links', 'profile_change_requests', 'policy_acceptances', 'placement_attempts'].forEach(k => drop(k, x => x.trainee_id === id));
   (D.trainer_groups || []).forEach(g => { if(Array.isArray(g.trainee_ids)) g.trainee_ids = g.trainee_ids.filter(x => x !== id); });
   (D.assignments || []).forEach(a => { if(Array.isArray(a.targets)) a.targets = a.targets.filter(x => x !== id); });
   const phoneShared = (D.trainees || []).some(x => x.id !== id && (x.phone === t.phone || x.guardian_phone === t.phone)) || (D.teachers || []).some(x => x.phone === t.phone);

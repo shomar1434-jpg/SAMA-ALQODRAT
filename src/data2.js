@@ -20,7 +20,7 @@ import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlock
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, isKidsProgram, selfLinkLogic, LINK_FAIL, LINK_LOCKED, checkMinorConsent } from './identity_logic.js';
 import { weeklyNotes } from './weekly_logic.js';
-import { PL_KINDS, PL_GRACE_SEC, plSet, plMinutes, plAvailable, plBuild, plPublicQ, plGrade, plCheckSettings } from './placement_logic.js';
+import { PL_KINDS, PL_GRACE_SEC, plSet, plMinutes, plAvailable, plBuild, plPublicQ, plGrade, plCheckSettings, plLink, plFresh } from './placement_logic.js';
 import { catOk, simOpen, simExpired, simsToday, SIM_DAILY_MAX, sortSubjects, buildSim, cleanAnswers, CATEGORIES } from './sim_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, backfillCategories, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf, snapOf, liveSubsOf } from './learning_logic.js';
 import { addDays, dowOf, fmtDate, fmtMoney, fmtNum, hash32, makeSaudiId, riyadhNow, t12, toMin, uid, validSaudiId } from './utils.js';
@@ -413,7 +413,7 @@ export const LocalStore = {
   /* الخطوة BH: اختبار تحديد المستوى ↔ placement_status / placement_start / placement_finish / admin_placement_data / admin_placement_settings */
   async placementStatus(){ const D=this.data, S=plSet(D.settings); return { enabled:S.placement_enabled, qudurat:plAvailable(D.questions, 'qudurat'), tahsili:plAvailable(D.questions, 'tahsili'),
     minutes:{qudurat:plMinutes('qudurat', D.settings), tahsili:plMinutes('tahsili', D.settings)}, assets:D.settings.bank_assets||'' }; },
-  async placementStart(kind, session){ const D=this.data, S=plSet(D.settings); D.placement_attempts=D.placement_attempts||[];
+  async placementStart(kind, session){ const D=this.data, S=plSet(D.settings); D.placement_attempts=plFresh(D.placement_attempts);
     if(!S.placement_enabled) throw new Error('اختبار تحديد المستوى متوقف حاليًا'); if(!PL_KINDS[kind]) throw new Error('اختر نوع الاختبار');
     if(!/^[A-Za-z0-9_-]{8,64}$/.test(String(session||''))) throw new Error('أعد تحميل الصفحة ثم حاول مجددًا');
     const today=riyadhNow().date; if(D.placement_attempts.filter(a=>a.session_id===session&&a.day===today).length>=S.placement_daily_max) throw new Error('وصلت إلى حد محاولات اليوم؛ حاول غدًا أو تواصل مع المركز');
@@ -425,8 +425,9 @@ export const LocalStore = {
     if(!at) throw new Error('المحاولة غير موجودة'); if(at.submitted_at) return structuredClone(at.result);
     if(Date.now() > Date.parse(at.deadline)+PL_GRACE_SEC*1000) throw new Error('انتهى وقت الاختبار');
     at.result=plGrade(at.snapshot, answers, at.kind, D.plans, D.settings); at.submitted_at=new Date().toISOString(); this.save(); return structuredClone(at.result); },
-  async adminPlacement(){ const D=this.data, S=plSet(D.settings), A=(D.placement_attempts||[]).filter(a=>Date.parse(a.started_at)>Date.now()-400*864e5);
-    return { settings:S, status:await this.placementStatus(), attempts:A.map(a=>({kind:a.kind, day:a.day, submitted:!!a.submitted_at, pct:a.result?.pct??null, tier:a.result?.tiers?.[0]||null})) }; },
+  async adminPlacement(){ const D=this.data, S=plSet(D.settings); D.placement_attempts=plFresh(D.placement_attempts); const A=D.placement_attempts, tn=id=>D.trainees.find(t=>t.id===id);
+    return { settings:S, status:await this.placementStatus(), attempts:A.map(a=>({kind:a.kind, day:a.day, submitted:!!a.submitted_at, pct:a.result?.pct??null, tier:a.result?.tiers?.[0]||null, linked:!!a.trainee_id})),
+      linked:A.filter(a=>a.trainee_id&&tn(a.trainee_id)).sort((a,b)=>String(b.linked_at).localeCompare(String(a.linked_at))).map(a=>({trainee_id:a.trainee_id, name:tn(a.trainee_id).full_name, kind:a.kind, day:a.day, linked_at:a.linked_at, pct:a.result?.pct??null, tiers:a.result?.tiers||[], weak:a.result?.weak||[]})) }; },
   async savePlacementSettings(p){ const x=plCheckSettings(p); Object.assign(this.data.settings, x); this.audit('settings.placement', 'placement', x); this.save(); return x; },
   async assistantResponses(){ return structuredClone(this.data.assistant_responses || []); },
   /* الخطوة BE: المهتمون والطلب والحملات ↔ assistant_note_inquiry / assistant_register_interest / admin_assistant_* */
@@ -513,7 +514,7 @@ export const LocalStore = {
     acceptPolicies(D, f, t.id, 'subscription');
     const s={id:uid(), ref:newRef(), trainee_id:t.id, plan_id:plan.id, section:sectionOfGender(t.gender), subjects:[...(plan.subjects||[])], status:'pending', start_date:null, end_date:null, created_at:new Date().toISOString()};
     D.subscriptions.push(s);
-    const order=this._newOrder({trainee_id:t.id, kind:'plan', subscription_id:s.id, title:'باقة '+planName(plan), total:planTotal(plan), due_now:+plan.reg_fee||0}); this.save();
+    const order=this._newOrder({trainee_id:t.id, kind:'plan', subscription_id:s.id, title:'باقة '+planName(plan), total:planTotal(plan), due_now:+plan.reg_fee||0}); plLink(D.placement_attempts, f, t.id); this.save();
     return {ok:true, subscription:true, ref:s.ref, order, plan:planName(plan), section:SECTIONS[s.section], schedule:sectionDaysTxt(D,s.section)};
   },
   async savePlan(p){ const a=this.data.plans, i=a.findIndex(x=>x.id===p.id); if(i>=0) a[i]={...a[i],...p}; else a.push({...p, id:uid(), sort:p.sort??a.length}); this.audit('plan.save', p.id||'new'); this.save(); },

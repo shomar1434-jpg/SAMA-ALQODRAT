@@ -49,6 +49,20 @@ begin
   assert (f->>'pct')::int = 50 and (f->'weak') ? 'الجبر' and not (f->'weak') ? 'غير مصنّف', 'المهارة الضعيفة المصنّفة فقط';
   assert f->'tiers' = '["custom","silver"]' and f->'plans'->0->>'tier' = 'custom', '40–65٪ مع ضعف مهارة: خصصناها لك ثم الفضية';
 
+  -- الربط بملف المتدرب عند التسجيل في باقة بالجلسة نفسها
+  declare nid text; i2 int := 0; rr jsonb; v_plan uuid := (select id from plans where tier = 'silver' and mode = 'in_person');
+    acc jsonb := coalesce((select jsonb_agg(id) from current_policies(riyadh_now()::date) where requires_acceptance), '[]');
+  begin
+    loop i2 := i2 + 1; nid := '1' || lpad((800000000 + i2)::text, 9, '0'); exit when saudi_id_valid(nid) and not exists (select 1 from trainees where national_id = nid); end loop;
+    rr := register_subscription(jsonb_build_object('national_id', nid, 'full_name', 'نايف علي محمد الحربي', 'phone', '0557772001', 'gender', 'ذكر', 'plan_id', v_plan, 'accepted_policies', acc,
+      'placement_id', r->>'id', 'placement_session', 'wrongSession1'));
+    assert (select trainee_id is null from placement_attempts where id = (r->>'id')::uuid), 'جلسة مختلفة لا تربط';
+    rr := register_subscription(jsonb_build_object('national_id', nid, 'full_name', 'نايف علي محمد الحربي', 'phone', '0557772001', 'gender', 'ذكر', 'accepted_policies', acc,
+      'plan_id', (select id from plans where tier = 'gold' and mode = 'in_person'), 'placement_id', r->>'id', 'placement_session', s));
+    assert (select trainee_id = (select id from trainees where national_id = nid) from placement_attempts where id = (r->>'id')::uuid), 'تُربط النتيجة بملف المتدرب';
+    assert jsonb_array_length((select jsonb_agg(1) from placement_attempts where trainee_id is not null)) = 1, 'ربط واحد';
+  end;
+
   -- الحد اليومي (3) للجلسة
   begin perform placement_start('qudurat', s); ok := false; exception when others then ok := sqlerrm like '%حد محاولات اليوم%'; end;
   assert ok, 'الحد اليومي';
@@ -56,11 +70,15 @@ begin
   -- الصلاحيات
   assert has_function_privilege('anon', 'placement_start(text, text)', 'execute') and has_function_privilege('anon', 'placement_finish(uuid, text, jsonb)', 'execute')
      and not has_function_privilege('anon', 'admin_placement_data()', 'execute') and not has_function_privilege('anon', 'pl_plans(text, text[])', 'execute')
-     and not has_function_privilege('anon', 'placement_purge()', 'execute'), 'الصلاحيات';
+     and not has_function_privilege('anon', 'placement_purge()', 'execute') and not has_function_privilege('anon', 'pl_link(jsonb)', 'execute'), 'الصلاحيات';
   assert not has_table_privilege('anon', 'placement_attempts', 'select'), 'الجدول مغلق';
   begin perform admin_placement_settings('{"placement_low":50,"placement_high":40,"placement_sec_per_q":60,"placement_daily_max":3}'); ok := false; exception when others then ok := true; end;
   assert ok, 'الإعدادات للمدير وحده وبحدود صحيحة';
 
+  -- الحذف بعد 100 يوم
+  update placement_attempts set started_at = now() - interval '101 days' where id = v_id;
+  assert placement_purge() = 1, 'تُحذف بعد 100 يوم';
+  assert not exists (select 1 from placement_attempts where id = v_id), 'المحذوفة لا تبقى';
   update questions set status = 'published' where id = any(other);
   delete from placement_attempts; delete from questions where code like 'PL%' or (subject = 'تحصيلي' and text = 'x');
 end $$;

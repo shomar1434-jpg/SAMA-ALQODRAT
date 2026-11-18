@@ -8,7 +8,7 @@ export const PL_KINDS = {
   tahsili: { title:'التحصيلي', parts:{ 'تحصيلي':20 } },
 };
 export const PL_DEFAULTS = { placement_enabled:true, placement_sec_per_q:60, placement_low:40, placement_high:65, placement_daily_max:3 };
-export const PL_WEAK = 50, PL_MIN_SKILL = 2, PL_GRACE_SEC = 120;
+export const PL_WEAK = 50, PL_MIN_SKILL = 2, PL_GRACE_SEC = 120, PL_KEEP_DAYS = 100;   // قرار المالك: تُحذف المحاولات بعد 100 يوم
 export const PL_TIER_TXT = { diamond:'الماسية', gold:'الذهبية', silver:'الفضية', basic:'الأساسية', custom:'خصصناها لك' };
 
 export const plSet = st => ({ ...PL_DEFAULTS, ...Object.fromEntries(Object.keys(PL_DEFAULTS).filter(k => st && st[k] !== undefined && st[k] !== null).map(k => [k, st[k]])) });
@@ -66,3 +66,11 @@ export function plGrade(snapshot, answers, kind, plans, st){
 
 /* نص واتساب المركز بملخص النتيجة (يرسله الزائر بنفسه) */
 export const plWaText = (kind, r) => `السلام عليكم، أجريت اختبار تحديد المستوى (${PL_KINDS[kind].title}) في موقع مركز سما القدرات، ومؤشر جاهزيتي ${r.pct}٪، والباقة المقترحة: ${(r.plans || []).map(x => x.name).join(' أو ') || '—'}. أرغب بمعرفة التفاصيل.`;
+
+/* ربط النتيجة بملف المتدرب عند تسجيله في باقة من الجهاز نفسه (يطابق pl_link) */
+export function plLink(attempts, f, trainee_id, now = Date.now()){
+  const a = (attempts || []).find(x => x.id === f?.placement_id && f?.placement_session && x.session_id === f.placement_session);
+  if(!a || !a.submitted_at || a.trainee_id || Date.parse(a.started_at) < now - PL_KEEP_DAYS * 864e5) return false;
+  a.trainee_id = trainee_id; a.linked_at = new Date(now).toISOString(); return true;
+}
+export const plFresh = (attempts, now = Date.now()) => (attempts || []).filter(a => Date.parse(a.started_at) >= now - PL_KEEP_DAYS * 864e5);

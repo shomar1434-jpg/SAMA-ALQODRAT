@@ -14,7 +14,10 @@ import { PL_KINDS, PL_TIER_TXT, plCount, plWaText } from './placement_logic.js';
 import { waLink } from './landing.js';
 
 const LET = ['أ', 'ب', 'ج', 'د'];
-const KEY = 'sama_pl_run';
+const KEY = 'sama_pl_run', LAST = 'sama_pl_last';
+/* آخر نتيجة على هذا الجهاز: تُرسل مع التسجيل في باقة لتُربط بملف المتدرب (100 يوم) */
+export function plLinkFields(){ try { const x = JSON.parse(localStorage.getItem(LAST) || 'null'); return x && x.id && x.at > Date.now() - 100 * 864e5 ? { placement_id:x.id, placement_session:plSession() } : {}; } catch(_){ return {}; } }
+export function plLinkDone(){ try { localStorage.removeItem(LAST); } catch(_){} }
 const toneVar = t => ({ ok:'success', info:'info', warn:'warning', bad:'danger' })[t] || 'brand';
 const clock = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 export function plSession(){ try { let s = localStorage.getItem('sama_pl_sid'); if(!s){ s = uid().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || String(Date.now()); localStorage.setItem('sama_pl_sid', s); } return s; } catch(_){ return 'pl' + Date.now(); } }
@@ -68,7 +71,7 @@ function runner(run){
   const go = k => { i = Math.max(0, Math.min(N - 1, k)); persist(); paint(); root.querySelector('.sim-b')?.scrollTo?.(0, 0); };
   const close = () => { clearInterval(tick); root.remove(); document.body.classList.remove('sim-on'); };
   const finish = async () => { if(done) return; done = true; clearInterval(tick);
-    try { const r = await Store.placementFinish(run.id, plSession(), ans); saveRun(null); close(); result(run.kind, r); }
+    try { const r = await Store.placementFinish(run.id, plSession(), ans); saveRun(null); try { localStorage.setItem(LAST, JSON.stringify({ id:run.id, at:Date.now() })); } catch(_){} close(); result(run.kind, r); }
     catch(e){ done = false; toast(e.message); if(/انتهى|غير موجودة/.test(e.message)){ saveRun(null); close(); viewPlacement(); } } };
   const confirmEnd = () => { const left = N - answered();
     if(!left) return finish();
@@ -98,7 +101,8 @@ function result(kind, r){
           <h3 style="margin:8px 0">${esc(p.name || PL_TIER_TXT[p.tier] || '')}</h3><a class="btn pri" href="#enroll-q-${esc(p.id)}">${ic('form')} سجّل في هذه الباقة</a> <a class="btn sm" href="#plan-${esc(p.id)}">التفاصيل</a></div>`).join('')}</div>`
         : `<p class="hint">تواصل مع المركز ليقترح عليك الباقة المناسبة.</p>`}
       <p style="margin:14px 0 0;display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="${esc(waLink(plWaText(kind, r)))}" target="_blank" rel="noopener">${ic('chat')} اسأل المركز عن النتيجة</a>
-        <a class="btn" href="#placement" id="plAgain">${ic('refresh')} اختبار آخر</a></p></section></div>`;
+        <a class="btn" href="#placement" id="plAgain">${ic('refresh')} اختبار آخر</a></p>
+      <p class="hint" style="margin:12px 0 0" data-pllinknote>${ic('lock')} إن سجّلت في باقة من هذا الجهاز خلال 100 يوم تُحفظ نتيجتك في ملفك ليطّلع عليها المركز، وتُحذف النتيجة بعد 100 يوم.</p></section></div>`;
   $('#plAgain').onclick = e => { e.preventDefault(); viewPlacement(); window.scrollTo(0, 0); };
   window.scrollTo(0, 0);
 }
