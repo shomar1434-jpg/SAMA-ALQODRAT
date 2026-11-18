@@ -4,7 +4,7 @@ import { CALC_DEFAULTS, LEVEL_TONE, LEVEL_TXT, Store, attendanceLevel, calcSet, 
 import { siteFooter } from './landing.js';
 import { LOGOS } from './logos.js';
 import { exportCSV, fmtGreg, printDocs } from './print.js';
-import { $, $$, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, validSaudiId } from './utils.js';
+import { $, $$, esc, fmtDate, fmtNum, fmtShort, riyadhNow, t12, nidFormat } from './utils.js';
 import { AD, progName, progOf, reloadAD } from './views2_admin.js';
 import { countUp, emptyBox, ic, quiet, reduceMotion, ringSvg, skeleton, toast } from './views2_head.js';
 import { baseUrl, cohortLabel, copyText, kpiCard, makeQR, short, titleBar } from './views2_main.js';
@@ -131,7 +131,7 @@ export async function viewMe(){
   $$('input',f).forEach(i=>i.addEventListener('input',()=>{ i.value=toLatin(i.value).replace(/\D/g,''); i.classList.remove('err'); i.removeAttribute('aria-invalid'); }));
   f.onsubmit=async e=>{ e.preventDefault(); const nid=f.nid.value.trim(), errs=[];
     $$('.errtxt',f).forEach(x=>x.textContent='');
-    if(!validSaudiId(nid)){ const el=f.nid, msg='الرقم غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.'; el.classList.add('err'); el.setAttribute('aria-invalid','true'); $('#'+el.id+'-err').textContent=msg; errs.push({id:el.id,label:'رقم السجل المدني',msg}); }
+    if(!nidFormat(nid)){ const el=f.nid, msg='الرقم غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.'; el.classList.add('err'); el.setAttribute('aria-invalid','true'); $('#'+el.id+'-err').textContent=msg; errs.push({id:el.id,label:'رقم السجل المدني',msg}); }
     showErrorSummary($('#mfSum'), errs); if(errs.length) return;
     const b=$('#mGo'); setBusy(b,true,'جارٍ البحث');
     let r; try{ r=await Store.myAttendance(nid); }catch(x){ r={ok:false,reason:'error',msg:x.message}; }
@@ -192,7 +192,7 @@ export function pageRules(){
   f.onsubmit=async e=>{ e.preventDefault(); const b=$('#rlS'); setBusy(b,true,'جارٍ الحفظ'); try{ await Store.saveSettings(read()); await reloadAD(); toast('حُفظت آلية الاحتساب'); }catch(x){ toast(x.message); } setBusy(b,false); };
   $('#rlN').addEventListener('input',e=>e.target.value=toLatin(e.target.value).replace(/\D/g,''));
   $('#rlQ').onsubmit=e=>{ e.preventDefault(); const nid=$('#rlN').value; const box=$('#rlR');
-    if(!validSaudiId(nid)){ box.innerHTML=`<div class="errtxt">الرقم غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.</div>`; return; }
+    if(!nidFormat(nid)){ box.innerHTML=`<div class="errtxt">الرقم غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.</div>`; return; }
     const r=traineeAttendanceLogic(AD,nid); box.innerHTML = r.ok ? traineeDetailHtml(r) : emptyBox('لا يوجد متدرب بهذا الرقم','تأكد من الرقم أو ابحث في صفحة المتدربين.'); };
 }
 export function traineeDetailHtml(r){

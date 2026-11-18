@@ -23,6 +23,8 @@ export const fmtDate = d => new Date(d+'T12:00:00Z').toLocaleDateString('ar-SA-u
 export const fmtShort = d => new Date(d+'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'short',timeZone:'UTC'});
 export const t12 = t => { if(!t) return ''; let [h,m]=t.split(':').map(Number); const s=h>=12?'م':'ص'; h=h%12||12; return `${h}:${String(m).padStart(2,'0')} ${s}`; };
 
+/* شكل رقم الهوية فقط (10 أرقام تبدأ بـ1 أو 2) — للبحث والتحضير، والخادم يتحقق من التسجيل؛ يقبل الحسابات التجريبية */
+export const nidFormat = id => /^[12]\d{9}$/.test(String(id || ''));
 export function validSaudiId(id){
   if(!/^[12]\d{9}$/.test(id)) return false;
   let s=0; for(let i=0;i<10;i++){ let d=+id[i]; if(i%2===0){ d*=2; if(d>9) d-=9; } s+=d; }

@@ -54,6 +54,14 @@ const real = D.trainees.find(t => !t.is_test && t.phone);
 await p.fill('#ta-ph', real.phone); await p.click('#taAdd'); await p.waitForTimeout(500);
 ok(/لحساب حقيقي/.test(await p.textContent('#taE')), 'جوال حساب حقيقي مرفوض');
 
+// التحضير يقبل هوية الحساب التجريبي (قرار المالك 18 نوفمبر: فحص الصيغة فقط)
+await p.goto(U + '#checkin'); await p.reload(); await p.waitForSelector('#nid');
+await p.fill('#nid', tt.national_id); await p.click('#cBtn'); await p.waitForTimeout(900);
+ok(!/رقم السجل غير صحيح/.test(await p.textContent('#cErr')), 'التحضير لا يرفض هوية الحساب التجريبي بالصيغة');
+await p.reload(); await p.waitForSelector('#nid'); await p.fill('#nid', '3123456789'); await p.click('#cBtn'); await p.waitForTimeout(300);
+ok(/رقم السجل غير صحيح/.test(await p.textContent('#cErr')), 'الصيغة الخاطئة ما زالت مرفوضة');
+await admin('admin-trainees'); await p.waitForSelector('#taBox'); await p.click('#taBox summary');
+
 // الإزالة: التجريبي وحده
 const before = (await data()).trainees.filter(t => !t.is_test).length;
 await p.click(`[data-tap="${tt.id}"]`); await p.click('#mo'); await p.waitForTimeout(800);

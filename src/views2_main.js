@@ -7,7 +7,7 @@ import { liveSay, setBusy, showErrorSummary, toLatin, wireFormA11y } from './fea
 import { siteFooter, viewHome } from './landing.js';
 import { viewPlacement, plLinkFields, plLinkDone } from './placement_views.js';
 import { closePrint } from './print.js';
-import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, matchQ } from './utils.js';
+import { $, $$, CITIES, DAYS, EDU, esc, fmtDate, fmtMoney, fmtNum, fmtShort, riyadhNow, t12, toMin, uid, validSaudiId, nidFormat, matchQ } from './utils.js';
 import { viewAdmin } from './views2_admin.js';
 import { countUp, emptyBox, ic, quiet, skeleton, toast } from './views2_head.js';
 import { closeModal } from './views2_programs.js';
@@ -372,7 +372,7 @@ export function bindAttendance(st, programCode, onBack){
   $('#cf').onsubmit = async e=>{
     e.preventDefault(); const er=$('#cErr'); er.textContent='';
     const id=nid.value.trim(), code=$$('.codebox input').map(x=>x.value).join('');
-    if(!validSaudiId(id)){ er.textContent='رقم السجل غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.'; nid.classList.add('err'); return; }
+    if(!nidFormat(id)){ er.textContent='رقم السجل غير صحيح. يتكون من 10 أرقام ويبدأ بـ 1 أو 2.'; nid.classList.add('err'); return; }
     if(st.require_code && code.length!==4){ er.textContent='اكتب رمز اليوم المكوّن من 4 أرقام.'; return; }
     const b=$('#cBtn'); setBusy(b,true,'جارٍ التحقق من السجل');
     const send = async choice => { let r; try{ r = await Store.checkin(id, code, programCode, {device:deviceId(), choice}); }catch(x){ r={ok:false,reason:'error',msg:x.message}; }

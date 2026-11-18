@@ -31,14 +31,14 @@ await p.fill('#hf-t', 'اختبار رسمي'); await p.selectOption('#hf-ty', '
 await p.check('#hfUnits input[value="النموذج 1"]'); await p.fill('#hf-n', '5'); await p.click('#hfS'); await p.waitForTimeout(500);
 ok(/مفاتيح معتمدة/.test(await text('#hfE')), 'الاختبار الرسمي لا يُنشر بمفاتيح غير معتمدة');
 // تدريب مستهدف لفرد واحد، والإجابات بعد موعد الاستحقاق
-await p.fill('#hf-t', 'تدريب علاجي'); await p.selectOption('#hf-ty', 'practice'); await p.selectOption('#hf-rv', 'after_due');
+await p.fill('#hf-t', 'تدريب علاجي'); await p.selectOption('#hf-ty', 'practice');
 await p.selectOption('#hf-tg', 'pick'); await p.waitForTimeout(200); await p.click('#hfS'); await p.waitForTimeout(300);
 ok(/متدربًا واحدًا/.test(await text('#hfE')), 'الاستهداف بأفراد يتطلب اختيار متدرب');
 await p.check(`#hfTgList input[value="${A.id}"]`);
 ok(/١ متدربًا/.test(await text('#hfTgN')), 'يظهر العدد النهائي قبل النشر');
 await p.click('#hfS'); await p.waitForTimeout(800);
 D = await data(); const hw = D.assignments.find(a => a.title === 'تدريب علاجي');
-ok(hw && hw.type === 'practice' && hw.reveal === 'after_due' && hw.targets.length === 1 && hw.targets[0] === A.id && hw.quiz.length === 3, 'يُحفظ الواجب بنوعه وسياسته وقائمة مستهدفيه الثابتة');
+ok(hw && hw.type === 'practice' && hw.reveal === 'after_submit' && hw.targets.length === 1 && hw.targets[0] === A.id && hw.quiz.length === 3, 'يُحفظ الواجب بنوعه وسياسته وقائمة مستهدفيه الثابتة');
 ok(/تدريب/.test(await text('#tBody')) && /من ١/.test(await text('#tBody')), 'المدرب يرى النوع وعدد المستهدفين');
 // استهداف بباقة
 await p.click('#hwAdd'); await p.waitForTimeout(300); await p.fill('#hf-t', 'واجب باقة'); await p.selectOption('#hf-tg', 'plan'); await p.waitForTimeout(200);
@@ -60,7 +60,7 @@ await p.click(`${form} button.pri`); await p.waitForTimeout(900); if(await p.$('
 D = await data(); const sb = D.submissions.find(x => x.assignment_id === hw.id && x.trainee_id === A.id);
 ok(sb && sb.status === 'graded' && sb.review, 'يُصحَّح على الخادم وتُحفظ المراجعة');
 const after = await text('#sBody');
-ok(/الدرجة/.test(after) && /تظهر الإجابات الصحيحة بعد/.test(after) && !(await p.$(form)) && !/الصحيح:/.test(after), 'المراجعة محجوبة عن المتدرب حتى موعد الاستحقاق، ولا يُعاد الحل');
+ok(/الدرجة/.test(after) && /الصحيح:/.test(after) && !(await p.$(form)), 'قرار المالك: الإجابة الصحيحة مع إجابة المتدرب في المراجعة بعد التسليم، ولا يُعاد الحل');
 await p.evaluate(id => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const a = D.assignments.find(x => x.id === id); a.publish_date = '2026-01-01'; a.due_date = '2026-01-02'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); }, hw.id);
 await p.reload(); await p.waitForTimeout(900); await tab('data-st', 'hw');
 ok(/الصحيح:/.test(await text('#sBody')), 'تظهر الإجابات بعد موعد الاستحقاق');
@@ -70,10 +70,10 @@ await adminBank(); await p.click('[data-ka="كمي"]'); await p.waitForTimeout(3
 D = await data();
 ok(D.questions.filter(q => q.shared && q.subject === 'كمي').every(q => q.key_status === 'approved'), 'الإدارة تعتمد مفاتيح المقرر');
 await login('teacher', T.phone); await tab('data-tt', 'hw'); await p.click('#hwAdd'); await p.waitForTimeout(300);
-await p.fill('#hf-t', 'اختبار رسمي معتمد'); await p.selectOption('#hf-ty', 'exam'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200); await p.selectOption('#hf-rv', 'never');
+await p.fill('#hf-t', 'اختبار رسمي معتمد'); await p.selectOption('#hf-ty', 'exam'); await p.check('#hf [name=kind][value=quiz]'); await p.waitForTimeout(200);
 await p.check('#hfUnits input[value="النموذج 1"]'); await p.click('#hfS'); await p.waitForTimeout(800);
 D = await data();
-ok(D.assignments.some(a => a.title === 'اختبار رسمي معتمد' && a.type === 'exam' && a.reveal === 'never' && !a.targets), 'بعد الاعتماد يُنشر الاختبار الرسمي لكل متدربي المقرر');
+ok(D.assignments.some(a => a.title === 'اختبار رسمي معتمد' && a.type === 'exam' && a.reveal === 'after_submit' && !a.targets), 'بعد الاعتماد يُنشر الاختبار الرسمي لكل متدربي المقرر');
 ok(!errs.length, 'لا أخطاء في الصفحات' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
 if (failed()) process.exit(1);

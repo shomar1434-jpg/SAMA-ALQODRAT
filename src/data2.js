@@ -881,7 +881,7 @@ export const LocalStore = {
   async saveAssignment(a){ const me=await this._me(); validateAssignment(a); if(!teacherCovers(me, me.section, a.subject)) throw new Error('المقرر خارج نطاقك');
     const L=this.data.assignments, row={title:a.title.trim(), body:String(a.body||'').slice(0,4000), subject:a.subject, section:me.section, publish_date:a.publish_date, due_date:a.due_date, max_score:+a.max_score||10};
     if(a.kind==='quiz'&&!a.id){ row.kind='quiz'; row.quiz=buildQuiz(this.data, me, a.subject, a.unit||null, a.count, a.question_ids); } else if(!a.id) row.kind='text';
-    if(!a.id){ row.type=a.type||'homework'; row.reveal=a.reveal||'after_submit'; row.max_attempts=row.kind==='quiz'?attemptsOf(a):1; row.targets=checkTargets(this.data, me, a.subject, a.targets??null); row.target_label=row.targets?String(a.target_label||`${row.targets.length} متدربًا`).slice(0,80):''; if(row.type==='exam'&&row.kind==='quiz') checkExamKeys(this.data, row.quiz); }
+    if(!a.id){ row.type=a.type||'homework'; row.reveal='after_submit'; row.max_attempts=row.kind==='quiz'?attemptsOf(a):1; row.targets=checkTargets(this.data, me, a.subject, a.targets??null); row.target_label=row.targets?String(a.target_label||`${row.targets.length} متدربًا`).slice(0,80):''; if(row.type==='exam'&&row.kind==='quiz') checkExamKeys(this.data, row.quiz); }
     if(a.id){ const ex=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(ex?.kind==='quiz'){ delete row.subject; } }
     if(a.id){ const x=L.find(y=>y.id===a.id&&y.teacher_id===me.id); if(!x) throw new Error('غير مصرح'); Object.assign(x,row); } else L.push({id:uid(), teacher_id:me.id, ...row, created_at:new Date().toISOString()});
     this.save(); return {ok:true}; },
