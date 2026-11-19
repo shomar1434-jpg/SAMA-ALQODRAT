@@ -120,26 +120,29 @@ export async function viewHome(){
   const P=data.programs, open=P.filter(p=>cohortPublicState(p.cohort).k==='open'), cats=[...new Set(P.map(p=>p.category))].sort(catSort);
   const hours=P.reduce((s,p)=>s+(p.hours||0),0);
   app.innerHTML = `<div class="home">
-    <section class="cover">
-      <div class="cover-card">
-        <div class="cover-logos" data-reveal><span>${logoPair(LOGOS.tvtc, 'tvtc', 'المؤسسة العامة للتدريب التقني والمهني')}</span><span>${logoPair(LOGOS.nelc, 'nelc', 'المركز الوطني للتعليم الإلكتروني')}</span><span class="main">${logoPair(LOGOS.sama, 'sama', 'مركز سما القدرات للتدريب')}</span></div>
-        <div class="cover-grid">
-          <div class="cover-art" data-reveal style="--i:2">${BULB_SVG}<i class="dot d1"></i><i class="dot d2"></i><i class="dot d3"></i></div>
-          <div class="cover-text">
-            ${STAR_SVG('s1')}
-            <h1 data-reveal style="--i:1"><span class="t1">أهلًا بكم في مركز سما القدرات للتدريب</span><span class="rule"></span></h1>
-            <p data-reveal style="--i:3">${fmtNum(P.length)} برنامجًا تدريبيًا معتمدًا في ${fmtNum(cats.length)} مجالات، بإشراف ${CENTER.accreditor}. سجّل في برنامجك أو باقتك، وسجّل حضورك بباركود المركز الموحد.</p>
-            <div class="cover-cta" data-reveal style="--i:4"><a class="btn pri lg" href="#home" id="ctaEnroll" data-go-crs="now">${ic('form')} أرغب بالتسجيل</a><a class="btn lg ghost-t" href="#register">${ic('book')} استعرض البرامج</a><a class="btn lg ghost-t" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
-          </div>
+    <section class="nh">
+      <div class="nh-ph" aria-hidden="true"><img id="nhM" class="on" src="home/hero_m.webp" alt=""><img id="nhF" src="home/hero_f.webp" alt=""></div>
+      <div class="nh-wrap">
+        <div>
+          <div class="nh-top"><div class="nh-logos"><span>${logoPair(LOGOS.tvtc, 'tvtc', 'المؤسسة العامة للتدريب التقني والمهني')}</span><span>${logoPair(LOGOS.nelc, 'nelc', 'المركز الوطني للتعليم الإلكتروني')}</span></div>
+          <span class="nh-chip"><span class="nh-dot"></span>التسجيل مفتوح لباقات القدرات والتحصيلي</span></div>
+          <h1>نصنع مع أبنائنا وبناتنا<br><em>مستقبلهم الدراسي</em></h1>
+          <p class="nh-lead">تدريب حضوري مدروس للقدرات والتحصيلي، ومتابعة يومية لحضورك وواجباتك ومستواك، وتقرير أسبوعي يصل ولي أمرك. ${fmtNum(P.length)} برنامجًا معتمدًا في ${fmtNum(cats.length)} مجالات بإشراف ${CENTER.accreditor}.</p>
+          <div class="nh-ctas"><a class="nh-btn gold" href="#home" id="ctaEnroll" data-go-crs="now">${ic('form')} أرغب بالتسجيل</a><a class="nh-btn ghost" href="#placement">اختبر مستواك مجانًا</a><a class="nh-btn ghost" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
+          <div class="nh-seg" role="group" aria-label="القسم"><button type="button" data-s="M" aria-pressed="true">قسم البنين</button><button type="button" data-s="F" aria-pressed="false">قسم البنات</button></div>
         </div>
-        <ul class="cover-stats" data-reveal style="--i:5">
-          <li><b data-count="${P.length}">0</b><span>برنامجًا معتمدًا</span></li>
-          <li><b data-count="${cats.length}">0</b><span>مجالات تدريبية</span></li>
-          <li><b data-count="${P.length}">0</b><span>برنامجًا متاحًا للتسجيل</span></li>
-          <li><b data-count="${hours}">0</b><span>ساعة تدريبية</span></li>
-        </ul>
-        <svg class="chev" viewBox="0 0 260 300" aria-hidden="true"><path d="M260 0v300L120 220l70-70-70-70z" fill="#C1E1DC" opacity=".55"/><path d="M200 60l-80 90 80 90" fill="none" stroke="#59A598" stroke-width="34" stroke-linejoin="round" opacity=".5"/></svg>
+        <div class="nh-cards" aria-hidden="true">
+          <div class="nh-gc g1"><h4>مؤشر الأداء العام</h4><div class="row"><b><span id="nhPct">0</span>٪</b><span>تقدّم جيد</span></div><div class="bar"><i></i></div></div>
+          <div class="nh-gc g2"><h4>جلستك القادمة</h4><div class="t"><span class="ic">${ic('calendar')}</span><span><b>القدرات</b><small id="nhSec">الكمي · قسم البنين</small></span></div></div>
+          <div class="nh-gc g3"><h4>حضور اليوم</h4><div class="t"><i>✓</i><span><b>سُجّل حضورك</b><small>بالباركود الموحد</small></span></div></div>
+        </div>
       </div>
+      <ul class="nh-stats" data-reveal>
+        <li><b data-count="${P.length}">0</b><span>برنامجًا معتمدًا</span></li>
+        <li><b data-count="${cats.length}">0</b><span>مجالات تدريبية</span></li>
+        <li><b data-count="5">0</b><span>باقات قدرات وتحصيلي</span></li>
+        <li><b data-count="${hours}">0</b><span>ساعة تدريبية</span></li>
+      </ul>
     </section>
 
     ${aboutSectionHtml(site.about, P)}
@@ -180,6 +183,32 @@ export async function viewHome(){
   </div>`;
   $$('.dom').forEach(b=>b.onclick=()=>{ cat.kind='program'; cat.cf=b.dataset.cat; location.hash='#register'; });
   bindCourses(app);
+  { const imgs = { M: app.querySelector('#nhM'), F: app.querySelector('#nhF') }, bs = [...app.querySelectorAll('.nh-seg button')], sec = app.querySelector('#nhSec');
+    if (imgs.M && imgs.F) {
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let cur = 'M', auto, idle, busy = false;
+      const mark = s => { cur = s; bs.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === s))); if (sec) sec.textContent = s === 'M' ? 'الكمي · قسم البنين' : 'الكمي · قسم البنات'; };
+      const clean = el => { el.style.transition = el.style.transform = el.style.opacity = el.style.filter = ''; };
+      /* المستخدم متوقف: تلاشٍ ناعم مع تقريب بطيء */
+      const fadeTo = s => { if (s === cur || busy) return; const o = imgs[cur], n = imgs[s]; n.classList.remove('kb'); void n.offsetWidth; n.classList.add('on', 'kb'); o.classList.remove('on'); mark(s); };
+      /* ضغط الزر: انزلاق جانبي (البنات من اليسار، والبنين من اليمين) */
+      const slideTo = s => {
+        if (s === cur || busy) return; const o = imgs[cur], n = imgs[s], dir = s === 'F' ? -1 : 1;
+        if (still) { n.classList.add('on'); o.classList.remove('on'); return mark(s); }
+        busy = true; mark(s);
+        n.classList.remove('kb'); n.style.transition = 'none'; n.style.opacity = '1'; n.style.transform = `translateX(${dir * 100}%)`; n.style.zIndex = 2; void n.offsetWidth;
+        n.style.transition = 'transform .8s cubic-bezier(.65,0,.25,1)'; n.style.transform = 'translateX(0)';
+        o.style.transition = 'transform .8s cubic-bezier(.65,0,.25,1), filter .8s'; o.style.transform = `translateX(${-dir * 35}%)`; o.style.filter = 'brightness(.5)';
+        setTimeout(() => { n.style.transition = o.style.transition = 'none'; n.classList.add('on'); o.classList.remove('on', 'kb'); n.style.transform = n.style.opacity = o.style.transform = o.style.filter = ''; void o.offsetWidth; clean(n); clean(o); n.style.zIndex = ''; busy = false; }, 820);
+      };
+      const start = () => { clearInterval(auto); if (!still) auto = setInterval(() => { if (!document.body.contains(imgs.M)) return clearInterval(auto); fadeTo(cur === 'M' ? 'F' : 'M'); }, 6000); };
+      bs.forEach(b => b.addEventListener('click', () => { clearInterval(auto); clearTimeout(idle); slideTo(b.dataset.s); idle = setTimeout(start, 10000); }));
+      if (!still) imgs.M.classList.add('kb');
+      { const pc = app.querySelector('#nhPct'), bar = app.querySelector('.nh-gc .bar i'), to = 78, d = 2800, t0 = performance.now() + 700;
+        if (still) { pc.textContent = to; bar.style.width = to + '%'; }
+        else { const step = now => { const k = Math.min(1, Math.max(0, (now - t0) / d)), e = 1 - Math.pow(1 - k, 3); pc.textContent = Math.round(to * e); bar.style.width = (to * e) + '%'; if (k < 1 && document.body.contains(pc)) requestAnimationFrame(step); }; requestAnimationFrame(step); } }
+      start();
+    } }
   revealOnScroll(app);
   initPartnerMarquee(site.partners||[]);
   initPlansMarquee(pl.plans||[]);
