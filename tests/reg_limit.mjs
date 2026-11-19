@@ -13,6 +13,7 @@ const r = await p.evaluate(async () => {
   out.off2 = await tryIt(() => S.requestCustomPlan({ phone:'0551230001', name:'أ' }));
   localStorage.setItem('sama_reg_limit', '1');
   out.first = await tryIt(() => S.requestCustomPlan({ phone:'0551230002', name:'ب' }));
+  out.second = await tryIt(() => S.requestCustomPlan({ phone:'0551230002', name:'ب' }));
   out.samePhone = await tryIt(() => S.requestCustomPlan({ phone:'0551230002', name:'ب', _device:'otherdevice000000001' }));
   out.sameDevice = await tryIt(() => S.requestCustomPlan({ phone:'0551230003', name:'ج' }));
   out.otherBoth = await tryIt(() => S.requestCustomPlan({ phone:'0551230004', name:'د', _device:'otherdevice000000002' }));
@@ -21,9 +22,9 @@ const r = await p.evaluate(async () => {
   return out;
 });
 ok(r.off1 === 'ok' && r.off2 === 'ok', 'الوضع التجريبي بلا حد افتراضيًا (لا يعطّل الاختبارات)');
-ok(r.first === 'ok', 'أول طلب في اليوم يُقبل');
-ok(/هذا الجوال أو هذا الجهاز اليوم/.test(r.samePhone), 'الجوال نفسه يُرفض في اليوم نفسه');
-ok(/هذا الجوال أو هذا الجهاز اليوم/.test(r.sameDevice), 'الجهاز نفسه يُرفض في اليوم نفسه');
+ok(r.first === 'ok' && r.second === 'ok', 'أول طلبين في اليوم يُقبلان (قرار المالك: مرتان)');
+ok(/هذا الجوال أو هذا الجهاز اليوم/.test(r.samePhone), 'الثالث من الجوال نفسه يُرفض في اليوم نفسه');
+ok(/هذا الجوال أو هذا الجهاز اليوم/.test(r.sameDevice), 'الثالث من الجهاز نفسه يُرفض في اليوم نفسه');
 ok(r.otherBoth === 'ok', 'جوال آخر وجهاز آخر يُقبل');
 ok(/^[0-9a-f]{36}$/.test(r.dev), 'رمز الجهاز عشوائي محفوظ في المتصفح');
 ok(!errs.length, 'بلا أخطاء صفحة');
