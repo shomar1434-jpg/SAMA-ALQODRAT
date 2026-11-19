@@ -16,7 +16,7 @@ const intro = await text('.intro-cta');
 ok(/دورات متاحة حاليا/.test(intro) && /دورات متاحة قريبا/.test(intro) && !/استعرض البرامج|التحقق من شهادة/.test(intro), 'النبذة: زرا «دورات متاحة حاليا» و«قريبا» بدل الاستعراض والتحقق');
 ok(/أرغب بالتسجيل/.test(await text('#ctaEnroll')), 'الزر العلوي «أرغب بالتسجيل»');
 // الخطوة BQ: القسم العلوي الجديد (صورتا القسمين، المبدّل، البطاقات الثلاث، الشعاران)
-ok(await p.$('.nh #nhM.on') && await p.$('.nh #nhF') && (await p.$$('.nh-logos img')).length === 2 && (await p.$$('.nh-gc')).length === 3, 'القسم العلوي: صورتا البنين والبنات والشعاران والبطاقات الثلاث');
+ok(await p.$('.nh #nhM.on') && await p.$('.nh #nhF') && (await p.$$('.nh-logos .lg-l')).length === 2 && (await p.$$('.nh-gc')).length === 3, 'القسم العلوي: صورتا البنين والبنات والشعاران والبطاقات الثلاث');
 await p.click('.nh-seg [data-s=F]'); await p.waitForTimeout(1000);
 ok(await p.$('#nhF.on') && !(await p.$('#nhM.on')) && /قسم البنات/.test(await text('#nhSec')) && await p.getAttribute('.nh-seg [data-s=F]', 'aria-pressed') === 'true', 'زر «قسم البنات» ينقل الصورة والجلسة القادمة إلى قسم البنات');
 await p.waitForTimeout(2600); ok(/^78$/.test(await text('#nhPct')), 'مؤشر الأداء يمتلئ حتى 78');

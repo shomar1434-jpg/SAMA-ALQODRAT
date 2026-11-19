@@ -1620,3 +1620,4 @@ body.sim-on{overflow:hidden}
 }
 @media (min-width:1001px){.nh-wrap{min-height:min(76vh,760px)}}
 @media (max-width:420px){.nh-chip{font-size:12.5px;padding:8px 14px 8px 12px;min-height:44px}.nh-logos{min-height:48px}.nh-logos img{height:30px}.nh h1{font-size:30px}.nh-lead{font-size:15.5px}.nh-ctas .nh-btn{flex:1 1 auto;justify-content:center}}
+.nh-logos .lg-d{display:none!important}.nh-logos .lg-l{display:block!important}

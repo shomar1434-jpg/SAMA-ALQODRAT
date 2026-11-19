@@ -127,7 +127,7 @@ export async function viewHome(){
           <div class="nh-top"><div class="nh-logos"><span>${logoPair(LOGOS.tvtc, 'tvtc', 'المؤسسة العامة للتدريب التقني والمهني')}</span><span>${logoPair(LOGOS.nelc, 'nelc', 'المركز الوطني للتعليم الإلكتروني')}</span></div>
           <span class="nh-chip"><span class="nh-dot"></span>التسجيل مفتوح لباقات القدرات والتحصيلي</span></div>
           <h1>نصنع مع أبنائنا وبناتنا<br><em>مستقبلهم الدراسي</em></h1>
-          <p class="nh-lead">تدريب حضوري مدروس للقدرات والتحصيلي، ومتابعة يومية لحضورك وواجباتك ومستواك، وتقرير أسبوعي يصل ولي أمرك. ${fmtNum(P.length)} برنامجًا معتمدًا في ${fmtNum(cats.length)} مجالات بإشراف ${CENTER.accreditor}.</p>
+          <p class="nh-lead">تدريب حضوري مدروس للقدرات والتحصيلي، ومتابعة يومية لحضورك وواجباتك ومستواك، وتقرير أسبوعي يصل ولي أمرك. ${fmtNum(P.length)} برنامجًا معتمدًا متاحًا للتسجيل في ${fmtNum(cats.length)} مجالات بإشراف ${CENTER.accreditor}.</p>
           <div class="nh-ctas"><a class="nh-btn gold" href="#home" id="ctaEnroll" data-go-crs="now">${ic('form')} أرغب بالتسجيل</a><a class="nh-btn ghost" href="#placement">اختبر مستواك مجانًا</a><a class="nh-btn ghost" href="#checkin">${ic('qr')} تسجيل الحضور</a></div>
           <div class="nh-seg" role="group" aria-label="القسم"><button type="button" data-s="M" aria-pressed="true">قسم البنين</button><button type="button" data-s="F" aria-pressed="false">قسم البنات</button></div>
         </div>
