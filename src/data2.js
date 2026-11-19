@@ -335,11 +335,12 @@ export const LocalStore = {
     if(v && !PUB_STATES[v]) throw new Error('حالة غير صالحة'); if(v==='open_for_registration' && !openCohortOf(D, id, riyadhNow().date)) throw new Error('افتح دفعة للبرنامج وفعّل استقبال التسجيل أولًا');
     const before={publish_state:p.publish_state||null, expected_start:p.expected_start||null}; p.publish_state=v; p.expected_start=expected||null; this.audit('programs.update', id, {before, after:{publish_state:v, expected_start:p.expected_start}}); this.save(); return {ok:true}; },
   async publicSettings(){ const s=this.data.settings; return {require_code:s.require_code, late_minutes:s.late_minutes, early_minutes:s.early_minutes, checkin_url:s.checkin_url}; },
-  /* ↔ reg_rate_gate: مرة واحدة في اليوم لكل جوال وجهاز. في الوضع التجريبي لا يُطبَّق إلا بمفتاح الاختبار sama_reg_limit */
+  /* ↔ reg_rate_gate: مرتان في اليوم لكل جوال وجهاز (settings.reg_per_phone/reg_per_device). في الوضع التجريبي لا يُطبَّق إلا بمفتاح الاختبار sama_reg_limit */
   regGate(f, kind){ let on=false; try { on = localStorage.getItem('sama_reg_limit')==='1'; } catch(_){} if(!on) return;
     const D=this.data, d=riyadhNow().date, ph=normPhone(f.phone||''), dv=String(f._device||regDevice());
     D.reg_log=(D.reg_log||[]).filter(x=>x.day>=d);
-    if(D.reg_log.some(x=>x.day===d && ((ph && x.phone===ph) || (dv && x.device===dv)))) throw new Error(REG_LIMIT_MSG);
+    const st=D.settings||{}, perPh=+st.reg_per_phone||2, perDv=+st.reg_per_device||2, today=D.reg_log.filter(x=>x.day===d);
+    if((ph && today.filter(x=>x.phone===ph).length>=perPh) || (dv && today.filter(x=>x.device===dv).length>=perDv)) throw new Error(REG_LIMIT_MSG);
     D.reg_log.push({day:d, kind, phone:ph, device:dv}); },
   async register(f){
     this.regGate(f, 'program');

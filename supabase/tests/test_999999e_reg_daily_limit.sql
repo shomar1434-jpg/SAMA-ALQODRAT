@@ -6,7 +6,8 @@ begin
   perform set_config('app.uid', '', true);
   -- بلا ترويسات طلب (استدعاء مباشر): لا حد
   perform request_custom_plan('{"phone":"0551110001","name":"أ"}'); perform request_custom_plan('{"phone":"0551110001","name":"أ"}');
-  -- عبر الواجهة (بترويسات)
+  -- عبر الواجهة (بترويسات)؛ الاختبار على حد واحد ثم يعيد القيمة
+  update settings set reg_per_phone = 1, reg_per_device = 1 where id = 1;
   perform set_config('request.headers', '{"x-forwarded-for":"10.0.0.1"}', true);
   perform request_custom_plan('{"phone":"0551110002","name":"ب","_device":"devAAAAAAAAAAAAAAAA1"}');
   ok := false; begin perform request_custom_plan('{"phone":"0551110002","name":"ب","_device":"devBBBBBBBBBBBBBBBB2"}'); exception when others then ok := sqlerrm like '%هذا الجوال أو هذا الجهاز%'; end;
@@ -20,7 +21,7 @@ begin
   update settings set reg_per_ip = 2 where id = 1;
   ok := false; begin perform request_custom_plan('{"phone":"0551110005","name":"ه","_device":"devDDDDDDDDDDDDDDDD4"}'); exception when others then ok := true; end;
   assert ok, 'حد عنوان الشبكة';
-  update settings set reg_per_ip = 15 where id = 1;
+  update settings set reg_per_ip = 15, reg_per_phone = 2, reg_per_device = 2 where id = 1;
   -- المسؤول غير مقيّد
   insert into auth.users(id, email) values (adm, 'reg-adm@test'); insert into admins(user_id, role, name) values (adm, 'staff', 'موظف');
   perform set_config('app.uid', adm::text, true);
