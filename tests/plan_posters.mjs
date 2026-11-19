@@ -18,6 +18,14 @@ ok(cu.name === 'خصصناها لك' && cu.reg_fee + cu.installments * cu.instal
 ok(D.plans.find(x => x.tier === 'custom' && x.mode === 'remote').status === 'coming_soon', 'خصصناها لك عن بُعد: قريبًا');
 ok(/خصصناها لك/.test(await text('#plMq')) && !/اطلب عرضًا/.test(await text('#plMq')), 'تظهر في شريط الباقات بدل بطاقة «اطلب عرضًا»');
 
+// الشريط يبقى متحركًا بعد إعادة الرسم الهادئة للتحديث الحي (live-redraw)
+await p.evaluate(() => { document.documentElement.classList.add('live-redraw'); window.dispatchEvent(new HashChangeEvent('hashchange')); });
+await p.waitForTimeout(600); await p.evaluate(() => document.documentElement.classList.remove('live-redraw'));
+await p.waitForSelector('#plMq .pl-card');
+const tx = () => p.$eval('#plMq .mq-track', t => t.style.transform);
+const t1 = await tx(); await p.waitForTimeout(800); const t2 = await tx();
+ok(t1 !== t2 && !(await p.$eval('#plMq [data-mq=toggle]', b => b.hidden)), 'شريط الباقات يتحرك بعد التحديث الحي الهادئ وزر الإيقاف ظاهر');
+
 // التصميم التعريفي في صفحة كل باقة
 let all = true; const srcs = new Set();
 for (const pl of inP) { await p.goto(U + '#plan-' + pl.id); await p.waitForSelector('#plPoster img'); await p.waitForFunction(() => document.querySelector('#plPoster img').complete);

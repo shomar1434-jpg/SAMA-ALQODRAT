@@ -3,7 +3,7 @@
    أزرار سابق/تالٍ، إيقاف واستئناف، توقف عند التركيز أو المؤشر،
    واحترام prefers-reduced-motion (لا حركة تلقائية).
    ===================================================================== */
-import { reduceMotion } from './views2_head.js';
+import { prefersReduced } from './views2_head.js';
 
 /* root: عنصر يحوي .mq-view > .mq-track، وأزرار [data-mq=prev|next|toggle] اختيارية
    items: قائمة البيانات، card(item, clone) يعيد HTML البطاقة، onOpen(item, el) عند النقر */
@@ -14,7 +14,7 @@ export function initMarquee(root, items, card, onOpen, { speed = 0.035, gap = 16
   let reps = 1; while(track.scrollWidth < view.clientWidth * 1.2 && reps < 12){ track.insertAdjacentHTML('beforeend', items.map(x => card(x, true)).join('')); reps++; }
   const unit = track.scrollWidth + gap;
   track.insertAdjacentHTML('beforeend', items.map(x => card(x, true)).join('').repeat(reps));
-  const still = reduceMotion();
+  const still = prefersReduced();   // لا quiet(): التحديث الحي الهادئ لا يوقف الشريط
   let x = -1, v = 0, last = performance.now(), drag = null, hover = false, paused = still, idleUntil = 0;
   const wrap = () => { while(x > 0) x -= unit; while(x <= -unit) x += unit; };
   const paint = () => { track.style.transform = `translate3d(${x}px,0,0)`; };

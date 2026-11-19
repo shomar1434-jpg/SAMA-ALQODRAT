@@ -4,7 +4,7 @@ import { setBusy, showErrorSummary, wireFormA11y } from './features.js';
 import { LOGOS } from './logos.js';
 import { $, $$, esc, fmtNum, uid } from './utils.js';
 import { AD, reloadAD } from './views2_admin.js';
-import { emptyBox, ic, reduceMotion, toast } from './views2_head.js';
+import { emptyBox, ic, prefersReduced, reduceMotion, toast } from './views2_head.js';
 import { titleBar } from './views2_main.js';
 import { closeModal, confirmBox, modal, swRow } from './views2_programs.js';
 
@@ -60,7 +60,7 @@ export function initPartnerMarquee(list){
   const unit = setW()+16;                                   // عرض مجموعة واحدة كاملة (مع التكرار)
   track.insertAdjacentHTML('beforeend', track.innerHTML.replace(/<button class="pt-card" data-pid="([^"]+)" (?!aria-hidden)/g,'<button class="pt-card" data-pid="$1" aria-hidden="true" tabindex="-1" '));
   $$('img',track).forEach(img=>{ img.addEventListener('error',()=>fix(img)); if(img.complete && !img.naturalWidth && img.src) fix(img); });
-  const still = reduceMotion();
+  const still = prefersReduced();   // لا quiet(): التحديث الحي الهادئ لا يوقف الشريط
   let x=-1, v=0, last=performance.now(), drag=null, hover=false, raf=0, idleUntil=0;
   const speed = still ? 0 : 0.035;                       // بكسل لكل ملّي ثانية
   const wrap = () => { while(x > 0) x -= unit; while(x <= -unit) x += unit; };
