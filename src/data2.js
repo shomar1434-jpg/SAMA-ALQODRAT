@@ -303,6 +303,13 @@ export function mergeOnRegister(D, t, person, source='registration'){
   const r={id:uid(), trainee_id:t.id, changes:ch, source, status:'pending', created_at:new Date().toISOString()};
   D.profile_change_requests.push(r); return r;
 }
+/* رمز الجهاز للحد اليومي للتسجيل (الخطوة BP): عشوائي يحفظه المتصفح ويُرسل مع التسجيل العام (`_device`)؛ يُجزَّأ في الخادم */
+export function regDevice(){
+  try { let v = localStorage.getItem('sama_reg_dev');
+    if(!v || !/^[A-Za-z0-9_-]{16,64}$/.test(v)){ const a = new Uint8Array(18); crypto.getRandomValues(a); v = [...a].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('sama_reg_dev', v); }
+    return v; } catch(_){ return ''; }
+}
+export const REG_LIMIT_MSG = 'سُجّل طلب من هذا الجوال أو هذا الجهاز اليوم. للتسجيل مرة أخرى تواصل مع المركز عبر واتساب.';
 export const LocalStore = {
   key:'sama_qudrat_v4', mode:'local', data:null, admin:false,
   load(){
@@ -328,7 +335,14 @@ export const LocalStore = {
     if(v && !PUB_STATES[v]) throw new Error('حالة غير صالحة'); if(v==='open_for_registration' && !openCohortOf(D, id, riyadhNow().date)) throw new Error('افتح دفعة للبرنامج وفعّل استقبال التسجيل أولًا');
     const before={publish_state:p.publish_state||null, expected_start:p.expected_start||null}; p.publish_state=v; p.expected_start=expected||null; this.audit('programs.update', id, {before, after:{publish_state:v, expected_start:p.expected_start}}); this.save(); return {ok:true}; },
   async publicSettings(){ const s=this.data.settings; return {require_code:s.require_code, late_minutes:s.late_minutes, early_minutes:s.early_minutes, checkin_url:s.checkin_url}; },
+  /* ↔ reg_rate_gate: مرة واحدة في اليوم لكل جوال وجهاز. في الوضع التجريبي لا يُطبَّق إلا بمفتاح الاختبار sama_reg_limit */
+  regGate(f, kind){ let on=false; try { on = localStorage.getItem('sama_reg_limit')==='1'; } catch(_){} if(!on) return;
+    const D=this.data, d=riyadhNow().date, ph=normPhone(f.phone||''), dv=String(f._device||regDevice());
+    D.reg_log=(D.reg_log||[]).filter(x=>x.day>=d);
+    if(D.reg_log.some(x=>x.day===d && ((ph && x.phone===ph) || (dv && x.device===dv)))) throw new Error(REG_LIMIT_MSG);
+    D.reg_log.push({day:d, kind, phone:ph, device:dv}); },
   async register(f){
+    this.regGate(f, 'program');
     const D=this.data, today=riyadhNow().date;
     if(!validSaudiId(f.national_id)) throw new Error('رقم السجل المدني غير صحيح');
     const pids = f.package_id ? (D.packages.find(k=>k.id===f.package_id)?.program_ids||[]) : [f.program_id];
@@ -505,6 +519,7 @@ export const LocalStore = {
   /* ---- باقات القدرات والتحصيلي ---- */
   async publicPlans(){ const D=this.data; return { plans:(D.plans||[]).filter(p=>p.active!==false).sort((a,b)=>a.sort-b.sort), schedule:D.schedule_templates||[] }; },
   async registerSubscription(f){
+    this.regGate(f, 'plan');
     const D=this.data; if(!validSaudiId(f.national_id)) throw new Error('رقم السجل المدني غير صحيح');
     const plan=D.plans.find(p=>p.id===f.plan_id); if(!planOpen(plan)) throw new Error('التسجيل في هذه الباقة غير متاح حاليًا'); checkAcceptance(D.policies, riyadhNow().date, f.accepted_policies);
     let t=D.trainees.find(x=>x.national_id===f.national_id);
@@ -553,7 +568,7 @@ export const LocalStore = {
     else { const ses=sessionOn(D,s.section,date); D.sub_attendance.push({id:uid(), subscription_id, trainee_id:s.trainee_id, att_date:date, time:(ses?.start||'00:00')+':00', status, manual:true, checkin_at:new Date().toISOString()});
       if(!s.start_date){ const plan=D.plans.find(p=>p.id===s.plan_id); Object.assign(s,{start_date:date, end_date:subEnd(plan,date), status:'active'}); } }
     this.audit('attendance.manual', subscription_id, {date, before, after:status}); this.save(); },
-  async requestCustomPlan(f){ (this.data.custom_requests=this.data.custom_requests||[]).push({id:uid(), name:String(f.name||'').trim().slice(0,80), phone:String(f.phone||''), program:f.program, section:f.section, mode:f.mode, notes:String(f.notes||'').slice(0,600), status:'new', created_at:new Date().toISOString()}); this.save(); return {ok:true}; },
+  async requestCustomPlan(f){ this.regGate(f, 'custom'); (this.data.custom_requests=this.data.custom_requests||[]).push({id:uid(), name:String(f.name||'').trim().slice(0,80), phone:String(f.phone||''), program:f.program, section:f.section, mode:f.mode, notes:String(f.notes||'').slice(0,600), status:'new', created_at:new Date().toISOString()}); this.save(); return {ok:true}; },
   async setCustomRequestStatus(id, status){ const r=(this.data.custom_requests||[]).find(x=>x.id===id); if(r){ r.status=status; this.audit('custom_request.status', id, {status}); this.save(); } },
   /* صور البنك (الخطوة BO): محليًا بلا توقيع؛ المسار يُلحق بقاعدة الصور كما هو */
   async signBankAssets(paths){ const b=String(this.data.settings?.bank_assets||'').replace(/\/+$/,''); const out={}; (paths||[]).forEach(p=>{ if(p) out[p]=b?b+'/'+String(p).replace(/^\/+/,''):''; }); return out; },
@@ -1083,7 +1098,7 @@ export const CloudStore = {
   async publicProgram(code){ return this._e(await this.sb.rpc('public_program',{p_code:code})); },
   async setPublish(id, state, expected){ return this._e(await this.sb.rpc('admin_set_publish',{p_program:id, p_state:state||null, p_expected:expected||null})); },
   async publicSettings(){ return this._e(await this.sb.rpc('public_settings')) || {}; },
-  async register(f){ return this._e(await this.sb.rpc('register_trainee',{p:f})); },
+  async register(f){ return this._e(await this.sb.rpc('register_trainee',{p:{...f, _device:regDevice()}})); },
   async placeRequests(ids){ return this._e(await this.sb.rpc('admin_place_requests',{p_ids:ids})); },
   async cancelRequest(id, reason){ return this._e(await this.sb.rpc('admin_cancel_request',{p_id:id, p_reason:reason})); },
   async checkin(nid, code, programCode, opts={}){ return this._e(await this.sb.rpc('checkin',{p_nid:nid, p_code:code||null, p_program:programCode||null, p_device:opts.device||'', p_choice:opts.choice||null})); },
@@ -1139,7 +1154,7 @@ export const CloudStore = {
   async saveSettings(s){ const {admin_pin,...rest}=s; const d=this._e(await this.sb.from('settings').update(rest).eq('id',1).select('id')); if(!d||!d.length) throw new Error('تعديل الإعدادات لمدير النظام فقط'); },
   /* ---- باقات القدرات والتحصيلي ---- */
   async publicPlans(){ const d=this._e(await this.sb.rpc('public_plans'))||{}; return {plans:d.plans||[], schedule:d.schedule||[]}; },
-  async registerSubscription(f){ return this._e(await this.sb.rpc('register_subscription',{p:f})); },
+  async registerSubscription(f){ return this._e(await this.sb.rpc('register_subscription',{p:{...f, _device:regDevice()}})); },
   async savePlan(p){ const row=this._strip(p,['id','created_at']); this._e(p.id ? await this.sb.from('plans').update(row).eq('id',p.id) : await this.sb.from('plans').insert(row)); },
   async saveTemplates(section, rows){ this._e(await this.sb.rpc('save_templates',{p_section:section, p_rows:rows})); },
   async saveException(x){ const row={date:x.date, section:x.section, type:x.type, start_time:x.start||null, end_time:x.end||null, note:x.note||''}; this._e(x.id ? await this.sb.from('schedule_exceptions').update(row).eq('id',x.id) : await this.sb.from('schedule_exceptions').insert(row)); },
@@ -1147,7 +1162,7 @@ export const CloudStore = {
   async saveSubscription(f){ return this._e(await this.sb.rpc('admin_save_subscription',{p:{...f, plan:undefined}})); },
   async cancelSubscription(id, on=true){ const s=this._e(await this.sb.from('subscriptions').select('start_date').eq('id',id).single()); this._e(await this.sb.from('subscriptions').update({status: on?'cancelled':(s.start_date?'active':'pending')}).eq('id',id)); },
   async setSubAttendance(subscription_id, date, status){ this._e(await this.sb.rpc('set_sub_attendance',{p_sub:subscription_id, p_date:date, p_status:status})); },
-  async requestCustomPlan(f){ return this._e(await this.sb.rpc('request_custom_plan',{p:f})); },
+  async requestCustomPlan(f){ return this._e(await this.sb.rpc('request_custom_plan',{p:{...f, _device:regDevice()}})); },
   async setCustomRequestStatus(id, status){ this._e(await this.sb.from('custom_requests').update({status}).eq('id',id)); },
   async absenceAlertAct(subId, level, action){ this._e(await this.sb.rpc('admin_absence_alert',{p_sub:subId, p_level:+level, p_action:action})); return {ok:true}; },
   /* روابط موقّعة لصور البنك الخاصة (الخطوة BO): يصدرها التخزين وفق سياسة bank_signed_read ↔ bank_object_ok */
