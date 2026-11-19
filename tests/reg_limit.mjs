@@ -1,0 +1,31 @@
+// الخطوة BP: التسجيل العام مرة واحدة في اليوم من الجوال نفسه أو الجهاز نفسه
+import { chromium } from 'playwright';
+import { serveDist, reporter } from './_server.mjs';
+const { ok, failed } = reporter();
+const { server, origin: U } = serveDist();
+const b = await chromium.launch(); const p = await (await b.newContext()).newPage();
+const errs = []; p.on('pageerror', e => errs.push(e.message));
+await p.goto(U); await p.waitForTimeout(800);
+const r = await p.evaluate(async () => {
+  const S = window.__SAMA__.LocalStore, out = {};
+  const tryIt = async fn => { try { await fn(); return 'ok'; } catch(e){ return e.message; } };
+  out.off1 = await tryIt(() => S.requestCustomPlan({ phone:'0551230001', name:'أ' }));
+  out.off2 = await tryIt(() => S.requestCustomPlan({ phone:'0551230001', name:'أ' }));
+  localStorage.setItem('sama_reg_limit', '1');
+  out.first = await tryIt(() => S.requestCustomPlan({ phone:'0551230002', name:'ب' }));
+  out.samePhone = await tryIt(() => S.requestCustomPlan({ phone:'0551230002', name:'ب', _device:'otherdevice000000001' }));
+  out.sameDevice = await tryIt(() => S.requestCustomPlan({ phone:'0551230003', name:'ج' }));
+  out.otherBoth = await tryIt(() => S.requestCustomPlan({ phone:'0551230004', name:'د', _device:'otherdevice000000002' }));
+  out.dev = localStorage.getItem('sama_reg_dev') || '';
+  localStorage.removeItem('sama_reg_limit');
+  return out;
+});
+ok(r.off1 === 'ok' && r.off2 === 'ok', 'الوضع التجريبي بلا حد افتراضيًا (لا يعطّل الاختبارات)');
+ok(r.first === 'ok', 'أول طلب في اليوم يُقبل');
+ok(/هذا الجوال أو هذا الجهاز اليوم/.test(r.samePhone), 'الجوال نفسه يُرفض في اليوم نفسه');
+ok(/هذا الجوال أو هذا الجهاز اليوم/.test(r.sameDevice), 'الجهاز نفسه يُرفض في اليوم نفسه');
+ok(r.otherBoth === 'ok', 'جوال آخر وجهاز آخر يُقبل');
+ok(/^[0-9a-f]{36}$/.test(r.dev), 'رمز الجهاز عشوائي محفوظ في المتصفح');
+ok(!errs.length, 'بلا أخطاء صفحة');
+await b.close(); server.close();
+if (failed()) process.exit(1);
