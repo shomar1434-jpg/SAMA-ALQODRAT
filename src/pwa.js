@@ -19,26 +19,26 @@ export function platformOf(ua = navigator.userAgent, touch = navigator.maxTouchP
   return 'desktop';
 }
 export const INSTALL_STEPS = {
-  ios:['افتح المنصة في متصفح Safari.', 'اضغط زر المشاركة (المربع الذي يخرج منه سهم) في شريط المتصفح.', 'اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة».', 'افتح المنصة من أيقونتها الجديدة، ثم فعّل الإشعارات من جرس الإشعارات.'],
+  ios:['افتح الموقع في متصفح Safari.', 'اضغط زر المشاركة (المربع الذي يخرج منه سهم) في شريط المتصفح.', 'اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة».', 'افتح الموقع من أيقونتها الجديدة، ثم فعّل الإشعارات من جرس الإشعارات.'],
   android:['افتح قائمة المتصفح (النقاط الثلاث أعلى الشاشة).', 'اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».', 'أكّد بالضغط على «تثبيت».'],
-  'mac-safari':['من شريط القوائم اختر «ملف».', 'اختر «إضافة إلى Dock».', 'افتح المنصة من أيقونتها في Dock.'],
-  desktop:['في متصفح Chrome أو Edge اضغط أيقونة التثبيت في شريط العنوان (شاشة عليها سهم).', 'أو من قائمة المتصفح اختر «تثبيت مركز سما القدرات».', 'تُفتح المنصة بعدها في نافذة مستقلة، ولها أيقونة على سطح المكتب.']
+  'mac-safari':['من شريط القوائم اختر «ملف».', 'اختر «إضافة إلى Dock».', 'افتح الموقع من أيقونتها في Dock.'],
+  desktop:['في متصفح Chrome أو Edge اضغط أيقونة التثبيت في شريط العنوان (شاشة عليها سهم).', 'أو من قائمة المتصفح اختر «تثبيت مركز سما القدرات».', 'يُفتح الموقع بعدها في نافذة مستقلة، ولها أيقونة على سطح المكتب.']
 };
 const PLAT_TXT = { ios:'آيفون وآيباد', android:'أندرويد', 'mac-safari':'ماك (Safari)', desktop:'الكمبيوتر (ويندوز وماك)' };
 
 function installModal(){
   const pf = platformOf();
-  modal(`<h3>${DL} تثبيت المنصة كتطبيق</h3><p class="hint" style="margin:-4px 0 12px">تفتح بضغطة من الشاشة الرئيسية، وتعمل بملء الشاشة، وتصلك إشعاراتها على الجهاز.</p>
+  modal(`<h3>${DL} تثبيت الموقع كتطبيق</h3><p class="hint" style="margin:-4px 0 12px">تفتح بضغطة من الشاشة الرئيسية، وتعمل بملء الشاشة، وتصلك إشعاراتها على الجهاز.</p>
     ${deferred ? `<button class="btn pri lg" id="pwaGo" style="width:100%">${DL} تثبيت الآن</button><p class="hint" style="text-align:center;margin:10px 0 0">أو يدويًا:</p>` : ''}
     <h4 style="margin:12px 0 6px;font-size:15px">${PLAT_TXT[pf]}</h4><ol class="pwa-steps">${INSTALL_STEPS[pf].map(x => `<li>${x}</li>`).join('')}</ol>
     <details class="pwa-more"><summary>أجهزة أخرى</summary>${Object.keys(INSTALL_STEPS).filter(k => k !== pf).map(k => `<h4 style="margin:10px 0 4px;font-size:14px">${PLAT_TXT[k]}</h4><ol class="pwa-steps">${INSTALL_STEPS[k].map(x => `<li>${x}</li>`).join('')}</ol>`).join('')}</details>
     <div style="text-align:end;margin-top:12px"><button class="btn" id="pwaX">إغلاق</button></div>`);
   $('#pwaX').onclick = closeModal;
-  if($('#pwaGo')) $('#pwaGo').onclick = async () => { const d = deferred; deferred = null; closeModal(); try { d.prompt(); const r = await d.userChoice; if(r.outcome === 'accepted') toast('جارٍ تثبيت المنصة'); } catch(_){} };
+  if($('#pwaGo')) $('#pwaGo').onclick = async () => { const d = deferred; deferred = null; closeModal(); try { d.prompt(); const r = await d.userChoice; if(r.outcome === 'accepted') toast('جارٍ تثبيت الموقع'); } catch(_){} };
 }
 function mountInstallBtn(){
   if(isStandalone() || $('#installBtn') || !$('#themeBtn')) return;
-  const b = document.createElement('button'); b.id = 'installBtn'; b.type = 'button'; b.className = 'themebtn'; b.setAttribute('aria-label', 'تثبيت المنصة كتطبيق'); b.title = 'تثبيت المنصة كتطبيق'; b.innerHTML = DL;
+  const b = document.createElement('button'); b.id = 'installBtn'; b.type = 'button'; b.className = 'themebtn'; b.setAttribute('aria-label', 'تثبيت الموقع كتطبيق'); b.title = 'تثبيت الموقع كتطبيق'; b.innerHTML = DL;
   $('#themeBtn').before(b); b.onclick = installModal;
 }
 
@@ -46,7 +46,7 @@ function mountInstallBtn(){
 function showUpdate(worker){
   if($('#pwaUpdate')) return;
   const box = document.createElement('div'); box.id = 'pwaUpdate'; box.setAttribute('role', 'status');
-  box.innerHTML = `<span>${ic('refresh')} يتوفر تحديث للمنصة</span><button class="btn pri sm" id="pwaUp">تحديث الآن</button><button class="btn sm ghost" id="pwaLater" aria-label="لاحقًا">لاحقًا</button>`;
+  box.innerHTML = `<span>${ic('refresh')} يتوفر تحديث للموقع</span><button class="btn pri sm" id="pwaUp">تحديث الآن</button><button class="btn sm ghost" id="pwaLater" aria-label="لاحقًا">لاحقًا</button>`;
   document.body.appendChild(box);
   $('#pwaLater').onclick = () => box.remove();
   $('#pwaUp').onclick = () => { reloading = true; $('#pwaUp').disabled = true; worker.postMessage('SKIP_WAITING'); setTimeout(() => location.reload(), 4000); };
