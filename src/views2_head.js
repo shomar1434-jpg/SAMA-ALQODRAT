@@ -77,6 +77,8 @@ export function ringSvg(pct, size=58, sw=6, tone){
   const r=(size-sw)/2, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
   return `<div class="ring" style="width:${size}px;height:${size}px;${tone?`--c:var(--${tone})`:''}"><svg width="${size}" height="${size}"><circle class="bg" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke-width="${sw}"/><circle class="fg" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke-width="${sw}" stroke-dasharray="${c}" stroke-dashoffset="${off}" style="--rc:${c}"/></svg><b>${fmtNum(pct)}٪</b></div>`;
 }
+// تفضيل المستخدم وحده (لا يتأثر بالتحديث الحي): للحركة المستمرة كالشرائط المنزلقة
+export const prefersReduced = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 export const reduceMotion = () => quiet() || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 export function countUp(root=document){
   $$('[data-count]', root).forEach(el=>{
