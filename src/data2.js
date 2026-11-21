@@ -20,6 +20,7 @@ import { PAY_METHODS, BANK_DEFAULT, orderRemaining, orderNumber, attendanceBlock
 import { checkRole, auditFilter, auditRedact } from './admin_logic.js';
 import { checkBirthGuardian, isKidsProgram, selfLinkLogic, LINK_FAIL, LINK_LOCKED, checkMinorConsent } from './identity_logic.js';
 import { weeklyNotes } from './weekly_logic.js';
+import { checkBreak, planBreak, breakNoteText } from './break_logic.js';
 import { PL_KINDS, PL_GRACE_SEC, plSet, plMinutes, plAvailable, plBuild, plPublicQ, plGrade, plCheckSettings, plLink, plFresh } from './placement_logic.js';
 import { catOk, simOpen, simExpired, simsToday, SIM_DAILY_MAX, sortSubjects, buildSim, cleanAnswers, CATEGORIES } from './sim_logic.js';
 import { SUBJECTS, validateAssignment, validateQuestion, buildAttempt, attemptPublic, gradeAttempt, canRate, ratingSummary, validateMessage, teacherCovers, teacherTeaches, studentHasScope, bankFor, period, demoLearning, backfillCategories, bankUnitsOf, buildQuiz, quizPublic, gradeQuiz, teacherBank, normalizeBundle, LETTERS, isTargeted, assignmentPublic, submissionPublic, checkTargets, checkExamKeys, quizDeadline, quizOpen , attemptsLeft, attemptsOf, snapOf, liveSubsOf } from './learning_logic.js';
@@ -537,7 +538,35 @@ export const LocalStore = {
   async savePlan(p){ const a=this.data.plans, i=a.findIndex(x=>x.id===p.id); if(i>=0) a[i]={...a[i],...p}; else a.push({...p, id:uid(), sort:p.sort??a.length}); this.audit('plan.save', p.id||'new'); this.save(); },
   async saveTemplates(section, rows){ const D=this.data; D.schedule_templates=[...D.schedule_templates.filter(x=>x.section!==section), ...rows.map(r=>({id:uid(), section, ...r}))]; this.audit('schedule.save', section); this.save(); },
   async saveException(x){ const a=this.data.schedule_exceptions; const i=a.findIndex(y=>y.id===x.id); if(i>=0) a[i]={...a[i],...x}; else a.push({...x, id:uid(), created_at:new Date().toISOString()}); this.audit('exception.save', x.date); this.save(); },
-  async deleteException(id){ this.data.schedule_exceptions=this.data.schedule_exceptions.filter(x=>x.id!==id); this.audit('exception.delete', id); this.save(); },
+  async deleteException(id){ const x=this.data.schedule_exceptions.find(y=>y.id===id); if(x?.break_id) throw new Error('هذا اليوم ضمن إلغاء جلسات لفترة؛ تراجع عنه من «إلغاء الجلسات» في شاشة محاضرات اليوم');
+    this.data.schedule_exceptions=this.data.schedule_exceptions.filter(x=>x.id!==id); this.audit('exception.delete', id); this.save(); },
+  /* إلغاء جلسات الباقات لفترة مع تعويض تلقائي ↔ admin_cancel_sessions / admin_revoke_session_break */
+  async cancelSessions(f){ const me=await this.adminMe(); if(!['owner','full'].includes(me?.role)) throw new Error('إلغاء الجلسات للمالك ومدير النظام');
+    const D=this.data, today=riyadhNow().date, sections=f.sections?.length?f.sections:['boys','girls'], g={...f, sections, note:String(f.note||'').trim()};
+    const err=checkBreak(g, today); if(err) throw new Error(err);
+    const id=f.preview?'preview':uid(), P=planBreak(D, g, id);
+    if(!P.sessions.length) throw new Error('لا توجد جلسات في هذه الفترة');
+    const out={id:f.preview?null:id, preview:!!f.preview, sessions:P.sessions, affected:P.affected, changes:P.changes, reason:P.reason};
+    if(f.preview) return out;
+    const now=new Date().toISOString(), seq=(D.session_breaks||[]).reduce((m,b)=>Math.max(m,b.seq||0),0)+1;
+    (D.session_breaks=D.session_breaks||[]).push({id, seq, from_date:g.from, to_date:g.to, sections, reason:g.reason, note:g.note, sessions:P.sessions, affected:P.affected, created_at:now, revoked_at:null});
+    P.exceptions.forEach(x=>D.schedule_exceptions.push({...x, id:uid(), created_at:now}));
+    D.break_compensations=D.break_compensations||[];
+    for(const c of P.comps){ const s=D.subscriptions.find(x=>x.id===c.subscription_id); s.end_date=c.new_end;
+      D.break_compensations.push({id:uid(), break_id:id, subscription_id:c.subscription_id, old_end:c.old_end, new_end:c.new_end, sessions:c.sessions, restored_at:null});
+      const t=D.trainees.find(x=>x.id===c.trainee_id); D.notifications=D.notifications||[];
+      D.notifications.push({id:uid(), at:now, date:today, sender:'system', to:'student', trainee_id:c.trainee_id, kind:'session_cancel', text:breakNoteText(c, g, P.reason), dedupe_key:`brk:${id}:s:${c.subscription_id}`});
+      if((D.guardian_links||[]).some(l=>l.status==='verified'&&l.trainee_id===c.trainee_id)) D.notifications.push({id:uid(), at:now, date:today, sender:'system', to:'guardian', trainee_id:c.trainee_id, kind:'session_cancel', text:breakNoteText(c, g, P.reason, (t?.full_name||'').split(' ')[0]), dedupe_key:`brk:${id}:g:${c.subscription_id}`}); }
+    this.audit('session_breaks.insert', id, {after:{from:g.from, to:g.to, sections, reason:g.reason, affected:P.affected}}); this.save(); return out; },
+  async revokeSessionBreak(id){ const me=await this.adminMe(); if(!['owner','full'].includes(me?.role)) throw new Error('إلغاء الجلسات للمالك ومدير النظام');
+    const D=this.data, b=(D.session_breaks||[]).find(x=>x.id===id); if(!b) throw new Error('الإلغاء غير موجود'); if(b.revoked_at) throw new Error('سبق التراجع عن هذا الإلغاء');
+    const C=(D.break_compensations||[]), mine=C.filter(c=>c.break_id===id), subs=new Set(mine.map(c=>c.subscription_id));
+    if(C.some(c=>subs.has(c.subscription_id)&&D.session_breaks.some(o=>o.id===c.break_id&&!o.revoked_at&&o.seq>b.seq))) throw new Error('تراجع أولًا عن الإلغاء الأحدث الذي مدّد الاشتراكات نفسها');
+    let restored=0, conflicts=0;
+    for(const c of mine.filter(c=>!c.restored_at)){ const s=D.subscriptions.find(x=>x.id===c.subscription_id); if(s&&s.end_date===c.new_end){ s.end_date=c.old_end; c.restored_at=new Date().toISOString(); restored++; } else conflicts++; }
+    D.schedule_exceptions=D.schedule_exceptions.filter(x=>x.break_id!==id); b.revoked_at=new Date().toISOString();
+    this.audit('session_breaks.update', id, {after:{revoked:true, restored, conflicts}}); this.save(); return {restored, conflicts}; },
+  async sessionBreaks(){ return JSON.parse(JSON.stringify((this.data.session_breaks||[]).slice().sort((a,b)=>b.seq-a.seq))); },
   /* إضافة/تعديل اشتراك من الإدارة، ومنها المتدربون الحاليون بتاريخ بداية فعلي (D-10) */
   async saveSubscription(f){
     const D=this.data, plan=D.plans.find(p=>p.id===f.plan_id); if(!plan) throw new Error('اختر الباقة');
@@ -1160,6 +1189,9 @@ export const CloudStore = {
   async saveTemplates(section, rows){ this._e(await this.sb.rpc('save_templates',{p_section:section, p_rows:rows})); },
   async saveException(x){ const row={date:x.date, section:x.section, type:x.type, start_time:x.start||null, end_time:x.end||null, note:x.note||''}; this._e(x.id ? await this.sb.from('schedule_exceptions').update(row).eq('id',x.id) : await this.sb.from('schedule_exceptions').insert(row)); },
   async deleteException(id){ this._e(await this.sb.from('schedule_exceptions').delete().eq('id',id)); },
+  async cancelSessions(f){ const r=await this.sb.rpc('admin_cancel_sessions',{p:{from:f.from, to:f.to, sections:f.sections?.length?f.sections:['boys','girls'], reason:f.reason, note:f.note||'', preview:!!f.preview}}); return this._e(r); },
+  async revokeSessionBreak(id){ return this._e(await this.sb.rpc('admin_revoke_session_break',{p_id:id})); },
+  async sessionBreaks(){ return this._e(await this.sb.from('session_breaks').select('*').order('seq',{ascending:false}).limit(50)); },
   async saveSubscription(f){ return this._e(await this.sb.rpc('admin_save_subscription',{p:{...f, plan:undefined}})); },
   async cancelSubscription(id, on=true){ const s=this._e(await this.sb.from('subscriptions').select('start_date').eq('id',id).single()); this._e(await this.sb.from('subscriptions').update({status: on?'cancelled':(s.start_date?'active':'pending')}).eq('id',id)); },
   async setSubAttendance(subscription_id, date, status){ this._e(await this.sb.rpc('set_sub_attendance',{p_sub:subscription_id, p_date:date, p_status:status})); },
