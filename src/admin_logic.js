@@ -37,7 +37,7 @@ export const AUDIT_SECTIONS = {
   enrollments:'التسجيلات', cohorts:'الدفعات', programs:'البرامج', plans:'الباقات', orders:'الطلبات', invoices:'الفواتير', invoice_receipts:'إيصالات الفواتير',
   teachers:'المدربون', questions:'بنوك الأسئلة', assignments:'الواجبات', settings:'الإعدادات', policies:'السياسات', certificates:'الشهادات',
   guardian_links:'روابط أولياء الأمور', activation_codes:'رموز التفعيل', trainer_groups:'مجموعات المدربين', notifications:'الإشعارات',
-  schedule_templates:'جداول الجلسات', schedule_exceptions:'استثناءات الجداول', profile_change_requests:'طلبات تعديل البيانات', audit:'سجل الحركات'
+  schedule_templates:'جداول الجلسات', schedule_exceptions:'استثناءات الجداول', session_breaks:'إلغاء الجلسات', break_compensations:'تعويض الجلسات الملغاة', profile_change_requests:'طلبات تعديل البيانات', audit:'سجل الحركات'
 };
 export const AUDIT_OPS = { insert:'إنشاء', update:'تعديل', delete:'حذف', export:'تصدير', purge:'تنظيف دوري' };
 export const auditSection = a => AUDIT_SECTIONS[String(a || '').split('.')[0]] || String(a || '').split('.')[0];

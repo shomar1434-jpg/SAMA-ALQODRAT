@@ -497,7 +497,7 @@ function tabSchedule(){
     <div class="card pad rv" style="margin-top:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 class="ctitle">${ic('calendar')}الاستثناءات: إجازة، أو تعويض، أو تغيير وقت</h3><button class="btn pri sm" id="exAdd">${ic('plus')} استثناء</button></div>
       ${ex.length ? `<div class="tblwrap" style="margin-top:10px"><table class="tb"><thead><tr><th>التاريخ</th><th>القسم</th><th>النوع</th><th>الوقت</th><th>ملاحظة</th><th></th></tr></thead><tbody>
         ${ex.map(x => `<tr class="${x.date < n.date ? 'muted' : ''}"><td>${fmtDate(x.date)}</td><td>${SECTIONS[x.section]}</td><td><span class="pill ${x.type === 'cancel' ? 'bad' : 'info'}">${EXC_TXT[x.type]}</span></td><td class="num">${x.type === 'cancel' ? '—' : `${t12(x.start)} – ${t12(x.end)}`}</td><td>${esc(x.note || '')}</td>
-          <td><button class="btn sm danger soft" data-xd="${x.id}" aria-label="حذف">${ic('trash')}</button></td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">لا توجد استثناءات. أضف الإجازات الرسمية والجلسات التعويضية هنا.</p>`}</div>`;
+          <td>${x.break_id ? `<a class="pill info" href="#display" title="تراجع عنه من شاشة محاضرات اليوم">إلغاء لفترة</a>` : `<button class="btn sm danger soft" data-xd="${x.id}" aria-label="حذف">${ic('trash')}</button>`}</td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">لا توجد استثناءات. أضف الإجازات الرسمية والجلسات التعويضية هنا.</p>`}</div>`;
   $$('[data-ta]').forEach(b => b.onclick = () => b.closest('form').querySelector('.tpl-rows').insertAdjacentHTML('beforeend', tplRow({ dow:4, start:'18:00', end:'20:00' })));
   body.addEventListener('click', e => { const r = e.target.closest('[data-tr]'); if(r) r.closest('.tpl-row').remove(); });
   $$('[data-tf]').forEach(f => f.onsubmit = async e => { e.preventDefault(); const rows = $$('.tpl-row', f).map(r => ({ dow:+$('select', r).value, start:$('[name=start]', r).value, end:$('[name=end]', r).value }));
@@ -516,7 +516,7 @@ function exceptionModal(){
     <div class="field"><label for="ex-type">النوع</label><select class="inp" id="ex-type" name="type">${Object.entries(EXC_TXT).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
     <div class="field ex-time"><label>الوقت</label><div style="display:flex;gap:6px"><input class="inp" type="time" name="start" value="18:00" aria-label="البداية"><input class="inp" type="time" name="end" value="20:00" aria-label="النهاية"></div></div>
     <div class="field" style="grid-column:1/-1"><label for="ex-note">ملاحظة</label><input class="inp" id="ex-note" name="note" placeholder="مثل: إجازة اليوم الوطني"></div>
-    <p class="hint" style="grid-column:1/-1;margin:0">الإلغاء لا يمدد نهاية الباقة. الجلسات الملغاة لا تُحتسب غيابًا.</p>
+    <p class="hint" style="grid-column:1/-1;margin:0">الإلغاء هنا لا يمدد نهاية الباقة، والجلسات الملغاة لا تُحتسب غيابًا. للإجازات والطوارئ مع تعويض تلقائي استخدم «إلغاء جلسات الباقات» في <a href="#display">شاشة محاضرات اليوم</a>.</p>
     <div class="errtxt" id="exE" style="grid-column:1/-1"></div>
     <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="exC">إلغاء</button><button class="btn pri">${ic('check')} حفظ</button></div></form>`);
   const sync = () => { $('.ex-time').style.display = $('#ex-type').value === 'cancel' ? 'none' : ''; }; sync(); $('#ex-type').onchange = sync;
