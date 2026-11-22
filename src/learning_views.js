@@ -12,7 +12,7 @@ import { simCard, bindSimCard, simResult } from './sim_views.js';
 import { analysisHtml, bindAnalysis } from './analysis_views.js';
 import { CATEGORIES } from './sim_logic.js';
 import { bankAttr } from './bank_media.js';
-import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen, attemptsLeft, attemptsOf, MAX_ATTEMPTS } from './learning_logic.js';
+import { assignmentsFor, SUB_TXT, RATE_ITEMS, canRate, threadFor, period, MIN_ATTEND_TO_RATE, assetUrl, KEY_ST, HW_TYPES, REVEAL, quizOpen, attemptsLeft, attemptsOf, MAX_ATTEMPTS, LETTERS } from './learning_logic.js';
 
 const STATE_TXT = { new:'جديد', draft:'قيد الحل', submitted:'مُرسل', needs_revision:'يحتاج تعديلًا', graded:'مصحح', late:'متأخر' };
 const STATE_TONE = { new:'info', draft:'o', submitted:'ok', needs_revision:'warn', graded:'ok', late:'bad' };
@@ -57,14 +57,19 @@ export function quizResultModal(a, onReview){
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" id="qrX">إغلاق</button><button class="btn pri" id="qrRev">${ic('eye')} مراجعة إجاباتي</button></div>`);
   $('#qrX').onclick = closeModal; $('#qrRev').onclick = () => { closeModal(); onReview?.(); };
 }
-/* مراجعة الإجابات: إجابتي دائمًا، والصحيحة والتفسير متى سمحت سياسة الاختبار */
+/* مراجعة الإجابات (قرار المالك 22 نوفمبر): إجابتي أخضر إن صحّت وأحمر إن أخطأت، والإجابة الصحيحة بالأزرق.
+   ما بقيت محاولة: صح/خطأ لكل سؤال فقط (marks) دون كشف الصحيح. */
+const optTxt = (q, i) => { const t = String(q.options?.[i] ?? '').trim(), L = LETTERS[i] || ''; return !t || t === L ? L : `${L}) ${t}`; };
 function reviewHtml(a){
   const sb = a.submission; if(!sb || !a.quiz) return '';
-  const rv = sb.review ? Object.fromEntries(sb.review.map(x => [x.id, x])) : null;
-  const note = rv ? '' : `<p class="hint">${attemptsLeft(a, sb) ? 'تظهر الإجابات الصحيحة بعد آخر محاولة.' : 'تظهر الإجابات الصحيحة بعد تحديث الصفحة.'}</p>`;
-  return `<details class="qrev" data-rev="${a.id}"><summary>${ic('eye')} مراجعة إجاباتي</summary>${note}<ol class="qres">${a.quiz.map(q => { const mine = sb.answers?.[q.id], c = rv?.[q.id]?.correct;
-    const cls = !rv ? (mine == null ? 'blank' : 'mine') : mine === c ? 'ok' : 'bad';
-    return `<li class="${cls}">${qStem(q)}${q.image ? '' : ''}<p>${mine == null ? '<b>لم تُجب</b>' : `<b>إجابتك:</b> ${esc(q.options[mine] ?? '')}`}${rv ? ` · <b>الصحيح:</b> ${esc(q.options[c] ?? '')}` : ''}</p>${rv?.[q.id]?.explanation ? `<p class="hint">${esc(rv[q.id].explanation)}</p>` : ''}</li>`; }).join('')}</ol></details>`;
+  const rv = sb.review ? Object.fromEntries(sb.review.map(x => [x.id, x])) : null, mk = !rv && sb.marks ? sb.marks : null;
+  const note = rv ? '' : `<p class="hint">${attemptsLeft(a, sb) ? (mk ? 'الأخضر إجابة صحيحة والأحمر خطأ. تظهر الإجابات الصحيحة بعد آخر محاولة.' : 'تظهر الإجابات الصحيحة بعد آخر محاولة.') : 'تظهر الإجابات الصحيحة بعد تحديث الصفحة.'}</p>`;
+  const legend = rv || mk ? `<div class="ans-legend"><span class="ans ok">إجابتك صحيحة</span><span class="ans bad">إجابتك خاطئة</span>${rv ? '<span class="ans key">الإجابة الصحيحة</span>' : ''}</div>` : '';
+  return `<details class="qrev" data-rev="${a.id}"><summary>${ic('eye')} مراجعة إجاباتي</summary>${note}${legend}<ol class="qres">${a.quiz.map(q => { const mine = sb.answers?.[q.id], c = rv?.[q.id]?.correct;
+    const right = rv ? (mine != null && +mine === +c) : mk ? !!mk[q.id] : null;
+    const cls = mine == null ? 'blank' : right == null ? 'mine' : right ? 'ok' : 'bad';
+    const mineChip = mine == null ? '<span class="ans blank">لم تُجب</span>' : `<span class="ans ${right == null ? 'mine' : right ? 'ok' : 'bad'}"${right == null ? '' : ` aria-label="${right ? 'صحيحة' : 'خاطئة'}"`}>${right ? ic('check') : ''}${esc(optTxt(q, mine))}</span>`;
+    return `<li class="${cls}">${qStem(q)}<p class="ans-row"><b>إجابتك:</b> ${mineChip}${rv ? ` <b>الإجابة الصحيحة:</b> <span class="ans key">${esc(optTxt(q, c))}</span>` : ''}</p>${rv?.[q.id]?.explanation ? `<p class="hint">${esc(rv[q.id].explanation)}</p>` : ''}</li>`; }).join('')}</ol></details>`;
 }
 export function studentHomework(D, tr, reload){ setBankAssets(D.bank_assets);
   const list = assignmentsFor(D, tr.id), counts = {};

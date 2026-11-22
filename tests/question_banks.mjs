@@ -78,7 +78,7 @@ await p.click(`[data-qz="${qa.id}"] button.pri`); await p.waitForTimeout(900); i
 D = await data();
 const sb = D.submissions.find(x => x.assignment_id === qa.id && x.trainee_id === st.id);
 ok(sb && sb.status === 'graded' && Math.abs(sb.score - Math.round(1 / 3 * qa.max_score * 10) / 10) < 0.01, 'تصحيح آلي فوري (1 من 3)');
-ok(/الصحيح:/.test(await text('#sBody')) && /2×2×2|3×3|10/.test(await text('#sBody')), 'مراجعة الإجابات الصحيحة بعد التسليم');
+ok(/الإجابة الصحيحة:/.test(await text('#sBody')) && /2×2×2|3×3|10/.test(await text('#sBody')), 'مراجعة الإجابات الصحيحة بعد التسليم');
 
 // ---------- قياس المستوى من بنك مدرب ----------
 await tab('data-st', 'level');

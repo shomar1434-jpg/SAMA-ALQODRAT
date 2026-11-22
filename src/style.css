@@ -1621,3 +1621,13 @@ body.sim-on{overflow:hidden}
 @media (min-width:1001px){.nh-wrap{min-height:min(76vh,760px)}}
 @media (max-width:420px){.nh-chip{font-size:12.5px;padding:8px 14px 8px 12px;min-height:44px}.nh-logos{min-height:48px}.nh-logos img{height:30px}.nh h1{font-size:30px}.nh-lead{font-size:15.5px}.nh-ctas .nh-btn{flex:1 1 auto;justify-content:center}}
 .nh-logos .lg-d{display:none!important}.nh-logos .lg-l{display:block!important}
+/* مراجعة الإجابات (قرار المالك 22 نوفمبر): أخضر صحيح، أحمر خطأ، أزرق الإجابة الصحيحة */
+.ans-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.ans{display:inline-flex;align-items:center;gap:4px;padding:2px 12px;border-radius:999px;font-weight:600;border:1.5px solid transparent;line-height:1.8}
+.ans svg{width:14px;height:14px}
+.ans.ok{background:var(--success-tint);color:var(--success-ink);border-color:var(--success)}
+.ans.bad{background:var(--danger-tint);color:var(--danger-ink);border-color:var(--danger)}
+.ans.key{background:var(--info-tint);color:var(--info-ink);border-color:var(--info)}
+.ans.mine{background:var(--surface-2,#eef3f3);color:inherit;border-color:var(--border)}
+.ans.blank{background:transparent;color:var(--muted,#667);border-color:var(--border);border-style:dashed}
+.ans-legend{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;font-size:13px}
