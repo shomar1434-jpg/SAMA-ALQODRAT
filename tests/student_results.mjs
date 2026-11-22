@@ -50,10 +50,12 @@ ok(/67٪/.test(res) && /50٪/.test(res) && /متوسط/.test(res), 'نتائجي
 const r1 = await text('[data-hwres="tq1"]');
 ok(/أجبت إجابة صحيحة عن 2 من 3/.test(r1) && /تركت 1/.test(r1), 'شرح النسبة: الصحيحة والمتروكة');
 await p.click('[data-goto="tq1"]'); await p.waitForTimeout(300);
-ok(await p.evaluate(() => document.querySelector('[data-rev="tq1"]').open) && /الصحيح/.test(await text('[data-rev="tq1"]')), 'مراجعة الإجابات مع الصحيح حين يسمح الاختبار');
+ok(await p.evaluate(() => document.querySelector('[data-rev="tq1"]').open) && /الإجابة الصحيحة/.test(await text('[data-rev="tq1"]')), 'مراجعة الإجابات مع الصحيح حين يسمح الاختبار');
 await p.click('[data-rev="tq2"] summary'); await p.waitForTimeout(200);
 const r2 = await text('[data-rev="tq2"]');
-ok(/إجابتك/.test(r2) && /الصحيح:/.test(r2), 'قرار المالك: الإجابة الصحيحة تظهر مع إجابتي دائمًا للمراجعة');
+ok(/إجابتك/.test(r2) && /الإجابة الصحيحة:/.test(r2), 'قرار المالك: الإجابة الصحيحة تظهر مع إجابتي دائمًا للمراجعة');
+ok(await p.$eval('[data-rev="tq2"]', d => !!d.querySelector('.qres .ans.key') && !!d.querySelector('.qres .ans.ok, .qres .ans.bad')
+  && getComputedStyle(d.querySelector('.qres .ans.key')).color !== getComputedStyle(d.querySelector('.qres .ans.ok, .qres .ans.bad')).color), 'قرار المالك 22 نوفمبر: إجابتي بالأخضر أو الأحمر والصحيحة بالأزرق');
 
 // الحل ثم نافذة النتيجة
 await p.click('[data-qs="tq3"]'); await p.click('#qsGo'); await p.waitForSelector('[data-qz="tq3"]');

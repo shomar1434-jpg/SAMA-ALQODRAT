@@ -60,10 +60,10 @@ await p.click(`${form} button.pri`); await p.waitForTimeout(900); if(await p.$('
 D = await data(); const sb = D.submissions.find(x => x.assignment_id === hw.id && x.trainee_id === A.id);
 ok(sb && sb.status === 'graded' && sb.review, 'يُصحَّح على الخادم وتُحفظ المراجعة');
 const after = await text('#sBody');
-ok(/الدرجة/.test(after) && /الصحيح:/.test(after) && !(await p.$(form)), 'قرار المالك: الإجابة الصحيحة مع إجابة المتدرب في المراجعة بعد التسليم، ولا يُعاد الحل');
+ok(/الدرجة/.test(after) && /الإجابة الصحيحة:/.test(after) && !(await p.$(form)), 'قرار المالك: الإجابة الصحيحة مع إجابة المتدرب في المراجعة بعد التسليم، ولا يُعاد الحل');
 await p.evaluate(id => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const a = D.assignments.find(x => x.id === id); a.publish_date = '2026-01-01'; a.due_date = '2026-01-02'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); }, hw.id);
 await p.reload(); await p.waitForTimeout(900); await tab('data-st', 'hw');
-ok(/الصحيح:/.test(await text('#sBody')), 'تظهر الإجابات بعد موعد الاستحقاق');
+ok(/الإجابة الصحيحة:/.test(await text('#sBody')), 'تظهر الإجابات بعد موعد الاستحقاق');
 
 // الإدارة تعتمد المفاتيح، فيُنشر الاختبار الرسمي
 await adminBank(); await p.click('[data-ka="كمي"]'); await p.waitForTimeout(300); await p.click('#mo'); await p.waitForTimeout(800);

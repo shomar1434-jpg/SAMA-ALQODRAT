@@ -41,6 +41,7 @@ begin
   assert sb.status = 'graded' and sb.score = a.max_score and sb.attempt_no = 1, 'المحاولة الأولى مصححة';
   pd := portal_data('student'); select y into x from jsonb_array_elements(pd->'submissions') y where y->>'id' = sb.id::text;
   assert not (x ? 'review') and (x->>'review_hidden')::boolean, 'الإجابات محجوبة ما بقيت محاولة';
+  assert (x->'marks'->>q1)::boolean and (x->'marks'->>q2)::boolean and jsonb_typeof(x->'marks'->q1) = 'boolean', 'صح/خطأ لكل سؤال دون الإجابة الصحيحة (marks)';
   -- بلا طلب صريح لا تبدأ محاولة جديدة
   r := student_start_quiz(jsonb_build_object('trainee_id', s1, 'assignment_id', a.id));
   assert (r->>'again')::boolean, 'البدء دون retry لا يفتح محاولة';

@@ -50,7 +50,9 @@ export const quizDeadline = (started_at, a) => new Date(Date.parse(started_at) +
 export const quizOpen = (sb, now = Date.now()) => !!sb && sb.status === 'draft' && !!sb.deadline && now <= Date.parse(sb.deadline) + QUIZ_GRACE_SEC * 1000;
 export const quizExpired = (sb, now = Date.now()) => !!sb && sb.status === 'draft' && !!sb.deadline && now > Date.parse(sb.deadline) + QUIZ_GRACE_SEC * 1000;   // يبقى من القائمة أبناء هذا الحساب فقط
 /* تسليم المتدرب: تُحجب المراجعة (الإجابات الصحيحة) حتى تسمح سياسة الواجب */
-export const submissionPublic = (s, a, today) => !a || a.kind !== 'quiz' || (canReveal(a, today) && !attemptsLeft(a, s)) ? s : (({ review, ...x }) => ({ ...x, review_hidden:true }))(s);
+/* صح/خطأ لكل سؤال دون كشف الصحيح (قرار المالك 22 نوفمبر) ↔ portal_data (…_review_marks.sql) */
+export const marksOf = s => Object.fromEntries((s?.review || []).map(r => [r.id, s.answers?.[r.id] != null && +s.answers[r.id] === +r.correct]));
+export const submissionPublic = (s, a, today) => !a || a.kind !== 'quiz' || (canReveal(a, today) && !attemptsLeft(a, s)) ? s : (({ review, ...x }) => ({ ...x, review_hidden:true, ...(review ? { marks:marksOf(s) } : {}) }))(s);
 /* التحقق من المستهدفين: كلهم ضمن نطاق المدرب (قسمه ومقرر الواجب باشتراك قائم) */
 export function checkTargets(D, teacher, subject, targets){
   if(targets == null) return null; if(!Array.isArray(targets) || !targets.length) throw new Error('اختر متدربًا واحدًا على الأقل'); const ids = [...new Set(targets)];
