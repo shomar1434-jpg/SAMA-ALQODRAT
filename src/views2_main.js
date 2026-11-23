@@ -405,6 +405,7 @@ export function checkinMsg(r){
       not_found:['السجل المدني غير موجود في كشف الدفعة', `لا يوجد تسجيل بهذا الرقم${r.program?` في ${cohortLabel(r)} من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
       not_in_cohort:['السجل المدني غير موجود في كشف الدفعة', `هذا الرقم غير مسجّل في ${r.number?cohortLabel(r):'الدفعات المنعقدة اليوم'}${r.program?` من «${esc(r.program)}»`:''}. تأكد من الرقم أو راجع الاستقبال.`,'bad','x'],
       no_cohort:['لا توجد دفعة منعقدة', r.upcoming?`تبدأ ${cohortLabel(r.upcoming)} من «${esc(r.program)}» في ${fmtShort(r.upcoming.start)}.`:`لا توجد دفعة منعقدة حاليًا${r.program?` في «${esc(r.program)}»`:''}.`,'warn','calendar'],
+      rate_limited:['محاولات كثيرة من هذا الجهاز','انتظر عشر دقائق ثم حاول مرة أخرى، أو راجع الاستقبال.','warn','timer'],
       order_pending:['طلبك لم يُعتمد بعد','لا يُسجَّل الحضور قبل اعتماد طلب التسجيل وتأكيد السداد. راجع إدارة المعهد أو تابع طلبك من بوابتك.','warn','timer'],
       no_program:['البرنامج غير موجود','الباركود لا يطابق أي برنامج. راجع الاستقبال.','bad','x'],
       no_session:['لا توجد محاضرة الآن', `${first}${r.next?`المحاضرة القادمة ${fmtDate(r.next.date)} الساعة ${t12(r.next.time)}.`:'لا توجد محاضرات قادمة في دفعتك.'}`,'warn','timer'],
