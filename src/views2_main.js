@@ -1,5 +1,5 @@
 import { programImg, stBadge } from './program_showcase.js';
-import { PORTAL_ART } from './portal_art.js';
+import { PORTAL_ART, PORTAL_PHOTO } from './portal_art.js';
 import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
 import { PAGE, adminBase, publicBase, portalBase } from './config.js';
@@ -484,7 +484,7 @@ export function viewPortals(){
   $('#app').innerHTML = `<section class="portals-page"><div class="wrap">
     <div class="sec-head rv portals-head"><span class="kicker">البوابات</span><h2>اختر <em>بوابتك</em></h2><p class="hint">الدخول برقم الهوية، وفي المرة الأولى برمز التفعيل من إدارة المركز.</p></div>
     <div class="portals-grid">${C.map(([k,t,who,d,c],n)=>`<a class="portal-card pc-${c} rv" style="--i:${n}" href="${portalBase(k)}">
-      <span class="pc-art">${PORTAL_ART[k]}</span><span class="pc-who">${who}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div></section>${siteFooter()}`;
+      ${PORTAL_PHOTO[k]?`<span class="pc-photo"><img src="${PORTAL_PHOTO[k]}" alt="" loading="lazy" decoding="async"></span>`:''}${PORTAL_PHOTO[k]?'':`<span class="pc-art">${PORTAL_ART[k]}</span>`}<span class="pc-who">${who}</span><b>${t}</b><span class="hint">${d}</span><span class="pl-cta">دخول ${ic('next')}</span></a>`).join('')}</div></div></section>${siteFooter()}`;
 }
 /* الباركود الموحد لكل البرامج والباقات (D-03): يُطبع ويُعلَّق في المعهد ولا يتغير */
 export async function viewQRCheckin(){

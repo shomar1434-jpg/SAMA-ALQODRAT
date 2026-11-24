@@ -14,6 +14,7 @@ import { ic, emptyBox, ringSvg, toast, statusPill, applyTheme, getTheme, setThem
 import { Store, initStore, cohortItemsOf, LEVEL_TXT, enrollmentStats, isSessionDay, cohortState } from './data2.js';
 import { setPage, publicBase } from './config.js';
 import { LOGO } from './assets/logo.js';
+import { PORTAL_PHOTO } from './portal_art.js';
 import { studentDashboard, teacherDashboard, guardianDashboard, ROLE_TXT, NOTIFY_TPL, normPhone, progressGauge, GAUGE_RED, mirrorData } from './portal_logic.js';
 import { modal, closeModal } from './views2_programs.js';
 import { setBusy, toLatin, liveSay } from './features.js';
@@ -123,7 +124,7 @@ function viewLogin(){
   const demo = Store.mode !== 'cloud';
   const mode = loginMode || (demo && !pwKnown() ? 'code' : 'pw'), forgot = mode === 'forgot', codeMode = mode !== 'pw';
   $('#app').innerHTML = `<div class="wrap"><div class="login card rv">
-    <div class="checkin" style="max-width:none"><div class="head"><img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">${ROLE === 'guardian' ? 'ادخل برقم هوية ابنك المسجّل في المعهد' : 'ادخل برقم هويتك المسجّل في المعهد'}</div></div></div>
+    <div class="checkin" style="max-width:none"><div class="head${PORTAL_PHOTO[ROLE] ? ' ph' : ''} pr-${ROLE}">${PORTAL_PHOTO[ROLE] ? `<img class="lg-photo" src="${PORTAL_PHOTO[ROLE]}" alt="">` : ''}<img src="${LOGO}" alt=""><h2>${TITLES[ROLE]}</h2><div class="hint">${ROLE === 'guardian' ? 'ادخل برقم هوية ابنك المسجّل في المعهد' : 'ادخل برقم هويتك المسجّل في المعهد'}</div></div></div>
     <form id="pl" class="grid pad" novalidate data-mode="${mode}">
       <div class="field"><label for="pl-phone">${ROLE === 'guardian' ? 'رقم هوية المتدرب (ابنك)' : 'رقم الهوية'}</label><input class="inp num" id="pl-phone" name="phone" inputmode="numeric" maxlength="10" dir="ltr" placeholder="10 أرقام" autocomplete="off"></div>
       ${codeMode ? `<p class="hint" style="margin:0" id="plModeH">${forgot ? 'نسيت كلمة المرور: اطلب من إدارة المركز «تفعيل» حسابك، ثم اكتب هويتك واضغط «رمز التحقق» فيظهر الرمز على هذا الجهاز، وبعد الدخول تختار كلمة مرور جديدة وتخرج أجهزتك الأخرى.' : 'أول دخول: بعد أن تفتح إدارة المركز «تفعيل» حسابك اضغط «رمز التحقق» فيظهر الرمز على هذا الجهاز، وبعد الدخول تختار كلمة مرورك.'}</p>

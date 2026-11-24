@@ -1720,3 +1720,20 @@ body.sim-on{overflow:hidden}
 @keyframes ppKb{from{transform:scale(1.08)}to{transform:none}}
 @media(max-width:700px){.pp-banner{aspect-ratio:16/9}}
 @media(prefers-reduced-motion:reduce){.pp-banner img{animation:none}.choice.pcard,.pc-img img{transition:none}}
+
+/* ---------- صور البوابات الواقعية (الخطوة BW) ---------- */
+.portal-card:has(.pc-photo){padding-top:0;justify-items:center;box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 2px 4px rgba(15,38,40,.06),0 22px 44px -26px rgba(15,38,40,.45)}
+.portal-card:has(.pc-photo)::before{display:none}
+.portal-card:has(.pc-photo):hover,.portal-card:has(.pc-photo):focus-visible{transform:translateY(-8px);border-color:var(--pc);box-shadow:0 0 0 1px var(--pc),0 30px 60px -26px color-mix(in srgb,var(--pc) 60%,transparent),0 12px 24px -16px rgba(15,38,40,.35)}
+.pc-photo{display:block;position:relative;width:calc(100% + 44px);margin:0 -22px 6px;aspect-ratio:4/3;overflow:hidden;background:linear-gradient(135deg,var(--pc-t),var(--surface-track))}
+.pc-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .8s var(--ease)}
+.pc-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,var(--surface-card) 0%,transparent 16%),linear-gradient(to bottom,color-mix(in srgb,var(--pc) 22%,transparent),transparent 40%)}
+.portal-card:hover .pc-photo img,.portal-card:focus-visible .pc-photo img{transform:scale(1.07)}
+.checkin .head.ph{padding-top:168px;background:var(--hero-bg)}
+.checkin .head.ph .lg-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;background:none;border-radius:0;padding:0;animation:lgKb 16s ease-out both}
+.checkin .head.ph::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,var(--hero-bg) 12%,color-mix(in srgb,var(--hero-bg) 70%,transparent) 42%,color-mix(in srgb,var(--hero-bg) 10%,transparent) 75%)}
+.checkin .head.ph img:not(.lg-photo){height:72px;box-shadow:0 12px 26px -12px rgba(0,0,0,.55)}
+@keyframes lgKb{from{transform:scale(1.08)}to{transform:none}}
+@media(prefers-reduced-motion:reduce){.pc-photo img{transition:none}.checkin .head.ph .lg-photo{animation:none}}
+@media(max-width:640px){.checkin .head.ph{padding-top:130px}}
+.login:has(.head.ph){border-radius:26px;border:1px solid var(--border);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 30px 60px -30px rgba(15,38,40,.5),0 10px 20px -14px rgba(15,38,40,.25)}
