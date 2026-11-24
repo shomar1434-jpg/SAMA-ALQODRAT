@@ -11,6 +11,8 @@ import { mountGuide } from './guide_link.js';
 import { $, makeSaudiId, riyadhNow } from './utils.js';
 
 export function boot(page){
+  // لوحة الإدارة لا تُعرض داخل إطار من موقع آخر (منع الخداع بالنقر؛ GitHub Pages لا يرسل ترويسة X-Frame-Options)
+  if(page === 'admin' && window.top !== window.self){ document.body.innerHTML = '<p style="padding:24px;font:16px sans-serif">لا يمكن فتح لوحة الإدارة داخل موقع آخر. افتحها مباشرة من رابطها.</p>'; return; }
   setPage(page);
   initStore();
   // وضع البيانات التجريبية فقط: واجهة للاختبارات الآلية. لا تُعرض عند الاتصال بقاعدة البيانات.

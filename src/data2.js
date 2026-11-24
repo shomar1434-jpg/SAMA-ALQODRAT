@@ -406,6 +406,11 @@ export const LocalStore = {
   async todayCode(){ return this.dayCode(riyadhNow().date); },
   async checkin(nid, code, programCode, opts={}){
     this.autoArchive(); const D=this.data;
+    // ↔ checkin: حد المحاولات الفاشلة لكل جهاز (15 في 10 دقائق)؛ في الوضع التجريبي بمفتاح الاختبار فقط
+    let lim=false; try{ lim=localStorage.getItem('sama_checkin_limit')==='1'; }catch(_){}
+    if(lim && opts.device){ const since=Date.now()-600000;
+      if((D.checkin_attempts||[]).filter(a=>a.device===opts.device && Date.parse(a.at)>since && !['ok','already'].includes(a.result)).length>=15){
+        D.checkin_attempts.push(attemptRecord(nid, opts.device, {ok:false, reason:'rate_limited'})); this.save(); return {ok:false, reason:'rate_limited'}; } }
     let r = unifiedCheckin(D, nid, code, programCode, this.dayCode(riyadhNow().date), opts.choice);
     if(r._rec && attendanceBlocked(D, r._sub ? {subscription_id:r._sub} : {enrollment_id:r._rec.enrollment_id})) r = {ok:false, reason:'order_pending'};   // خيار الإدارة: لا حضور قبل اعتماد الطلب وتأكيد السداد
     if(r._rec){
@@ -415,6 +420,7 @@ export const LocalStore = {
     if(r.reason!=='choose'){ D.checkin_attempts.push(attemptRecord(nid, opts.device, r)); if(D.checkin_attempts.length>5000) D.checkin_attempts.splice(0, D.checkin_attempts.length-5000); }
     this.save(); delete r._rec; delete r._sub; delete r._start; delete r._trainee;
     if(!r.ok) delete r.name;   // ↔ checkin: رفض التحضير لا يكشف اسم صاحب الهوية (الخطوة BN)
+    else if(r.name) r.name=String(r.name).trim().split(/\s+/)[0];   // والنجاح بالاسم الأول فقط (الخطوة BT)
     return r;
   },
   async isAdmin(){ return this.admin; },
