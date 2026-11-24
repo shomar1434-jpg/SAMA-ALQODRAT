@@ -32,3 +32,7 @@ export const PORTAL_ART = {
     ${bust('pt', 34, 64, 1, 'bl')}
     <path d="M48 70 66 46" stroke="url(#ptgd)" stroke-width="4" stroke-linecap="round"/><circle cx="66" cy="46" r="3.5" fill="#D99A1E"/></svg>`,
 };
+
+/* صور واقعية للبوابات الثلاث (الخطوة BW، طلب المالك 24 نوفمبر): قاعة التدريب للمتدرب، ومكتب المدرب، والأب والأم لولي الأمر */
+const PHOTO = import.meta.glob('./assets/portals/*.webp', { eager:true, query:'?url', import:'default' });
+export const PORTAL_PHOTO = { student:PHOTO['./assets/portals/student.webp'] || '', teacher:PHOTO['./assets/portals/teacher.webp'] || '', guardian:PHOTO['./assets/portals/guardian.webp'] || '' };

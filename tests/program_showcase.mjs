@@ -71,6 +71,19 @@ for (const [w, h, tag] of [[1280, 900, 'حاسب'], [360, 780, 'جوال']]) {
   if (SHOTS) await p.screenshot({ path: `${SHOTS}/program_1280.png` });
   await p.close();
 }
+// الخطوة BW: صور البوابات في صفحة «البوابات» وشاشات الدخول
+{
+  const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  p.on('pageerror', e => errs.push(e.message));
+  await p.goto(U + '#portals'); await p.waitForSelector('.pc-photo img'); await p.waitForTimeout(800);
+  const ph = await p.$$eval('.portal-card .pc-photo img', l => l.map(i => i.complete && i.naturalWidth > 0));
+  ok(ph.length === 3 && ph.every(Boolean), 'صفحة البوابات: صورة واقعية محمّلة لكل بوابة');
+  for (const r of ['student', 'teacher', 'guardian']) {
+    await p.goto(U + r + '/'); await p.waitForSelector('#pl-phone'); await p.waitForTimeout(500);
+    ok(await p.$eval('.checkin .head.ph .lg-photo', i => i.complete && i.naturalWidth > 0).catch(() => false), `شاشة دخول ${r}: صورتها في الرأس`);
+  }
+  await p.close();
+}
 ok(!errs.length, 'لا أخطاء في الصفحة' + (errs.length ? ': ' + errs.join(' | ') : ''));
 await b.close(); server.close();
 if (failed()) process.exit(1);
