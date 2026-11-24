@@ -67,7 +67,7 @@ export function bindShowcase(programs, root = document){
   if(!sec || !stage) return;
   if(SC.run) SC.run.stop();
   const ALL = showcaseOrder(programs);
-  let list = [], idx = 0, geo = null, hold = 0, timer = null, ro = null, alive = true;
+  let list = [], idx = 0, geo = null, hold = 0, timer = null, ro = null, io = null, alive = true, near = false;
   const els = new Map();
   const RM = () => prefersReduced();
 
@@ -104,15 +104,18 @@ export function bindShowcase(programs, root = document){
       } };
     }
     stage.style.setProperty('--cw', geo.cw + 'px');
-    place(false, 0);
+    if(near) place(false, 0);
   }
 
-  function make(p){
+  function make(p, hi){
     const el = document.createElement('button');
     el.type = 'button'; el.className = 'ps-card still'; el.tabIndex = -1; el.dataset.code = progCode(p);
     const src = programImg(p);
-    el.innerHTML = (src ? `<img alt="" decoding="async" src="${esc(src)}">` : `<span class="ps-ph">${ic('book')}</span>`) + `<span class="ps-tag">${esc(ST_TXT[showcaseState(p)] || p.category || '')}</span>`;
+    /* صورة الوسط أولًا، والطابور بأولوية منخفضة، وتظهر بتلاشٍ بعد اكتمالها */
+    el.innerHTML = (src ? `<img alt="" decoding="async" fetchpriority="${hi ? 'high' : 'low'}" src="${esc(src)}">` : `<span class="ps-ph">${ic('book')}</span>`) + `<span class="ps-tag">${esc(ST_TXT[showcaseState(p)] || p.category || '')}</span>`;
     el.setAttribute('aria-label', p.name);
+    const im = el.querySelector('img');
+    if(im){ const done = () => el.classList.add('ld'); if(im.complete && im.naturalWidth) done(); else { im.addEventListener('load', done, { once:true }); im.addEventListener('error', done, { once:true }); } }
     stage.appendChild(el);
     return el;
   }
@@ -132,7 +135,7 @@ export function bindShowcase(programs, root = document){
   const OFFS = [0, 1, 2, 3, 4, 5, -1, 6];
   const at = o => list[((idx + o) % list.length + list.length) % list.length];
   function place(animate, dir){
-    if(!geo || !list.length) return;
+    if(!geo || !list.length || !near) return;
     const want = new Map();
     for(const o of OFFS){ const p = at(o); const c = progCode(p); if(!want.has(c)) want.set(c, { o, p }); }
     for(const [code, el] of els){
@@ -142,7 +145,7 @@ export function bindShowcase(programs, root = document){
     }
     for(const [code, { o, p }] of want){
       let el = els.get(code);
-      if(!el){ el = make(p); els.set(code, el); setSlot(el, dir < 0 && o === 0 ? -1 : (o >= 5 ? 7 : o)); el.getBoundingClientRect(); el.classList.remove('still'); }
+      if(!el){ el = make(p, o === 0); els.set(code, el); setSlot(el, dir < 0 && o === 0 ? -1 : (o >= 5 ? 7 : o)); el.getBoundingClientRect(); el.classList.remove('still'); }
       if(!animate || RM()){ el.classList.add('still'); setSlot(el, o); el.getBoundingClientRect(); el.classList.remove('still'); }
       else setSlot(el, o, dir < 0 && o === -1);
     }
@@ -185,7 +188,7 @@ export function bindShowcase(programs, root = document){
   sec.addEventListener('pointermove', e => { if(e.pointerType === 'mouse') pause(3000); });
   sec.addEventListener('focusin', () => pause(9000));
 
-  function stop(){ alive = false; clearInterval(timer); ro?.disconnect(); }
+  function stop(){ alive = false; clearInterval(timer); ro?.disconnect(); io?.disconnect(); }
   SC.run = { stop };
   let rt; ro = new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(layout, 80); }); ro.observe(stage);
   timer = setInterval(() => {
@@ -196,4 +199,8 @@ export function bindShowcase(programs, root = document){
     go(1);
   }, 5200);
   setCat(SC.cat, true);
+  /* الصور لا تُطلب إلا حين يقترب القسم (شاشة واحدة قبل الوصول إليه)، فلا يبطئ أعلى الرئيسية */
+  const wake = () => { if(near) return; near = true; io?.disconnect(); io = null; layout(); };
+  if('IntersectionObserver' in window){ io = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) wake(); }, { rootMargin:'100% 0px 100% 0px' }); io.observe(sec); }
+  else wake();
 }

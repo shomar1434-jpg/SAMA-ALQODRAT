@@ -1669,12 +1669,13 @@ body.sim-on{overflow:hidden}
 .ps-next i{font-style:normal;color:var(--ink-subtle);font-size:12px;min-width:22px}
 .ps-rise{animation:psRise .7s var(--ease) both;animation-delay:var(--d,0ms)}
 @keyframes psRise{from{opacity:0;transform:translateY(14px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
-.ps-stage{position:relative;height:var(--sh,440px);overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.ps-stage{position:relative;height:var(--sh,440px);border-radius:20px;overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .ps-floor{position:absolute;inset-inline:0;bottom:12px;height:1px;background:linear-gradient(to left,var(--border),transparent)}
-.ps-card{all:unset;box-sizing:border-box;position:absolute;top:0;left:0;width:var(--cw);aspect-ratio:830/464;border-radius:20px;overflow:hidden;cursor:pointer;transform-origin:0 0;background:var(--surface-track);box-shadow:0 30px 60px -28px rgba(6,26,28,.5),0 0 0 1px rgba(255,255,255,.06) inset;transition:transform .95s cubic-bezier(.22,1,.36,1),filter .95s ease,opacity .8s ease;will-change:transform}
+.ps-card{all:unset;box-sizing:border-box;position:absolute;top:0;left:0;width:var(--cw);aspect-ratio:830/464;border-radius:20px;overflow:hidden;cursor:pointer;transform-origin:0 0;background:linear-gradient(135deg,var(--brand-tint),var(--surface-track));box-shadow:0 30px 60px -28px rgba(6,26,28,.5),0 0 0 1px rgba(255,255,255,.06) inset;transition:transform .95s cubic-bezier(.22,1,.36,1),filter .95s ease,opacity .8s ease;will-change:transform}
 .ps-card.fast{transition-duration:.55s,.55s,.45s}
 .ps-card.still{transition:none}
-.ps-card img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.ps-card img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;opacity:0;transition:opacity .5s ease}
+.ps-card.ld img{opacity:1}
 .ps-card:focus-visible{outline:3px solid var(--brand);outline-offset:3px}
 .ps-ph{display:grid;place-items:center;width:100%;height:100%;background:linear-gradient(135deg,var(--brand),var(--brand-strong));color:var(--on-brand)}.ps-ph .ic{width:56px;height:56px;opacity:.7}
 .ps-tag{position:absolute;inset-inline-start:14px;bottom:12px;background:rgba(6,20,21,.62);color:#fff;font-size:13px;padding:4px 12px;border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .5s}
