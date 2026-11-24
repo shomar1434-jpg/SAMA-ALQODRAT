@@ -11,8 +11,10 @@ const text = async (p, s) => ((await p.textContent(s).catch(() => '')) || '').tr
 for (const [w, h, tag] of [[1280, 900, 'حاسب'], [360, 780, 'جوال']]) {
   const p = await (await b.newContext({ viewport: { width: w, height: h } })).newPage();
   p.on('pageerror', e => errs.push(e.message));
-  await p.goto(U); await p.waitForSelector('#progShow .ps-card.hero');
-  await p.$eval('#progShow', el => el.scrollIntoView()); await p.waitForTimeout(900);
+  await p.goto(U); await p.waitForSelector('#progShow #psInfo .ps-name');
+  ok(!(await p.$('#progShow .ps-card')), `${tag}: لا تُطلب صور العرض قبل الاقتراب من القسم`);
+  await p.$eval('#progShow', el => el.scrollIntoView()); await p.waitForSelector('#progShow .ps-card.hero.ld'); await p.waitForTimeout(900);
+  ok(await p.getAttribute('#progShow .ps-card.hero img', 'fetchpriority') === 'high', `${tag}: صورة الوسط بأولوية عالية`);
   if (SHOTS) await p.screenshot({ path: `${SHOTS}/home_${w}.png` });
   const n = await p.evaluate(() => document.querySelectorAll('#progShow .ps-card').length);
   ok(n >= 6 && n <= 9, `${tag}: المنصة تعرض نافذة محدودة من البطاقات (${n}) لا البرامج كلها`);
@@ -44,7 +46,7 @@ for (const [w, h, tag] of [[1280, 900, 'حاسب'], [360, 780, 'جوال']]) {
     ok(/^#p\w+$|^#enroll-p-/.test(href || ''), 'زر التفاصيل أو التسجيل يشير إلى صفحة البرنامج أو نموذجه');
     // الحالة من «العرض في الرئيسية»: المنشور للتسجيل أولًا بشارة «متاحة الآن»
     await p.evaluate(() => { const D = JSON.parse(localStorage.getItem('sama_qudrat_v4')); const pr = D.programs[40]; pr.publish_state = 'coming_soon'; pr.expected_start = '2027-02-01'; localStorage.setItem('sama_qudrat_v4', JSON.stringify(D)); });
-    await p.reload(); await p.waitForSelector('#progShow .ps-card.hero'); await p.click('[data-psc="الكل"]'); await p.waitForTimeout(600);
+    await p.reload(); await p.waitForSelector('#progShow #psInfo'); await p.$eval('#progShow', el => el.scrollIntoView()); await p.waitForSelector('#progShow .ps-card.hero'); await p.click('[data-psc="الكل"]'); await p.waitForTimeout(600);
     let seen = [], st = '';
     for (let i = 0; i < 30; i++) { st = await text(p, '#psInfo .ps-st'); if (/قريبًا/.test(st)) break; seen.push(st); await p.click('#psNext'); await p.waitForTimeout(150); }
     await p.waitForTimeout(900);
