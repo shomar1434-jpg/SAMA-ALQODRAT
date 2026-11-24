@@ -1,3 +1,4 @@
+import { programImg, stBadge } from './program_showcase.js';
 import { PORTAL_ART } from './portal_art.js';
 import { LOGO } from './assets/logo.js';
 import { CATEGORIES, CAT_ICON, CENTER, catPill } from './catalog.js';
@@ -143,13 +144,15 @@ export async function viewCatalog(){
 }
 export function programCard(p, i){
   const c=p.cohort, st=cohortPublicState(c), left=c?c.seats-(c.taken||0):0, pc=c?Math.min(100,Math.round((c.taken||0)/c.seats*100)):0;
-  return `<a class="choice rv" href="#${p.code}" style="--i:${Math.min(i,12)};text-decoration:none;color:inherit">
+  const img = programImg(p);
+  return `<a class="choice pcard rv" href="#${p.code}" style="--i:${Math.min(i,12)};text-decoration:none;color:inherit">
+    ${img?`<div class="pc-img"><img loading="lazy" decoding="async" alt="" src="${esc(img)}">${stBadge(p)}</div>`:''}<div class="pc-body">
     <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill dot ${catPill(p.category)}">${esc(p.category)}</span><span class="pill dot ${st.pill}">${st.txt}</span></div>
     <h3>${esc(p.name)}</h3>
     <div class="meta"><span>${ic('hourglass')}${hoursTxt(p.hours)}</span><span>${ic('calendar')}${daysTxt(p.duration_days)}</span>${p.accreditation_no?`<span>${ic('award')}اعتماد ${esc(p.accreditation_no)}</span>`:''}</div>
     ${c?`<div class="meta"><span>${ic('calendar')}${fmtShort(c.start_date)} – ${fmtShort(c.end_date)}</span><span>${ic('clock')}${t12(c.start_time)}</span></div>`:'<div class="hint">يُعلن عن الدفعة القادمة قريبًا.</div>'}
     <div class="price ${priceTxt(p.price)==='السعر عند التواصل'?'tbd':''}" style="margin-top:auto">${priceTxt(p.price)}</div>
-    ${st.k==='open'?`<div class="bar"><i class="${pc>80?'hot':''}" style="width:${pc}%"></i></div><div class="hint" style="display:flex;justify-content:space-between"><span>متبقٍ ${fmtNum(left)} مقعد</span><span style="color:var(--brand);font-weight:500">التسجيل ${ic('next')}</span></div>`:`<div class="hint" style="text-align:left;color:var(--brand);font-weight:500">${st.k==='running'?'صفحة البرنامج':'تسجيل مبدئي'} ${ic('next')}</div>`}</a>`;
+    ${st.k==='open'?`<div class="bar"><i class="${pc>80?'hot':''}" style="width:${pc}%"></i></div><div class="hint" style="display:flex;justify-content:space-between"><span>متبقٍ ${fmtNum(left)} مقعد</span><span style="color:var(--brand);font-weight:500">التسجيل ${ic('next')}</span></div>`:`<div class="hint" style="text-align:left;color:var(--brand);font-weight:500">${st.k==='running'?'صفحة البرنامج':'تسجيل مبدئي'} ${ic('next')}</div>`}</div></a>`;
 }
 export function renderCatalogCards(){
   const {programs, packages} = cat.data; const box=$('#choices'); if(!box) return;
@@ -438,7 +441,9 @@ export async function viewProgramPage(code, tab){
   if(!p){ app.innerHTML=`<div class="wrap">${emptyBox('البرنامج غير موجود','تحقق من الرابط أو الباركود.')}<div style="text-align:center;margin-top:14px"><a class="btn pri" href="#register">${ic('book')} دليل البرامج</a></div></div>${siteFooter()}`; return; }
   const c=p.cohort, today=riyadhNow().date, ps=cohortPublicState(c,today), sessionToday = c && isSessionDay(c,today);
   tab = tab || (sessionToday || (c && c.start_date<=today && !c.reg_open) ? 'att' : 'reg');
+  const banner = programImg(p);
   app.innerHTML = `<div class="wrap">
+    ${banner?`<div class="pp-banner rv"><img alt="" src="${esc(banner)}"></div>`:''}
     <section class="hero rv" style="align-items:flex-start"><div class="logo"><img src="${LOGO}" alt="" style="height:96px"></div><div style="flex:1;min-width:0">
       <span class="hero-pill">${ic(CAT_ICON[p.category]||'book')}${esc(p.category)}${p.accreditation_no?` · رقم الاعتماد ${esc(p.accreditation_no)}`:''}</span>
       <h1>${esc(p.name)}</h1>

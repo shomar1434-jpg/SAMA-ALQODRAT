@@ -1,13 +1,14 @@
-import { CAT_ICON, CAT_TONE, CENTER, KIDS_PROGRAMS, KIDS_ACCREDITATION } from './catalog.js';
+import { CENTER, KIDS_PROGRAMS, KIDS_ACCREDITATION } from './catalog.js';
 import { Store } from './data2.js';
 import { LOGOS } from './logos.js';
 import { logoPair } from './logo_dark.js';
 import { DEFAULT_ABOUT, aboutSectionHtml, initPartnerMarquee, partnersSectionHtml } from './partners.js';
 import { $, $$, esc, fmtNum } from './utils.js';
 import { countUp, ic, reduceMotion } from './views2_head.js';
-import { cat, catSort, cohortPublicState } from './views2_main.js';
+import { catSort } from './views2_main.js';
 import { plansSectionHtml, initPlansMarquee } from './qudurat_views.js';
 import { coursesSectionHtml, bindCourses } from './courses.js';
+import { showcaseSectionHtml, bindShowcase } from './program_showcase.js';
 
 /* =====================================================================
    الصفحات الافتتاحية — مستوحاة من صفحتي الغلاف والرؤية في دليل برامج المركز
@@ -117,7 +118,7 @@ export function viewContact(){
 export async function viewHome(){
   const app=$('#app');
   let data={programs:[],packages:[]}, site={about:DEFAULT_ABOUT, partners:[]}, pl={plans:[]}; try{ [data, site, pl] = await Promise.all([Store.catalog(), Store.publicSite().catch(()=>site), Store.publicPlans().catch(()=>pl)]); }catch(e){}
-  const P=data.programs, open=P.filter(p=>cohortPublicState(p.cohort).k==='open'), cats=[...new Set(P.map(p=>p.category))].sort(catSort);
+  const P=data.programs, cats=[...new Set(P.map(p=>p.category))].sort(catSort);
   const hours=P.reduce((s,p)=>s+(p.hours||0),0);
   app.innerHTML = `<div class="home">
     <section class="nh">
@@ -159,11 +160,7 @@ export async function viewHome(){
       </div>
     </section>
 
-    <section class="domains">
-      <div class="sec-head" data-reveal><span class="kicker">مجالاتنا</span><h2>${fmtNum(cats.length)} مجالات تدريبية <em>معتمدة</em></h2></div>
-      <div class="dom-grid">${cats.map((c,i)=>{ const n=P.filter(p=>p.category===c).length, o=P.filter(p=>p.category===c&&cohortPublicState(p.cohort).k==='open').length;
-        return `<button class="dom t-${CAT_TONE[c]==='brand'?'info':CAT_TONE[c]||'info'}" data-cat="${esc(c)}" data-reveal style="--i:${i}"><span class="kic-lg">${ic(CAT_ICON[c]||'book')}</span><b>${esc(c)}</b><span>${fmtNum(n)} برنامج${o?` · <em>${fmtNum(o)} مفتوح</em>`:''}</span><i class="go">${ic('next')}</i></button>`; }).join('')}</div>
-    </section>
+    ${showcaseSectionHtml(P)}
 
     ${plansSectionHtml(pl.plans)}
 
@@ -181,8 +178,8 @@ export async function viewHome(){
     </section>
     ${siteFooter()}
   </div>`;
-  $$('.dom').forEach(b=>b.onclick=()=>{ cat.kind='program'; cat.cf=b.dataset.cat; location.hash='#register'; });
   bindCourses(app);
+  bindShowcase(P, app);
   { const imgs = { M: app.querySelector('#nhM'), F: app.querySelector('#nhF') }, bs = [...app.querySelectorAll('.nh-seg button')], sec = app.querySelector('#nhSec');
     if (imgs.M && imgs.F) {
       const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
